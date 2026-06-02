@@ -36,7 +36,7 @@ function MonthDropdown({ month, setMonth }: { month: string; setMonth: (m: strin
   // After a keyboard-triggered scroll, ignore mouseEnter briefly so the list
   // scrolling under the pointer doesn't hijack the cursor position.
   const suppressMouse  = useRef(false);
-  const suppressTimer  = useRef<number>();
+  const suppressTimer  = useRef<number | undefined>(undefined);
 
   function scrollToIdx(idx: number, behavior: ScrollBehavior = "auto") {
     itemRefs.current[idx]?.scrollIntoView({ block: "nearest", behavior });
@@ -804,7 +804,7 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
       {tile === null ? (
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
           {/* Expense tiles with budget tracking */}
-          {(["essential", "flexible", "daily"] as Section[]).map((sec) => (
+          {(["essential", "flexible", "daily"] as const).map((sec) => (
             <TileCard
               key={sec}
               meta={META[sec]}

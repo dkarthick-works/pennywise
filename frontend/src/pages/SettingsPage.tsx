@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSettings, updateBudgets, updatePreferences, putTemplates } from "../api/ledger";
 import { inr } from "../lib/money";
 import { IconPlus, IconX } from "../components/ui/Icons";
-import type { Budgets, Settings } from "../types";
+import type { Budgets } from "../types";
 
 function Row({ label, sub, children }: { label: string; sub?: string; children: React.ReactNode }) {
   return (
