@@ -1,0 +1,18 @@
+.env
+.DS_Store
+.claude
+.idea
+.vscode
+.opencode
+.thumbnail
+.AGENTS.md
+.CLAUDE.md
+.claude_history
+.claude_history.json
+Ledger PRD (standalone).html
+
+/frontend/node_modules
+/backend/web/dist
+
+/graphify-out
+/project

@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS settlement_links;
+DROP TABLE IF EXISTS month_state;
+DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS templates;
+DROP TABLE IF EXISTS user_settings;
+DROP TABLE IF EXISTS users;
+DROP TYPE IF EXISTS txn_kind;
+DROP TYPE IF EXISTS section;

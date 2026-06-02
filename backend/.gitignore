@@ -1,0 +1,5 @@
+.env
+/server
+/seed
+/token
+*.log
