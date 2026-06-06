@@ -24,7 +24,7 @@ func main() {
 	ctx := context.Background()
 
 	log.Println("running migrations…")
-	if err := database.Migrate(cfg.DatabaseURL); err != nil {
+	if err := database.Migrate(ctx, cfg.DatabaseURL); err != nil {
 		log.Fatalf("migrate: %v", err)
 	}
 

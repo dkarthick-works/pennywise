@@ -30,7 +30,7 @@ func main() {
 
 	cfg := config.Load()
 	ctx := context.Background()
-	if err := database.Migrate(cfg.DatabaseURL); err != nil {
+	if err := database.Migrate(ctx, cfg.DatabaseURL); err != nil {
 		log.Fatalf("migrate: %v", err)
 	}
 	pool, err := database.Connect(ctx, cfg.DatabaseURL)
