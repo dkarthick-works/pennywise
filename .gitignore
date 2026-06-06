@@ -13,6 +13,7 @@ Ledger PRD (standalone).html
 
 /frontend/node_modules
 /backend/web/dist
+/backend/healthcheck
 
 /graphify-out
 /project
