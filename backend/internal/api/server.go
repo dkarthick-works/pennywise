@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"mime"
 	"net/http"
 	"strings"
 
@@ -144,6 +145,12 @@ func readJSON(r *http.Request, dst any) error {
 		return errors.New("invalid request body")
 	}
 	return nil
+}
+
+func init() {
+	// Go does not register the PWA manifest extension by default; without this
+	// the service worker manifest is served as a sniffed type.
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 }
 
 func spaHandler(fsys fs.FS) http.Handler {
