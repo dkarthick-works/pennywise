@@ -26,7 +26,12 @@ function settleShort(row: Transaction): string {
 
 export function StatusCell({ row, section, month, settledSet }: Props) {
   const [open, setOpen] = useState(false);
-  const [dropPos, setDropPos] = useState({ top: 0, left: 0 });
+  const [dropPos, setDropPos] = useState<{
+    top: number | undefined;
+    bottom: number | undefined;
+    left: number;
+    maxHeight: number;
+  }>({ top: 0, bottom: undefined, left: 0, maxHeight: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const qc = useQueryClient();
   const kind = row.kind;
@@ -43,13 +48,23 @@ export function StatusCell({ row, section, month, settledSet }: Props) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["open-month", month] }),
   });
 
+  // Position below the chip when there's room; flip above when there isn't.
+  // Always cap maxHeight to the available space so the card fits + scrolls.
+  function computePos() {
+    const rect = triggerRef.current!.getBoundingClientRect();
+    const margin = 8, gap = 6, dropWidth = 268;
+    const left = Math.min(rect.left, window.innerWidth - dropWidth - margin);
+    const spaceBelow = window.innerHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    if (spaceBelow >= spaceAbove) {
+      return { left, top: rect.bottom + gap, bottom: undefined, maxHeight: spaceBelow - gap };
+    }
+    return { left, top: undefined, bottom: window.innerHeight - rect.top + gap, maxHeight: spaceAbove - gap };
+  }
+
   function openDropdown() {
     if (!triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    // Position below the chip; clamp right-edge so it stays inside the viewport.
-    const dropWidth = 268;
-    const left = Math.min(rect.left, window.innerWidth - dropWidth - 8);
-    setDropPos({ top: rect.bottom + 6, left });
+    setDropPos(computePos());
     setOpen(true);
   }
 
@@ -58,10 +73,7 @@ export function StatusCell({ row, section, month, settledSet }: Props) {
     if (!open) return;
     function onScroll() {
       if (!triggerRef.current) return;
-      const rect = triggerRef.current.getBoundingClientRect();
-      const dropWidth = 268;
-      const left = Math.min(rect.left, window.innerWidth - dropWidth - 8);
-      setDropPos({ top: rect.bottom + 6, left });
+      setDropPos(computePos());
     }
     window.addEventListener("scroll", onScroll, true);
     return () => window.removeEventListener("scroll", onScroll, true);
@@ -113,7 +125,10 @@ export function StatusCell({ row, section, month, settledSet }: Props) {
             style={{
               position: "fixed",
               top: dropPos.top,
+              bottom: dropPos.bottom,
               left: dropPos.left,
+              maxHeight: dropPos.maxHeight,
+              overflowY: "auto",
               zIndex: 31,
               width: 268,
               boxShadow: "var(--sh-lg)",
