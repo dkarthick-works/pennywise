@@ -38,7 +38,7 @@ export function AuthPage() {
         setServerErr("Account created — check your email to verify, then sign in.");
       } else {
         await login({ email: email.trim(), password: pw });
-        navigate("/dashboard");
+        navigate("/record");
       }
     } catch (err: unknown) {
       const msg =

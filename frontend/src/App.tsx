@@ -23,7 +23,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<AuthPage />} />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<Navigate to="/record" replace />} />
 
       <Route
         path="/*"
@@ -35,7 +35,7 @@ export default function App() {
                 <Route path="/record"    element={<RecordPage month={month} setMonth={setMonth} />} />
                 <Route path="/settings"  element={<SettingsPage />} />
                 <Route path="/profile"   element={<ProfilePage />} />
-                <Route path="*"          element={<Navigate to="/dashboard" replace />} />
+                <Route path="*"          element={<Navigate to="/record" replace />} />
               </Routes>
             </AppShell>
           </RequireAuth>
