@@ -10,3 +10,14 @@ Rules:
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+
+## app-story
+
+Product changelog and design decisions live in `frontend/app-story/` (gitignored — local only).
+
+When the user asks to update app-story, or after shipping a user-facing feature, invoke the `skill` tool with `skill: "app-story"` and follow it.
+
+Rules:
+- Append one user-facing line to `frontend/app-story/stories.md` per shipped change.
+- Append to `frontend/app-story/decisions.md` only when a non-obvious design choice was made (formula, defaults, UI hierarchy, data source).
+- Never rewrite existing entries unless the user asks to fix one.
