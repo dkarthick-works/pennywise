@@ -15,6 +15,16 @@ SELECT * FROM transactions
 WHERE user_id = $1 AND to_char(txn_date, 'YYYY') = sqlc.arg(year)::text
 ORDER BY txn_date, created_at;
 
+-- name: SumEssentialSpendByMonths :many
+SELECT to_char(txn_date, 'YYYY-MM') AS month,
+       COALESCE(SUM(amount), 0)::numeric AS total
+FROM transactions
+WHERE user_id = $1
+  AND section = 'essential'
+  AND kind <> 'settlement'
+  AND to_char(txn_date, 'YYYY-MM') = ANY($2::text[])
+GROUP BY 1;
+
 -- name: GetTransaction :one
 SELECT * FROM transactions
 WHERE id = $1 AND user_id = $2;

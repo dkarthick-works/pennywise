@@ -74,3 +74,27 @@ type ProfileDTO struct {
 	Email       string `json:"email"`
 	DisplayName string `json:"display_name"`
 }
+
+type MonthEssentialTotalDTO struct {
+	Month  string  `json:"month"`
+	Amount float64 `json:"amount"`
+}
+
+type EmergencyFundTierDTO struct {
+	Multiplier int     `json:"multiplier"`
+	Amount     float64 `json:"amount"`
+}
+
+type EmergencyFundTiersDTO struct {
+	Bare    EmergencyFundTierDTO `json:"bare"`
+	Comfort EmergencyFundTierDTO `json:"comfort"`
+	Luxury  EmergencyFundTierDTO `json:"luxury"`
+}
+
+type InsightsDTO struct {
+	SeedAmount     float64                  `json:"seed_amount"`
+	SeedMonth      string                   `json:"seed_month"`
+	LookbackMonths []string                 `json:"lookback_months"`
+	MonthlyTotals  []MonthEssentialTotalDTO `json:"monthly_totals"`
+	EmergencyFund  EmergencyFundTiersDTO    `json:"emergency_fund"`
+}

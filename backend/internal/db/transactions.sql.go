@@ -474,6 +474,47 @@ func (q *Queries) SettledCreditIdsByMonth(ctx context.Context, arg SettledCredit
 	return items, nil
 }
 
+const sumEssentialSpendByMonths = `-- name: SumEssentialSpendByMonths :many
+SELECT to_char(txn_date, 'YYYY-MM') AS month,
+       COALESCE(SUM(amount), 0)::numeric AS total
+FROM transactions
+WHERE user_id = $1
+  AND section = 'essential'
+  AND kind <> 'settlement'
+  AND to_char(txn_date, 'YYYY-MM') = ANY($2::text[])
+GROUP BY 1
+`
+
+type SumEssentialSpendByMonthsParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	Column2 []string  `json:"column_2"`
+}
+
+type SumEssentialSpendByMonthsRow struct {
+	Month string         `json:"month"`
+	Total pgtype.Numeric `json:"total"`
+}
+
+func (q *Queries) SumEssentialSpendByMonths(ctx context.Context, arg SumEssentialSpendByMonthsParams) ([]SumEssentialSpendByMonthsRow, error) {
+	rows, err := q.db.Query(ctx, sumEssentialSpendByMonths, arg.UserID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SumEssentialSpendByMonthsRow
+	for rows.Next() {
+		var i SumEssentialSpendByMonthsRow
+		if err := rows.Scan(&i.Month, &i.Total); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateTransaction = `-- name: UpdateTransaction :one
 UPDATE transactions
 SET section    = $3,

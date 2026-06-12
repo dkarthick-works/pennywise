@@ -7,6 +7,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { RecordPage }    from "./pages/RecordPage";
 import { SettingsPage }  from "./pages/SettingsPage";
 import { ProfilePage }   from "./pages/ProfilePage";
+import { InsightsPage }  from "./pages/InsightsPage";
 import { currentMonth }  from "./lib/dates";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -33,6 +34,7 @@ export default function App() {
               <Routes>
                 <Route path="/dashboard" element={<DashboardPage month={month} setMonth={setMonth} />} />
                 <Route path="/record"    element={<RecordPage month={month} setMonth={setMonth} />} />
+                <Route path="/insights"  element={<InsightsPage />} />
                 <Route path="/settings"  element={<SettingsPage />} />
                 <Route path="/profile"   element={<ProfilePage />} />
                 <Route path="*"          element={<Navigate to="/record" replace />} />

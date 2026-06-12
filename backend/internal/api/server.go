@@ -86,6 +86,7 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/sections/{section}/open-credits", s.handleOpenCredits)
 		pr.Get("/api/daily-suggestions", s.handleDailySuggestions)
 		pr.Get("/api/income-suggestions", s.handleIncomeSuggestions)
+		pr.Get("/api/insights", s.handleGetInsights)
 
 		pr.Get("/api/months/{month}", s.handleGetMonth)
 		pr.Put("/api/months/{month}/closed", s.handleSetMonthClosed)

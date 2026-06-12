@@ -96,6 +96,7 @@ only ever talks to this origin.
 | DELETE | `/api/transactions/{id}` | delete |
 | GET    | `/api/sections/{section}/open-credits?exclude={id}` | settlement picker candidates |
 | GET    | `/api/daily-suggestions` | ghost-autocomplete categories |
+| GET    | `/api/insights` | emergency fund targets from essential spend |
 | GET    | `/api/months/{month}` | `{closed, seeded}` |
 | PUT    | `/api/months/{month}/closed` | toggle the cosmetic closed flag |
 | POST   | `/api/months/{month}/open` | clone templates into a fresh month, return its rows |

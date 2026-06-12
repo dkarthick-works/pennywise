@@ -57,3 +57,29 @@ export interface Profile {
 export interface LoginRequest  { email: string; password: string; }
 export interface SignupRequest { email: string; password: string; }
 export interface TokenResponse { access_token: string; }
+
+// ─── Insights ─────────────────────────────────────────────────────────────
+
+export interface MonthEssentialTotal {
+  month: string;
+  amount: number;
+}
+
+export interface EmergencyFundTier {
+  multiplier: number;
+  amount: number;
+}
+
+export interface EmergencyFundTiers {
+  bare: EmergencyFundTier;
+  comfort: EmergencyFundTier;
+  luxury: EmergencyFundTier;
+}
+
+export interface Insights {
+  seed_amount: number;
+  seed_month: string;
+  lookback_months: string[];
+  monthly_totals: MonthEssentialTotal[];
+  emergency_fund: EmergencyFundTiers;
+}

@@ -10,6 +10,7 @@ import type {
   Profile,
   MonthState,
   OpenMonthResponse,
+  Insights,
 } from "../types";
 
 // ─── Profile ─────────────────────────────────────────────────────────────
@@ -72,6 +73,11 @@ export const getDailySuggestions = () =>
 
 export const getIncomeSuggestions = () =>
   client.get<string[]>("/api/income-suggestions").then((r) => r.data);
+
+// ─── Insights ─────────────────────────────────────────────────────────────
+
+export const getInsights = () =>
+  client.get<Insights>("/api/insights").then((r) => r.data);
 
 // ─── Month state ──────────────────────────────────────────────────────────
 

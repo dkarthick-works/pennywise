@@ -92,6 +92,18 @@ export const IconWallet = (p: IcProps) => (
 export const IconTrend = (p: IcProps) => (
   <Ic {...p}><path d="M3 17l6-6 4 4 8-8M21 7v5M21 7h-5" /></Ic>
 );
+export const IconInsights = (p: IcProps) => (
+  <Ic {...p}>
+    <path d="M12 3l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V7l8-4z" />
+    <path d="M9 12l2 2 4-4" />
+  </Ic>
+);
+export const IconShield = (p: IcProps) => (
+  <Ic {...p}>
+    <path d="M12 3l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V7l8-4z" />
+    <path d="M9 12l2 2 4-4" />
+  </Ic>
+);
 export const IconCheck = (p: IcProps) => (
   <Ic {...p}><path d="M5 12l5 5L20 6" /></Ic>
 );
