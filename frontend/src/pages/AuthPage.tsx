@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { signup } from "../api/auth";
-import { IconArrowR } from "../components/ui/Icons";
+import { IconArrowR, IconEye, IconEyeOff } from "../components/ui/Icons";
 
 type Mode = "signin" | "register";
 
@@ -13,6 +13,7 @@ export function AuthPage() {
   const [name, setName]   = useState("");
   const [email, setEmail] = useState("");
   const [pw, setPw]       = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [serverErr, setServerErr] = useState("");
@@ -54,6 +55,7 @@ export function AuthPage() {
     setMode(isReg ? "signin" : "register");
     setErrors({});
     setServerErr("");
+    setShowPw(false);
   }
 
   return (
@@ -95,11 +97,24 @@ export function AuthPage() {
 
           <div className="field">
             <label>Password</label>
-            <input
-              className={"input" + (errors.pw ? " err" : "")}
-              type="password" value={pw} onChange={(e) => setPw(e.target.value)}
-              placeholder="••••••••" autoComplete="off"
-            />
+            <div className="input-wrap">
+              <input
+                className={"input" + (errors.pw ? " err" : "")}
+                type={showPw ? "text" : "password"}
+                value={pw}
+                onChange={(e) => setPw(e.target.value)}
+                placeholder="••••••••"
+                autoComplete={isReg ? "new-password" : "current-password"}
+              />
+              <button
+                type="button"
+                className="input-toggle"
+                onClick={() => setShowPw((v) => !v)}
+                aria-label={showPw ? "Hide password" : "Show password"}
+              >
+                {showPw ? <IconEyeOff size={18} /> : <IconEye size={18} />}
+              </button>
+            </div>
             {errors.pw && <div className="err-msg">{errors.pw}</div>}
           </div>
 
