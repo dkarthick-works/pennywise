@@ -236,6 +236,13 @@ input, button { font-family: inherit; }
 .tbl td { padding: 7px 12px; border-bottom: 1px solid var(--border-2); font-size: 14px; vertical-align: middle; }
 .tbl tr:last-child td { border-bottom: none; }
 .tbl tr:hover td { background: var(--surface-2); }
+.tbl tr.date-group-hdr td {
+  background: var(--surface-2);
+  border-top: 2px solid var(--border);
+  border-bottom: none;
+  padding: 10px 12px 6px;
+}
+.tbl tr.date-group-hdr:hover td { background: var(--surface-2); }
 
 /* inline editable cell */
 .cell-input {

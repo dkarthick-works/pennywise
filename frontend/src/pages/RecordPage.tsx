@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   openMonth, setMonthClosed, getSettings, updateBudgets,
@@ -9,6 +9,12 @@ import { budgetColor } from "../lib/money";
 import { monthCode, shiftMonth, MONTH_NAMES, monthLabel } from "../lib/dates";
 import { settledCreditIds } from "../lib/txns";
 import { StatusCell } from "../components/record/StatusCell";
+import {
+  StatusFilterHeader,
+  availableStatuses,
+  matchesStatusFilter,
+  type StatusDisplay,
+} from "../components/record/StatusFilter";
 import { AmountInput, DateCell, RowCategoryInput, CategoryInput } from "../components/record/TableCells";
 import {
   IconChevL, IconChevR, IconChevD, IconPlus, IconX, IconCheck, IconLock, IconArrowR, IconDownload,
@@ -278,6 +284,12 @@ function EssentialTile({ rows, section, month, settledSet, templates }: {
 }) {
   const qc = useQueryClient();
   const { upd, del, add } = useRowMutations(month);
+  const [statusFilter, setStatusFilter] = useState<Set<StatusDisplay>>(new Set());
+  const statusOptions = useMemo(() => availableStatuses(rows, settledSet), [rows, settledSet]);
+  const visible = useMemo(
+    () => rows.filter((r) => matchesStatusFilter(r, statusFilter, settledSet)),
+    [rows, statusFilter, settledSet]
+  );
 
   // Labels in templates that don't yet have a matching row in this section.
   const existingCats = new Set(rows.map((r) => r.category));
@@ -301,11 +313,11 @@ function EssentialTile({ rows, section, month, settledSet, templates }: {
             <th style={{ width: 158 }}>Date</th>
             <th style={{ minWidth: 190 }}>Category</th>
             <th style={{ width: 130 }}>Amount (₹)</th>
-            <th style={{ width: 150 }}>Status</th>
+            <StatusFilterHeader active={statusFilter} onChange={setStatusFilter} options={statusOptions} />
             <th style={{ width: 44 }} />
           </tr></thead>
           <tbody>
-            {rows.map((r) => (
+            {visible.map((r) => (
               <tr key={r.id}>
                 <td><DateCell value={r.date} onChange={(v) => upd.mutate({ id: r.id, patch: { date: v } })} /></td>
                 <td>
@@ -321,10 +333,12 @@ function EssentialTile({ rows, section, month, settledSet, templates }: {
                 <td><button className="x-btn" onClick={() => del.mutate(r.id)} aria-label="Remove"><IconX size={15} /></button></td>
               </tr>
             ))}
-            {rows.length === 0 && (
+            {visible.length === 0 && (
               <tr>
                 <td colSpan={5} className="muted" style={{ textAlign: "center", padding: "26px 0", fontSize: 13.5 }}>
-                  No rows yet — add one or load from templates.
+                  {rows.length === 0
+                    ? "No rows yet — add one or load from templates."
+                    : "No rows match the status filter."}
                 </td>
               </tr>
             )}
@@ -363,6 +377,12 @@ function FlexibleTile({ rows, section, month, settledSet, templates }: {
 }) {
   const qc = useQueryClient();
   const { upd, del, add } = useRowMutations(month);
+  const [statusFilter, setStatusFilter] = useState<Set<StatusDisplay>>(new Set());
+  const statusOptions = useMemo(() => availableStatuses(rows, settledSet), [rows, settledSet]);
+  const visible = useMemo(
+    () => rows.filter((r) => matchesStatusFilter(r, statusFilter, settledSet)),
+    [rows, statusFilter, settledSet]
+  );
 
   const existingCats = new Set(rows.map((r) => r.category));
   const missing = templates.filter((label) => !existingCats.has(label));
@@ -385,11 +405,11 @@ function FlexibleTile({ rows, section, month, settledSet, templates }: {
             <th style={{ width: 158 }}>Date</th>
             <th style={{ minWidth: 180 }}>Subscription</th>
             <th style={{ width: 130 }}>Amount (₹)</th>
-            <th style={{ width: 150 }}>Status</th>
+            <StatusFilterHeader active={statusFilter} onChange={setStatusFilter} options={statusOptions} />
             <th style={{ width: 44 }} />
           </tr></thead>
           <tbody>
-            {rows.map((r) => (
+            {visible.map((r) => (
               <tr key={r.id}>
                 <td><DateCell value={r.date} onChange={(v) => upd.mutate({ id: r.id, patch: { date: v } })} /></td>
                 <td>
@@ -405,10 +425,12 @@ function FlexibleTile({ rows, section, month, settledSet, templates }: {
                 <td><button className="x-btn" onClick={() => del.mutate(r.id)} aria-label="Remove"><IconX size={15} /></button></td>
               </tr>
             ))}
-            {rows.length === 0 && (
+            {visible.length === 0 && (
               <tr>
                 <td colSpan={5} className="muted" style={{ textAlign: "center", padding: "26px 0", fontSize: 13.5 }}>
-                  No rows yet — add one or load from templates.
+                  {rows.length === 0
+                    ? "No rows yet — add one or load from templates."
+                    : "No rows match the status filter."}
                 </td>
               </tr>
             )}
@@ -443,6 +465,12 @@ function FlexibleTile({ rows, section, month, settledSet, templates }: {
 // ─── Daily row — isolated component with local category state ─────────────
 // Keeps category in local state so onChange only updates the ghost-autocomplete
 // display; the server mutation fires only on blur (onCommit).
+
+function dailyGroupLabel(d: string): string {
+  if (!d) return "";
+  const [y, m, dd] = d.split("-");
+  return `${parseInt(dd, 10)} ${MONTH_NAMES[parseInt(m, 10) - 1]} ${y}`;
+}
 
 function DailyRow({ r, section, month, settledSet, suggestions, upd, del }: {
   r: Transaction;
@@ -486,6 +514,8 @@ function DailyTile({ rows, section, month, settledSet }: {
   rows: Transaction[]; section: Section; month: string; settledSet: Set<string>;
 }) {
   const { upd, del, add } = useRowMutations(month);
+  const [statusFilter, setStatusFilter] = useState<Set<StatusDisplay>>(new Set());
+  const statusOptions = useMemo(() => availableStatuses(rows, settledSet), [rows, settledSet]);
   const today = new Date();
   const blank = { date: `${month}-${String(today.getDate()).padStart(2, "0")}`.slice(0, 10), category: "", amount: 0 };
   const [draft, setDraft] = useState(blank);
@@ -495,7 +525,23 @@ function DailyTile({ rows, section, month, settledSet }: {
     queryFn: getDailySuggestions,
   });
 
-  const sorted = [...rows].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const sorted = useMemo(
+    () => [...rows].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)),
+    [rows]
+  );
+  const visible = useMemo(
+    () => sorted.filter((r) => matchesStatusFilter(r, statusFilter, settledSet)),
+    [sorted, statusFilter, settledSet]
+  );
+  const dateGroups = useMemo(() => {
+    const groups: { date: string; rows: Transaction[] }[] = [];
+    for (const r of visible) {
+      const last = groups[groups.length - 1];
+      if (last?.date === r.date) last.rows.push(r);
+      else groups.push({ date: r.date, rows: [r] });
+    }
+    return groups;
+  }, [visible]);
 
   function commit() {
     if (!draft.category.trim() || !draft.amount) return;
@@ -513,7 +559,7 @@ function DailyTile({ rows, section, month, settledSet }: {
             <th style={{ width: 158 }}>Date</th>
             <th style={{ minWidth: 190 }}>Category</th>
             <th style={{ width: 130 }}>Amount (₹)</th>
-            <th style={{ width: 150 }}>Status</th>
+            <StatusFilterHeader active={statusFilter} onChange={setStatusFilter} options={statusOptions} />
             <th style={{ width: 44 }} />
           </tr></thead>
           <tbody>
@@ -551,14 +597,37 @@ function DailyTile({ rows, section, month, settledSet }: {
               </td>
             </tr>
 
-            {sorted.map((r) => (
-              <DailyRow key={r.id} r={r} section={section} month={month} settledSet={settledSet} suggestions={suggestions} upd={upd} del={del} />
+            {dateGroups.map((group) => (
+              <Fragment key={group.date}>
+                <tr className="date-group-hdr">
+                  <td colSpan={5}>
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>{dailyGroupLabel(group.date)}</span>
+                    <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>
+                      {group.rows.length} {group.rows.length === 1 ? "entry" : "entries"}
+                    </span>
+                  </td>
+                </tr>
+                {group.rows.map((r) => (
+                  <DailyRow
+                    key={r.id}
+                    r={r}
+                    section={section}
+                    month={month}
+                    settledSet={settledSet}
+                    suggestions={suggestions}
+                    upd={upd}
+                    del={del}
+                  />
+                ))}
+              </Fragment>
             ))}
 
-            {sorted.length === 0 && (
+            {visible.length === 0 && (
               <tr>
                 <td colSpan={5} className="muted" style={{ textAlign: "center", padding: "26px 0", fontSize: 13.5 }}>
-                  No entries yet — add your first above.
+                  {rows.length === 0
+                    ? "No entries yet — add your first above."
+                    : "No entries match the status filter."}
                 </td>
               </tr>
             )}
