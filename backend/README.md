@@ -41,6 +41,7 @@ internal/
   db/                sqlc-GENERATED code (do not edit)
   seed/              default templates + demo dataset (ported from data.jsx)
   api/               HTTP handlers, DTOs, pgx<->JSON conversion
+  insights/          emergency fund calculation (pure logic, no I/O)
 cmd/
   server/            the API server
   seed/              seed an existing user id with templates/demo data
@@ -112,6 +113,48 @@ Mirrors the prototype shape so the frontend port is a pass-through:
 ```
 
 `settles` appears on settlement rows; `settled` is the derived flag on credit rows.
+
+### Insights (`GET /api/insights`)
+
+Derives emergency fund targets from **essential** section spend. Used by the
+Insights page in the SPA.
+
+**Lookback:** the last 3 calendar months including the current month (e.g. in
+June 2026: Apr, May, Jun).
+
+**What counts as spend:** per-month sum of `amount` where `section = 'essential'`
+and `kind <> 'settlement'` — i.e. `cash` and open `credit` rows. Settlements
+are excluded because they represent cash-out timing, not incurred essential
+cost. Months with no rows return `0`.
+
+**Seed amount:** the highest monthly total in the lookback window. If two months
+tie, the most recent month wins.
+
+**Tiers:** Bare (3× seed), Comfort (6×), Luxury (12×). The UI highlights
+Comfort as the primary target.
+
+Response shape:
+
+```json
+{
+  "seed_amount": 42000,
+  "seed_month": "2026-05",
+  "lookback_months": ["2026-04", "2026-05", "2026-06"],
+  "monthly_totals": [
+    { "month": "2026-04", "amount": 38000 },
+    { "month": "2026-05", "amount": 42000 },
+    { "month": "2026-06", "amount": 39500 }
+  ],
+  "emergency_fund": {
+    "bare":    { "multiplier": 3,  "amount": 126000 },
+    "comfort": { "multiplier": 6,  "amount": 252000 },
+    "luxury":  { "multiplier": 12, "amount": 504000 }
+  }
+}
+```
+
+Logic lives in `internal/insights/emergency_fund.go`; the handler aggregates
+via `SumEssentialSpendByMonths` in `db/queries/transactions.sql`.
 
 ## Configuration
 

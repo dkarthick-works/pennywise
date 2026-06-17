@@ -1,73 +1,71 @@
-# React + TypeScript + Vite
+# Pennywise — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript + Vite SPA for **Pennywise** (Ledger). Talks to the Go API
+in `../backend/`; auth is proxied through that backend to Goauth.
 
-Currently, two official plugins are available:
+## Running locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Start the API first (see `../backend/README.md`), then:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev          # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Vite proxies `/api` to `http://localhost:8080` (see `vite.config.ts`). Cookies
+from Goauth refresh are rewritten for `localhost` during dev.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Production builds are embedded into the Go binary (`Dockerfile` multi-stage build).
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Routes
+
+| Path | Page | Notes |
+|------|------|-------|
+| `/record` | Record & Expense | **Default landing page** after login (`/` redirects here) |
+| `/dashboard` | Dashboard | Month/year charts and summaries |
+| `/insights` | Insights | Emergency fund targets (from `GET /api/insights`) |
+| `/settings` | Settings | Budgets, templates, preferences |
+| `/profile` | Profile | Display name and email |
+| `/login` | Auth | Sign up / log in (password field has show/hide toggle) |
+
+Unknown authenticated paths fall back to `/record`.
+
+## Record page
+
+The primary workflow surface. Three section tiles — **Essential**, **Flexible**,
+and **Daily / Running** — each with an editable transaction table for the
+selected month.
+
+### Status filter
+
+Every section table has a **Status** column with an optional header filter
+(`StatusFilter.tsx`). Click the funnel icon to multi-select display statuses:
+
+| Display status | When it applies |
+|----------------|-----------------|
+| `cash` | `kind = cash` |
+| `credit` | `kind = credit`, not yet settled |
+| `settled` | `kind = credit`, linked from a settlement |
+| `settlement` | `kind = settlement` |
+
+An empty selection shows all rows. The filter button appears only when the
+section has two or more distinct statuses. Filtering is client-side only — it
+does not change API queries.
+
+### Daily date grouping
+
+The **Daily** tile sorts rows by date descending (then by id), then inserts
+date header rows (`date-group-hdr`) whenever the date changes. Each header shows
+the formatted date and entry count. The quick-add row stays pinned at the top.
+
+## API client
+
+- `src/api/client.ts` — axios instance, Bearer token from `sessionStorage`,
+  silent refresh on 401 via `/api/auth/refresh`.
+- `src/api/ledger.ts` — typed wrappers for all ledger endpoints.
+- `src/api/auth.ts` — signup, login, logout.
+
+## PWA
+
+`vite-plugin-pwa` precaches the app shell. Client-side routes fall back to
+`index.html`; `/api/*` is excluded from the service worker navigate fallback.
