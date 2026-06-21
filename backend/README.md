@@ -1,7 +1,7 @@
 # Ledger — Backend
 
-Go API + Postgres for **Ledger**, a calm single-user expense tracker. This is the
-real backend for the design prototype in `../project/`. Authentication is handled
+Go API + Postgres for **Pennywise** (Ledger), a calm single-user expense tracker.
+Authentication is handled
 by a separate **Goauth** service (`../auth-api-spec.json`); this backend consumes
 it — it never stores passwords.
 
