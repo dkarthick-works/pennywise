@@ -24,6 +24,7 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/record` | Record & Expense | **Default landing page** after login (`/` redirects here) |
 | `/dashboard` | Dashboard | Month/year charts and summaries |
 | `/insights` | Insights | Emergency fund targets (from `GET /api/insights`) |
+| `/categories` | Map Categories | Assign transaction labels to high-level groups |
 | `/settings` | Settings | Budgets, templates, preferences |
 | `/profile` | Profile | Display name and email |
 | `/login` | Auth | Sign up / log in (password field has show/hide toggle) |
@@ -57,6 +58,33 @@ does not change API queries.
 The **Daily** tile sorts rows by date descending (then by id), then inserts
 date header rows (`date-group-hdr`) whenever the date changes. Each header shows
 the formatted date and entry count. The quick-add row stays pinned at the top.
+
+## Categories page
+
+Nav item: **Map Categories** (`/categories`). Maps free-text transaction labels to
+user-defined **groups** for future dashboard rollups. Transaction rows are not modified.
+
+### Tabs
+
+| Tab | Purpose |
+|-----|---------|
+| **Needs mapping** | Lists unmapped category strings from `GET /api/categories/unmapped`. Each row can be assigned to an existing group (pill buttons) or a new group name. |
+| **Groups** | Browse groups, rename or delete a group, remove individual mappings. Includes an **All mappings** flat table at the bottom. |
+
+A search box filters both tabs (category text and group names).
+
+### API wrappers
+
+Category endpoints are in `src/api/ledger.ts` (`getUnmappedCategories`, `getCategoryGroups`,
+`createCategoryMapping`, `updateCategoryGroup`, `deleteCategoryGroup`, `deleteCategoryMapping`).
+React Query keys are prefixed with `["categories", …]`; mutations invalidate the whole tree.
+
+### Constraints (from the API)
+
+- A mapping can only be created for category text that already appears in your transactions.
+- Label matching is case- and whitespace-insensitive (backend normalizes before compare).
+- Deleting the last mapping in a group removes the empty group automatically.
+- `POST /api/category-mappings` accepts `group_id` **or** `group_name`, not both.
 
 ## API client
 
