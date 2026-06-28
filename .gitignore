@@ -19,5 +19,6 @@ Ledger PRD (standalone).html
 /project
 /backend/ai-conversations/*
 .cursor/skills/app-story/SKILL.md
+.cursor/plans/*
 
 frontend/app-story/*
