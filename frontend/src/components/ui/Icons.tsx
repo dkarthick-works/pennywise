@@ -128,3 +128,9 @@ export const IconDownload = (p: IcProps) => (
     <line x1="12" y1="15" x2="12" y2="3" />
   </Ic>
 );
+export const IconCategories = (p: IcProps) => (
+  <Ic {...p}>
+    <path d="M4 7h6M4 12h6M4 17h6" />
+    <path d="M14 7l6 3-6 3V7z" />
+  </Ic>
+);

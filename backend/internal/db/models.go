@@ -99,6 +99,25 @@ func (ns NullTxnKind) Value() (driver.Value, error) {
 	return string(ns.TxnKind), nil
 }
 
+type CategoryGroup struct {
+	ID             uuid.UUID          `json:"id"`
+	UserID         uuid.UUID          `json:"user_id"`
+	Name           string             `json:"name"`
+	NormalizedName string             `json:"normalized_name"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type CategoryMapping struct {
+	ID                 uuid.UUID          `json:"id"`
+	UserID             uuid.UUID          `json:"user_id"`
+	RawCategory        string             `json:"raw_category"`
+	NormalizedCategory string             `json:"normalized_category"`
+	GroupID            uuid.UUID          `json:"group_id"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
 type MonthState struct {
 	UserID uuid.UUID `json:"user_id"`
 	Month  string    `json:"month"`

@@ -11,6 +11,8 @@ import type {
   MonthState,
   OpenMonthResponse,
   Insights,
+  CategoryGroup,
+  CategoryMapping,
 } from "../types";
 
 // ─── Profile ─────────────────────────────────────────────────────────────
@@ -89,3 +91,35 @@ export const setMonthClosed = (month: string, closed: boolean) =>
 
 export const openMonth = (month: string) =>
   client.post<OpenMonthResponse>(`/api/months/${month}/open`).then((r) => r.data);
+
+// ─── Category grouping ──────────────────────────────────────────────────────
+
+export const getUnmappedCategories = () =>
+  client.get<string[]>("/api/categories/unmapped").then((r) => r.data);
+
+export const getCategoryGroups = () =>
+  client.get<CategoryGroup[]>("/api/category-groups").then((r) => r.data);
+
+export const createCategoryGroup = (body: { name: string; raw_category: string }) =>
+  client.post<CategoryGroup>("/api/category-groups", body).then((r) => r.data);
+
+export const updateCategoryGroup = (id: string, body: { name: string }) =>
+  client.patch<CategoryGroup>(`/api/category-groups/${id}`, body).then((r) => r.data);
+
+export const deleteCategoryGroup = (id: string) =>
+  client.delete(`/api/category-groups/${id}`);
+
+export const getCategoryMappings = () =>
+  client.get<CategoryMapping[]>("/api/category-mappings").then((r) => r.data);
+
+export const createCategoryMapping = (body: {
+  raw_category: string;
+  group_id?: string;
+  group_name?: string;
+}) => client.post<CategoryMapping>("/api/category-mappings", body).then((r) => r.data);
+
+export const updateCategoryMapping = (id: string, body: { group_id: string }) =>
+  client.patch<CategoryMapping>(`/api/category-mappings/${id}`, body).then((r) => r.data);
+
+export const deleteCategoryMapping = (id: string) =>
+  client.delete(`/api/category-mappings/${id}`);

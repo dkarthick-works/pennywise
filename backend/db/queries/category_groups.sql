@@ -1,0 +1,97 @@
+-- name: ListCategoryGroups :many
+SELECT * FROM category_groups
+WHERE user_id = $1
+ORDER BY name;
+
+-- name: GetCategoryGroup :one
+SELECT * FROM category_groups
+WHERE id = $1 AND user_id = $2;
+
+-- name: InsertCategoryGroup :one
+INSERT INTO category_groups (user_id, name, normalized_name)
+VALUES ($1, $2, $3)
+RETURNING *;
+
+-- name: UpdateCategoryGroupName :one
+UPDATE category_groups
+SET name = $3,
+    normalized_name = $4,
+    updated_at = now()
+WHERE id = $1 AND user_id = $2
+RETURNING *;
+
+-- name: DeleteCategoryGroup :exec
+DELETE FROM category_groups
+WHERE id = $1 AND user_id = $2;
+
+-- name: CountCategoryMappingsForGroup :one
+SELECT COUNT(*)::bigint AS count
+FROM category_mappings
+WHERE group_id = $1 AND user_id = $2;
+
+-- name: ListUnmappedCategoryTexts :many
+SELECT DISTINCT t.category
+FROM transactions t
+WHERE t.user_id = $1
+  AND btrim(t.category) <> ''
+  AND NOT EXISTS (
+      SELECT 1 FROM category_mappings cm
+      WHERE cm.user_id = t.user_id
+        AND cm.normalized_category = lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g'))
+  )
+ORDER BY t.category;
+
+-- name: CategoryTextExistsForUser :one
+SELECT EXISTS (
+    SELECT 1 FROM transactions
+    WHERE user_id = $1
+      AND lower(regexp_replace(btrim(category), '\s+', ' ', 'g')) = $2
+) AS exists;
+
+-- name: ListCategoryMappings :many
+SELECT
+    cm.id,
+    cm.user_id,
+    cm.raw_category,
+    cm.normalized_category,
+    cm.group_id,
+    cm.created_at,
+    cm.updated_at,
+    cg.name AS group_name
+FROM category_mappings cm
+JOIN category_groups cg ON cg.id = cm.group_id
+WHERE cm.user_id = $1
+ORDER BY cg.name, cm.raw_category;
+
+-- name: ListCategoryMappingsByGroup :many
+SELECT * FROM category_mappings
+WHERE group_id = $1 AND user_id = $2
+ORDER BY raw_category;
+
+-- name: GetCategoryMapping :one
+SELECT * FROM category_mappings
+WHERE id = $1 AND user_id = $2;
+
+-- name: InsertCategoryMapping :one
+INSERT INTO category_mappings (user_id, raw_category, normalized_category, group_id)
+VALUES ($1, $2, $3, $4)
+RETURNING *;
+
+-- name: UpdateCategoryMappingGroup :one
+UPDATE category_mappings
+SET group_id = $3,
+    updated_at = now()
+WHERE id = $1 AND user_id = $2
+RETURNING *;
+
+-- name: DeleteCategoryMapping :exec
+DELETE FROM category_mappings
+WHERE id = $1 AND user_id = $2;
+
+-- name: DeleteCategoryGroupIfEmpty :exec
+DELETE FROM category_groups cg
+WHERE cg.id = $1
+  AND cg.user_id = $2
+  AND NOT EXISTS (
+      SELECT 1 FROM category_mappings cm WHERE cm.group_id = cg.id
+  );

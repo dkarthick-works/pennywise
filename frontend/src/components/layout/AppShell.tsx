@@ -3,13 +3,14 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { initials } from "../../lib/txns";
 import {
-  IconDashboard, IconRecord, IconInsights, IconSettings, IconProfile, IconMenu,
+  IconDashboard, IconRecord, IconInsights, IconCategories, IconSettings, IconProfile, IconMenu,
 } from "../ui/Icons";
 
 const NAV = [
   { path: "/record",    label: "Record & Expense",  Icon: IconRecord },
   { path: "/dashboard", label: "Dashboard",        Icon: IconDashboard },
   { path: "/insights",  label: "Insights",          Icon: IconInsights },
+  { path: "/categories", label: "Map Categories",   Icon: IconCategories },
   { path: "/settings",  label: "Settings",          Icon: IconSettings },
   { path: "/profile",   label: "Profile",           Icon: IconProfile },
 ];

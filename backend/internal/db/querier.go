@@ -11,22 +11,34 @@ import (
 )
 
 type Querier interface {
+	CategoryTextExistsForUser(ctx context.Context, arg CategoryTextExistsForUserParams) (bool, error)
+	CountCategoryMappingsForGroup(ctx context.Context, arg CountCategoryMappingsForGroupParams) (int64, error)
 	// Distinct non-settlement daily categories for ghost autocomplete.
 	DailyCategorySuggestions(ctx context.Context, userID uuid.UUID) ([]string, error)
+	DeleteCategoryGroup(ctx context.Context, arg DeleteCategoryGroupParams) error
+	DeleteCategoryGroupIfEmpty(ctx context.Context, arg DeleteCategoryGroupIfEmptyParams) error
+	DeleteCategoryMapping(ctx context.Context, arg DeleteCategoryMappingParams) error
 	DeleteSettlementLinks(ctx context.Context, settlementID uuid.UUID) error
 	DeleteTemplatesBySection(ctx context.Context, arg DeleteTemplatesBySectionParams) error
 	DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) error
 	// Create the default settings row for a user if it does not exist yet.
 	EnsureSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
+	GetCategoryGroup(ctx context.Context, arg GetCategoryGroupParams) (CategoryGroup, error)
+	GetCategoryMapping(ctx context.Context, arg GetCategoryMappingParams) (CategoryMapping, error)
 	GetMonthState(ctx context.Context, arg GetMonthStateParams) (MonthState, error)
 	GetSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
 	GetTransaction(ctx context.Context, arg GetTransactionParams) (Transaction, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	// Distinct income source categories for ghost autocomplete.
 	IncomeCategorySuggestions(ctx context.Context, userID uuid.UUID) ([]string, error)
+	InsertCategoryGroup(ctx context.Context, arg InsertCategoryGroupParams) (CategoryGroup, error)
+	InsertCategoryMapping(ctx context.Context, arg InsertCategoryMappingParams) (CategoryMapping, error)
 	InsertSettlementLink(ctx context.Context, arg InsertSettlementLinkParams) error
 	InsertTemplate(ctx context.Context, arg InsertTemplateParams) (Template, error)
 	InsertTransaction(ctx context.Context, arg InsertTransactionParams) (Transaction, error)
+	ListCategoryGroups(ctx context.Context, userID uuid.UUID) ([]CategoryGroup, error)
+	ListCategoryMappings(ctx context.Context, userID uuid.UUID) ([]ListCategoryMappingsRow, error)
+	ListCategoryMappingsByGroup(ctx context.Context, arg ListCategoryMappingsByGroupParams) ([]CategoryMapping, error)
 	ListLinksForSettlement(ctx context.Context, settlementID uuid.UUID) ([]uuid.UUID, error)
 	ListMonthStates(ctx context.Context, userID uuid.UUID) ([]MonthState, error)
 	// ---- settlement links --------------------------------------------------
@@ -38,6 +50,7 @@ type Querier interface {
 	ListTransactionsByMonth(ctx context.Context, arg ListTransactionsByMonthParams) ([]Transaction, error)
 	ListTransactionsByMonthSection(ctx context.Context, arg ListTransactionsByMonthSectionParams) ([]Transaction, error)
 	ListTransactionsByYear(ctx context.Context, arg ListTransactionsByYearParams) ([]Transaction, error)
+	ListUnmappedCategoryTexts(ctx context.Context, userID uuid.UUID) ([]string, error)
 	MarkMonthSeeded(ctx context.Context, arg MarkMonthSeededParams) (MonthState, error)
 	// Open (unsettled) credits in a section, newest first — candidates for a settlement
 	// picker. Excludes any credit already linked to a settlement other than the one
@@ -47,6 +60,8 @@ type Querier interface {
 	SettledCreditIdsByMonth(ctx context.Context, arg SettledCreditIdsByMonthParams) ([]uuid.UUID, error)
 	SumEssentialSpendByMonths(ctx context.Context, arg SumEssentialSpendByMonthsParams) ([]SumEssentialSpendByMonthsRow, error)
 	UpdateBudgets(ctx context.Context, arg UpdateBudgetsParams) (UserSetting, error)
+	UpdateCategoryGroupName(ctx context.Context, arg UpdateCategoryGroupNameParams) (CategoryGroup, error)
+	UpdateCategoryMappingGroup(ctx context.Context, arg UpdateCategoryMappingGroupParams) (CategoryMapping, error)
 	UpdatePreferences(ctx context.Context, arg UpdatePreferencesParams) (UserSetting, error)
 	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)

@@ -83,3 +83,23 @@ export interface Insights {
   monthly_totals: MonthEssentialTotal[];
   emergency_fund: EmergencyFundTiers;
 }
+
+// ─── Category grouping ──────────────────────────────────────────────────────
+
+export interface CategoryMappingBrief {
+  id: string;
+  raw_category: string;
+}
+
+export interface CategoryGroup {
+  id: string;
+  name: string;
+  mappings: CategoryMappingBrief[];
+}
+
+export interface CategoryMapping {
+  id: string;
+  raw_category: string;
+  group_id: string;
+  group_name?: string;
+}
