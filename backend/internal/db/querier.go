@@ -16,7 +16,6 @@ type Querier interface {
 	// Distinct non-settlement daily categories for ghost autocomplete.
 	DailyCategorySuggestions(ctx context.Context, userID uuid.UUID) ([]string, error)
 	DeleteCategoryGroup(ctx context.Context, arg DeleteCategoryGroupParams) error
-	DeleteCategoryGroupIfEmpty(ctx context.Context, arg DeleteCategoryGroupIfEmptyParams) error
 	DeleteCategoryMapping(ctx context.Context, arg DeleteCategoryMappingParams) error
 	DeleteSettlementLinks(ctx context.Context, settlementID uuid.UUID) error
 	DeleteTemplatesBySection(ctx context.Context, arg DeleteTemplatesBySectionParams) error
@@ -47,6 +46,7 @@ type Querier interface {
 	ListSettlementLinksByYear(ctx context.Context, arg ListSettlementLinksByYearParams) ([]SettlementLink, error)
 	ListTemplates(ctx context.Context, userID uuid.UUID) ([]Template, error)
 	ListTemplatesBySection(ctx context.Context, arg ListTemplatesBySectionParams) ([]Template, error)
+	ListTransactionCategoryTexts(ctx context.Context, arg ListTransactionCategoryTextsParams) ([]string, error)
 	ListTransactionsByDateRange(ctx context.Context, arg ListTransactionsByDateRangeParams) ([]Transaction, error)
 	ListTransactionsByMonth(ctx context.Context, arg ListTransactionsByMonthParams) ([]Transaction, error)
 	ListTransactionsByMonthSection(ctx context.Context, arg ListTransactionsByMonthSectionParams) ([]Transaction, error)
@@ -62,7 +62,6 @@ type Querier interface {
 	SumEssentialSpendByMonths(ctx context.Context, arg SumEssentialSpendByMonthsParams) ([]SumEssentialSpendByMonthsRow, error)
 	UpdateBudgets(ctx context.Context, arg UpdateBudgetsParams) (UserSetting, error)
 	UpdateCategoryGroupName(ctx context.Context, arg UpdateCategoryGroupNameParams) (CategoryGroup, error)
-	UpdateCategoryMappingGroup(ctx context.Context, arg UpdateCategoryMappingGroupParams) (CategoryMapping, error)
 	UpdatePreferences(ctx context.Context, arg UpdatePreferencesParams) (UserSetting, error)
 	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)

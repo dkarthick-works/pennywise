@@ -133,7 +133,7 @@ export const getUnmappedCategories = () =>
 export const getCategoryGroups = () =>
   client.get<CategoryGroup[]>("/api/category-groups").then((r) => r.data);
 
-export const createCategoryGroup = (body: { name: string; raw_category: string }) =>
+export const createCategoryGroup = (body: { name: string }) =>
   client.post<CategoryGroup>("/api/category-groups", body).then((r) => r.data);
 
 export const updateCategoryGroup = (id: string, body: { name: string }) =>
@@ -145,14 +145,18 @@ export const deleteCategoryGroup = (id: string) =>
 export const getCategoryMappings = () =>
   client.get<CategoryMapping[]>("/api/category-mappings").then((r) => r.data);
 
+export const getTransactionCategoryTexts = (params: { q?: string; excludeGroupId?: string }) =>
+  client
+    .get<string[]>("/api/categories/texts", {
+      params: { q: params.q, exclude_group_id: params.excludeGroupId },
+    })
+    .then((r) => r.data);
+
 export const createCategoryMapping = (body: {
   raw_category: string;
   group_id?: string;
   group_name?: string;
 }) => client.post<CategoryMapping>("/api/category-mappings", body).then((r) => r.data);
-
-export const updateCategoryMapping = (id: string, body: { group_id: string }) =>
-  client.patch<CategoryMapping>(`/api/category-mappings/${id}`, body).then((r) => r.data);
 
 export const deleteCategoryMapping = (id: string) =>
   client.delete(`/api/category-mappings/${id}`);

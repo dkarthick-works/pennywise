@@ -41,6 +41,22 @@ WHERE t.user_id = $1
   )
 ORDER BY t.category;
 
+-- name: ListTransactionCategoryTexts :many
+SELECT MIN(t.category)::text AS category
+FROM transactions t
+WHERE t.user_id = @user_id
+  AND btrim(t.category) <> ''
+  AND (sqlc.narg('search')::text IS NULL OR t.category ILIKE '%' || sqlc.narg('search') || '%')
+  AND (sqlc.narg('exclude_group_id')::uuid IS NULL OR NOT EXISTS (
+      SELECT 1 FROM category_mappings cm
+      WHERE cm.user_id = t.user_id
+        AND cm.group_id = sqlc.narg('exclude_group_id')
+        AND cm.normalized_category = lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g'))
+  ))
+GROUP BY lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g'))
+ORDER BY MIN(t.category)
+LIMIT sqlc.arg('limit');
+
 -- name: CategoryTextExistsForUser :one
 SELECT EXISTS (
     SELECT 1 FROM transactions
@@ -77,21 +93,6 @@ INSERT INTO category_mappings (user_id, raw_category, normalized_category, group
 VALUES ($1, $2, $3, $4)
 RETURNING *;
 
--- name: UpdateCategoryMappingGroup :one
-UPDATE category_mappings
-SET group_id = $3,
-    updated_at = now()
-WHERE id = $1 AND user_id = $2
-RETURNING *;
-
 -- name: DeleteCategoryMapping :exec
 DELETE FROM category_mappings
 WHERE id = $1 AND user_id = $2;
-
--- name: DeleteCategoryGroupIfEmpty :exec
-DELETE FROM category_groups cg
-WHERE cg.id = $1
-  AND cg.user_id = $2
-  AND NOT EXISTS (
-      SELECT 1 FROM category_mappings cm WHERE cm.group_id = cg.id
-  );

@@ -3,11 +3,13 @@ package api
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/ledger/backend/internal/category"
 	"github.com/ledger/backend/internal/db"
@@ -44,6 +46,48 @@ func (s *Server) handleListUnmappedCategories(w http.ResponseWriter, r *http.Req
 	rows, err := s.q.ListUnmappedCategoryTexts(r.Context(), userID(r))
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not load unmapped categories")
+		return
+	}
+	if rows == nil {
+		rows = []string{}
+	}
+	writeJSON(w, http.StatusOK, rows)
+}
+
+func (s *Server) handleListTransactionCategoryTexts(w http.ResponseWriter, r *http.Request) {
+	uid := userID(r)
+
+	var search *string
+	if q := strings.TrimSpace(r.URL.Query().Get("q")); q != "" {
+		search = &q
+	}
+
+	var excludeGroupID pgtype.UUID
+	if raw := strings.TrimSpace(r.URL.Query().Get("exclude_group_id")); raw != "" {
+		gid, err := uuid.Parse(raw)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "invalid exclude_group_id")
+			return
+		}
+		if _, err := s.q.GetCategoryGroup(r.Context(), db.GetCategoryGroupParams{ID: gid, UserID: uid}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeErr(w, http.StatusNotFound, "category group not found")
+				return
+			}
+			writeErr(w, http.StatusInternalServerError, "could not load category group")
+			return
+		}
+		excludeGroupID = pgtype.UUID{Bytes: gid, Valid: true}
+	}
+
+	rows, err := s.q.ListTransactionCategoryTexts(r.Context(), db.ListTransactionCategoryTextsParams{
+		UserID:         uid,
+		Search:         search,
+		ExcludeGroupID: excludeGroupID,
+		Limit:          50,
+	})
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "could not load category text")
 		return
 	}
 	if rows == nil {
@@ -90,50 +134,27 @@ func (s *Server) handleListCategoryGroups(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, out)
 }
 
-// handleCreateCategoryGroup creates a group together with its first mapping.
 func (s *Server) handleCreateCategoryGroup(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Name        string `json:"name"`
-		RawCategory string `json:"raw_category"`
+		Name string `json:"name"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if body.Name == "" || body.RawCategory == "" {
-		writeErr(w, http.StatusBadRequest, "name and raw_category are required")
+	if body.Name == "" {
+		writeErr(w, http.StatusBadRequest, "name is required")
 		return
 	}
 
 	uid := userID(r)
-	normCat := category.NormalizeLabel(body.RawCategory)
 	normName := category.NormalizeLabel(body.Name)
-	if normCat == "" || normName == "" {
-		writeErr(w, http.StatusBadRequest, "name and raw_category cannot be blank")
+	if normName == "" {
+		writeErr(w, http.StatusBadRequest, "name cannot be blank")
 		return
 	}
 
-	ok, err := s.q.CategoryTextExistsForUser(r.Context(), db.CategoryTextExistsForUserParams{
-		UserID: uid, Category: normCat,
-	})
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "could not validate category text")
-		return
-	}
-	if !ok {
-		writeErr(w, http.StatusBadRequest, "category text does not exist in your transactions")
-		return
-	}
-
-	tx, err := s.pool.Begin(r.Context())
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "could not create category group")
-		return
-	}
-	defer tx.Rollback(r.Context())
-	qtx := s.q.WithTx(tx)
-
-	grp, err := qtx.InsertCategoryGroup(r.Context(), db.InsertCategoryGroupParams{
+	grp, err := s.q.InsertCategoryGroup(r.Context(), db.InsertCategoryGroupParams{
 		UserID: uid, Name: body.Name, NormalizedName: normName,
 	})
 	if err != nil {
@@ -145,29 +166,10 @@ func (s *Server) handleCreateCategoryGroup(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	mapping, err := qtx.InsertCategoryMapping(r.Context(), db.InsertCategoryMappingParams{
-		UserID: uid, RawCategory: body.RawCategory, NormalizedCategory: normCat, GroupID: grp.ID,
-	})
-	if err != nil {
-		if isUniqueViolation(err) {
-			writeErr(w, http.StatusConflict, "that category text is already mapped")
-			return
-		}
-		writeErr(w, http.StatusInternalServerError, "could not create mapping")
-		return
-	}
-
-	if err := tx.Commit(r.Context()); err != nil {
-		writeErr(w, http.StatusInternalServerError, "could not create category group")
-		return
-	}
-
 	writeJSON(w, http.StatusCreated, CategoryGroupDTO{
-		ID:   grp.ID.String(),
-		Name: grp.Name,
-		Mappings: []CategoryMappingBrief{
-			{ID: mapping.ID.String(), RawCategory: mapping.RawCategory},
-		},
+		ID:       grp.ID.String(),
+		Name:     grp.Name,
+		Mappings: []CategoryMappingBrief{},
 	})
 }
 
@@ -330,7 +332,7 @@ func (s *Server) handleCreateCategoryMapping(w http.ResponseWriter, r *http.Requ
 	})
 	if err != nil {
 		if isUniqueViolation(err) {
-			writeErr(w, http.StatusConflict, "that category text is already mapped")
+			writeErr(w, http.StatusConflict, "that category text is already in this group")
 			return
 		}
 		writeErr(w, http.StatusInternalServerError, "could not create mapping")
@@ -348,81 +350,6 @@ func (s *Server) handleCreateCategoryMapping(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-func (s *Server) handleUpdateCategoryMapping(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(chi.URLParam(r, "id"))
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid id")
-		return
-	}
-	var body struct {
-		GroupID string `json:"group_id"`
-	}
-	if err := readJSON(r, &body); err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	newGroupID, err := uuid.Parse(body.GroupID)
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid group_id")
-		return
-	}
-
-	uid := userID(r)
-	cur, err := s.q.GetCategoryMapping(r.Context(), db.GetCategoryMappingParams{ID: id, UserID: uid})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			writeErr(w, http.StatusNotFound, "mapping not found")
-			return
-		}
-		writeErr(w, http.StatusInternalServerError, "could not load mapping")
-		return
-	}
-	oldGroupID := cur.GroupID
-
-	grp, err := s.q.GetCategoryGroup(r.Context(), db.GetCategoryGroupParams{ID: newGroupID, UserID: uid})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			writeErr(w, http.StatusNotFound, "category group not found")
-			return
-		}
-		writeErr(w, http.StatusInternalServerError, "could not load category group")
-		return
-	}
-
-	tx, err := s.pool.Begin(r.Context())
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "could not update mapping")
-		return
-	}
-	defer tx.Rollback(r.Context())
-	qtx := s.q.WithTx(tx)
-
-	updated, err := qtx.UpdateCategoryMappingGroup(r.Context(), db.UpdateCategoryMappingGroupParams{
-		ID: id, UserID: uid, GroupID: newGroupID,
-	})
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "could not update mapping")
-		return
-	}
-
-	if err := qtx.DeleteCategoryGroupIfEmpty(r.Context(), db.DeleteCategoryGroupIfEmptyParams{
-		ID: oldGroupID, UserID: uid,
-	}); err != nil {
-		writeErr(w, http.StatusInternalServerError, "could not update mapping")
-		return
-	}
-
-	if err := tx.Commit(r.Context()); err != nil {
-		writeErr(w, http.StatusInternalServerError, "could not update mapping")
-		return
-	}
-
-	writeJSON(w, http.StatusOK, CategoryMappingDTO{
-		ID: updated.ID.String(), RawCategory: updated.RawCategory,
-		GroupID: grp.ID.String(), GroupName: grp.Name,
-	})
-}
-
 func (s *Server) handleDeleteCategoryMapping(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -431,8 +358,7 @@ func (s *Server) handleDeleteCategoryMapping(w http.ResponseWriter, r *http.Requ
 	}
 
 	uid := userID(r)
-	cur, err := s.q.GetCategoryMapping(r.Context(), db.GetCategoryMappingParams{ID: id, UserID: uid})
-	if err != nil {
+	if _, err := s.q.GetCategoryMapping(r.Context(), db.GetCategoryMappingParams{ID: id, UserID: uid}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeErr(w, http.StatusNotFound, "mapping not found")
 			return
@@ -440,29 +366,8 @@ func (s *Server) handleDeleteCategoryMapping(w http.ResponseWriter, r *http.Requ
 		writeErr(w, http.StatusInternalServerError, "could not load mapping")
 		return
 	}
-	groupID := cur.GroupID
 
-	tx, err := s.pool.Begin(r.Context())
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "could not delete mapping")
-		return
-	}
-	defer tx.Rollback(r.Context())
-	qtx := s.q.WithTx(tx)
-
-	if err := qtx.DeleteCategoryMapping(r.Context(), db.DeleteCategoryMappingParams{ID: id, UserID: uid}); err != nil {
-		writeErr(w, http.StatusInternalServerError, "could not delete mapping")
-		return
-	}
-
-	if err := qtx.DeleteCategoryGroupIfEmpty(r.Context(), db.DeleteCategoryGroupIfEmptyParams{
-		ID: groupID, UserID: uid,
-	}); err != nil {
-		writeErr(w, http.StatusInternalServerError, "could not delete mapping")
-		return
-	}
-
-	if err := tx.Commit(r.Context()); err != nil {
+	if err := s.q.DeleteCategoryMapping(r.Context(), db.DeleteCategoryMappingParams{ID: id, UserID: uid}); err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not delete mapping")
 		return
 	}
