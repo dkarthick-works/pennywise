@@ -2,11 +2,16 @@ package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/ledger/backend/internal/db"
 )
@@ -14,7 +19,10 @@ import (
 var (
 	monthRe = regexp.MustCompile(`^\d{4}-\d{2}$`)
 	yearRe  = regexp.MustCompile(`^\d{4}$`)
+	dateRe  = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 )
+
+const noExportRowsMessage = "no transactions to export for the selected date range"
 
 // handleListTransactions returns the rows for ?month=YYYY-MM or ?year=YYYY,
 // decorated with settlement links (settles) and the derived "settled" flag.
@@ -89,6 +97,43 @@ func (s *Server) handleListTransactions(w http.ResponseWriter, r *http.Request) 
 		out = append(out, dto)
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleExportTransactions(w http.ResponseWriter, r *http.Request) {
+	from, to, err := validateExportRange(r.URL.Query().Get("from"), r.URL.Query().Get("to"))
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	txns, err := s.q.ListTransactionsByDateRange(r.Context(), db.ListTransactionsByDateRangeParams{
+		UserID:   userID(r),
+		FromDate: from,
+		ToDate:   to,
+	})
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "could not export transactions")
+		return
+	}
+	if err := ensureExportTransactions(txns); err != nil {
+		writeErr(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	currency := "INR"
+	settings, err := s.q.GetSettings(r.Context(), userID(r))
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		writeErr(w, http.StatusInternalServerError, "could not export transactions")
+		return
+	}
+	if err == nil && settings.Currency != "" {
+		currency = settings.Currency
+	}
+
+	filename := fmt.Sprintf("pennywise-transactions-%s_%s.csv", dateToString(from), dateToString(to))
+	if err := writeCSV(w, filename, exportTransactionRows(txns, currency)); err != nil {
+		return
+	}
 }
 
 type txnInput struct {
@@ -343,4 +388,57 @@ func validSection(s string) bool {
 
 func validKind(k string) bool {
 	return k == "cash" || k == "credit" || k == "settlement"
+}
+
+func validateExportRange(fromRaw, toRaw string) (pgFrom pgtype.Date, pgTo pgtype.Date, err error) {
+	if !dateRe.MatchString(fromRaw) || !dateRe.MatchString(toRaw) {
+		return pgtype.Date{}, pgtype.Date{}, errors.New("from and to must be YYYY-MM-DD")
+	}
+	from, err := parseDate(fromRaw)
+	if err != nil {
+		return pgtype.Date{}, pgtype.Date{}, errors.New("from and to must be valid dates")
+	}
+	to, err := parseDate(toRaw)
+	if err != nil {
+		return pgtype.Date{}, pgtype.Date{}, errors.New("from and to must be valid dates")
+	}
+	if from.Time.After(to.Time) {
+		return pgtype.Date{}, pgtype.Date{}, errors.New("from date must be before or equal to to date")
+	}
+	if inclusiveMonthSpan(from.Time, to.Time) > 6 {
+		return pgtype.Date{}, pgtype.Date{}, errors.New("date range must not exceed 6 months")
+	}
+	return from, to, nil
+}
+
+func inclusiveMonthSpan(from, to time.Time) int {
+	return (to.Year()-from.Year())*12 + int(to.Month()-from.Month()) + 1
+}
+
+func ensureExportTransactions(txns []db.Transaction) error {
+	for _, t := range txns {
+		if t.Kind != db.TxnKindSettlement {
+			return nil
+		}
+	}
+	return errors.New(noExportRowsMessage)
+}
+
+func exportTransactionRows(txns []db.Transaction, currency string) [][]string {
+	rows := [][]string{{"id", "date", "section", "category", "amount", "currency", "kind"}}
+	for _, t := range txns {
+		if t.Kind == db.TxnKindSettlement {
+			continue
+		}
+		rows = append(rows, []string{
+			t.ID.String(),
+			dateToString(t.TxnDate),
+			string(t.Section),
+			t.Category,
+			fmt.Sprintf("%.2f", numToFloat(t.Amount)),
+			currency,
+			string(t.Kind),
+		})
+	}
+	return rows
 }

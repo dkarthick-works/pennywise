@@ -263,6 +263,51 @@ func (q *Queries) ListSettlementLinksByYear(ctx context.Context, arg ListSettlem
 	return items, nil
 }
 
+const listTransactionsByDateRange = `-- name: ListTransactionsByDateRange :many
+SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at FROM transactions
+WHERE user_id = $1
+  AND txn_date >= $2
+  AND txn_date <= $3
+  AND kind <> 'settlement'
+ORDER BY txn_date, created_at
+`
+
+type ListTransactionsByDateRangeParams struct {
+	UserID   uuid.UUID   `json:"user_id"`
+	FromDate pgtype.Date `json:"from_date"`
+	ToDate   pgtype.Date `json:"to_date"`
+}
+
+func (q *Queries) ListTransactionsByDateRange(ctx context.Context, arg ListTransactionsByDateRangeParams) ([]Transaction, error) {
+	rows, err := q.db.Query(ctx, listTransactionsByDateRange, arg.UserID, arg.FromDate, arg.ToDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Transaction
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Section,
+			&i.Category,
+			&i.Amount,
+			&i.TxnDate,
+			&i.Kind,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTransactionsByMonth = `-- name: ListTransactionsByMonth :many
 SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at FROM transactions
 WHERE user_id = $1 AND to_char(txn_date, 'YYYY-MM') = $2::text

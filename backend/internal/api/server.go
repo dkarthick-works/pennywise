@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -79,6 +80,7 @@ func (s *Server) Router() http.Handler {
 		pr.Put("/api/templates/{section}", s.handlePutTemplates)
 
 		pr.Get("/api/transactions", s.handleListTransactions)
+		pr.Get("/api/transactions/export", s.handleExportTransactions)
 		pr.Post("/api/transactions", s.handleCreateTransaction)
 		pr.Patch("/api/transactions/{id}", s.handleUpdateTransaction)
 		pr.Delete("/api/transactions/{id}", s.handleDeleteTransaction)
@@ -147,6 +149,21 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 
 func writeErr(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
+}
+
+func writeCSV(w http.ResponseWriter, filename string, rows [][]string) error {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := w.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
+		return err
+	}
+	cw := csv.NewWriter(w)
+	if err := cw.WriteAll(rows); err != nil {
+		return err
+	}
+	return cw.Error()
 }
 
 func readJSON(r *http.Request, dst any) error {

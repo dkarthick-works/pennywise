@@ -1,7 +1,9 @@
 // All Pennywise API calls. Every function returns the unwrapped data so callers
 // can pass them directly into React Query queryFn / mutationFn.
 
+import axios from "axios";
 import client from "./client";
+import { parseContentDisposition } from "../lib/export";
 import type {
   Transaction,
   Settings,
@@ -49,6 +51,37 @@ export const getTxnsByMonth = (month: string) =>
 
 export const getTxnsByYear = (year: string) =>
   client.get<Transaction[]>("/api/transactions", { params: { year } }).then((r) => r.data);
+
+export async function exportTransactions(
+  from: string,
+  to: string
+): Promise<{ blob: Blob; filename: string }> {
+  try {
+    const r = await client.get<Blob>("/api/transactions/export", {
+      params: { from, to },
+      responseType: "blob",
+    });
+    return {
+      blob: r.data,
+      filename:
+        parseContentDisposition(r.headers["content-disposition"]) ??
+        `pennywise-transactions-${from}_${to}.csv`,
+    };
+  } catch (e) {
+    if (axios.isAxiosError(e) && e.response?.data instanceof Blob) {
+      const text = await e.response.data.text();
+      let message = "Export failed";
+      try {
+        const body = JSON.parse(text) as { error?: string };
+        message = body.error ?? message;
+      } catch {
+        // The backend normally returns JSON errors, but keep the UI readable if not.
+      }
+      throw new Error(message);
+    }
+    throw e;
+  }
+}
 
 export const createTxn = (body: Omit<Transaction, "id" | "settled">) =>
   client.post<Transaction>("/api/transactions", body).then((r) => r.data);

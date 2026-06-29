@@ -47,6 +47,7 @@ type Querier interface {
 	ListSettlementLinksByYear(ctx context.Context, arg ListSettlementLinksByYearParams) ([]SettlementLink, error)
 	ListTemplates(ctx context.Context, userID uuid.UUID) ([]Template, error)
 	ListTemplatesBySection(ctx context.Context, arg ListTemplatesBySectionParams) ([]Template, error)
+	ListTransactionsByDateRange(ctx context.Context, arg ListTransactionsByDateRangeParams) ([]Transaction, error)
 	ListTransactionsByMonth(ctx context.Context, arg ListTransactionsByMonthParams) ([]Transaction, error)
 	ListTransactionsByMonthSection(ctx context.Context, arg ListTransactionsByMonthSectionParams) ([]Transaction, error)
 	ListTransactionsByYear(ctx context.Context, arg ListTransactionsByYearParams) ([]Transaction, error)
