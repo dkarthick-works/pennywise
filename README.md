@@ -57,7 +57,7 @@ Health check: `GET /health` (also used by the container `HEALTHCHECK`).
 
 ```
 backend/              Go API, migrations, sqlc queries, dev Postgres compose
-frontend/             React SPA (Record, Dashboard, Insights, Settings, Profile)
+frontend/             React SPA (Record, Dashboard, Insights, Categories, Settings, Profile)
 auth-api-spec.json    Goauth OpenAPI spec (signup, login, refresh, …)
 Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine runtime
 ```
@@ -66,6 +66,9 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
 
 - **Record page** — default landing route; per-section status filter; daily rows grouped by date
   ([frontend/README.md § Record page](frontend/README.md))
+- **Category mapping** — map transaction labels to high-level groups for future dashboards
+  ([frontend/README.md § Categories page](frontend/README.md),
+  [backend/README.md § Category groups](backend/README.md))
 - **Insights** — emergency fund targets from essential spend lookback
   ([backend/README.md § Insights](backend/README.md))
 - **PWA** — installable, offline-capable app shell ([frontend/README.md § PWA](frontend/README.md))

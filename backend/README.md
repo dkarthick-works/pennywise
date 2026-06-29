@@ -27,6 +27,28 @@ without double-counting:
   `settlement_links` join table. A linked credit is reported as `settled`.
 - Sections: `essential`, `flexible`, `daily`. Budgets are per-section, user-global.
 
+### Category groups (mapping layer)
+
+Transaction rows store free-text `category` labels. **Category groups** are a separate
+metadata layer that maps those labels to high-level group names (e.g. `"Netflix"` →
+`"Streaming"`). Mappings do **not** rewrite transaction rows — they exist for future
+aggregations (dashboard rollups, etc.).
+
+| table | purpose |
+|-------|---------|
+| `category_groups` | named bucket per user (`name` + `normalized_name`, unique per user) |
+| `category_mappings` | links a transaction category string to a group (`raw_category` preserved, `normalized_category` for matching) |
+
+**Normalization** (Go: `internal/category/normalize.go`, SQL: same rules in queries):
+trim whitespace, collapse runs of spaces to one, lowercase. Two labels that normalize
+to the same string are treated as one mapping slot per user.
+
+**Unmapped** = distinct non-blank `transactions.category` values with no matching
+`category_mappings.normalized_category`. Creating a mapping requires the normalized
+category to already appear in the user's transactions.
+
+Deleting the last mapping in a group auto-removes the empty group (`DeleteCategoryGroupIfEmpty`).
+
 ## Layout
 
 ```
@@ -41,6 +63,7 @@ internal/
   db/                sqlc-GENERATED code (do not edit)
   seed/              default templates + demo dataset (ported from data.jsx)
   api/               HTTP handlers, DTOs, pgx<->JSON conversion
+  category/          label normalization for category groups
   insights/          emergency fund calculation (pure logic, no I/O)
 cmd/
   server/            the API server
@@ -97,6 +120,15 @@ only ever talks to this origin.
 | DELETE | `/api/transactions/{id}` | delete |
 | GET    | `/api/sections/{section}/open-credits?exclude={id}` | settlement picker candidates |
 | GET    | `/api/daily-suggestions` | ghost-autocomplete categories |
+| GET    | `/api/categories/unmapped` | distinct transaction category strings with no group mapping |
+| GET    | `/api/category-groups` | groups with nested mapping briefs |
+| POST   | `/api/category-groups` | create group + first mapping (`name`, `raw_category`) |
+| PATCH  | `/api/category-groups/{id}` | rename group |
+| DELETE | `/api/category-groups/{id}` | delete group and all its mappings |
+| GET    | `/api/category-mappings` | flat list with `group_name` |
+| POST   | `/api/category-mappings` | map label to existing `group_id` **or** new `group_name` (not both) |
+| PATCH  | `/api/category-mappings/{id}` | move mapping to another group; prunes empty old group |
+| DELETE | `/api/category-mappings/{id}` | remove mapping; prunes empty group |
 | GET    | `/api/insights` | emergency fund targets from essential spend |
 | GET    | `/api/months/{month}` | `{closed, seeded}` |
 | PUT    | `/api/months/{month}/closed` | toggle the cosmetic closed flag |
@@ -113,6 +145,29 @@ Mirrors the prototype shape so the frontend port is a pass-through:
 ```
 
 `settles` appears on settlement rows; `settled` is the derived flag on credit rows.
+
+### Category groups
+
+Handlers live in `internal/api/categories.go`; queries in `db/queries/category_groups.sql`.
+Migration: `0004_category_groups`.
+
+**Create mapping** — `POST /api/category-mappings`:
+
+```json
+{ "raw_category": "Netflix", "group_id": "uuid-of-streaming" }
+```
+
+or create a new group inline:
+
+```json
+{ "raw_category": "Swiggy", "group_name": "Food delivery" }
+```
+
+Returns `409 Conflict` if the normalized category is already mapped or the group name
+collides. Returns `400` if the category text does not exist in any transaction.
+
+**List unmapped** — `GET /api/categories/unmapped` returns a JSON array of strings,
+sorted alphabetically.
 
 ### Insights (`GET /api/insights`)
 
