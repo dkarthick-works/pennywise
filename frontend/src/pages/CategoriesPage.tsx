@@ -1,10 +1,11 @@
 import axios from "axios";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getUnmappedCategories,
   getCategoryGroups,
-  getCategoryMappings,
+  getTransactionCategoryTexts,
+  createCategoryGroup,
   createCategoryMapping,
   updateCategoryGroup,
   deleteCategoryGroup,
@@ -18,11 +19,29 @@ type Tab = "unmapped" | "groups";
 const catKeys = {
   unmapped: ["categories", "unmapped"] as const,
   groups: ["categories", "groups"] as const,
-  mappings: ["categories", "mappings"] as const,
+  texts: (groupId: string, q: string) => ["categories", "texts", groupId, q] as const,
 };
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["categories"] });
+}
+
+function errorMessage(e: unknown, fallback: string) {
+  if (axios.isAxiosError(e)) {
+    return (e.response?.data as { error?: string })?.error || fallback;
+  }
+  return e instanceof Error ? e.message : fallback;
+}
+
+function useDebouncedValue<T>(value: T, delayMs = 250) {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [value, delayMs]);
+
+  return debounced;
 }
 
 // ─── Assign row (Needs Mapping tab) ─────────────────────────────────────────
@@ -49,10 +68,7 @@ function AssignRow({
     },
     onSuccess: onDone,
     onError: (e: unknown) => {
-      const msg = axios.isAxiosError(e)
-        ? (e.response?.data as { error?: string })?.error
-        : e instanceof Error ? e.message : undefined;
-      setErr(msg || "Could not save mapping");
+      setErr(errorMessage(e, "Could not save mapping"));
     },
   });
 
@@ -126,6 +142,77 @@ function AssignRow({
 
 // ─── Group card (Groups tab) ────────────────────────────────────────────────
 
+function AddCategoryTextControl({
+  group,
+  onChanged,
+}: {
+  group: CategoryGroup;
+  onChanged: () => void;
+}) {
+  const [term, setTerm] = useState("");
+  const [err, setErr] = useState("");
+  const query = term.trim();
+  const debouncedQuery = useDebouncedValue(query);
+
+  const { data: matches = [], isFetching } = useQuery({
+    queryKey: catKeys.texts(group.id, debouncedQuery),
+    queryFn: () => getTransactionCategoryTexts({ q: debouncedQuery, excludeGroupId: group.id }),
+    enabled: debouncedQuery.length > 0,
+  });
+
+  const add = useMutation({
+    mutationFn: (rawCategory: string) =>
+      createCategoryMapping({ raw_category: rawCategory, group_id: group.id }),
+    onSuccess: () => {
+      setTerm("");
+      setErr("");
+      onChanged();
+    },
+    onError: (e: unknown) => {
+      setErr(errorMessage(e, "Could not add category text"));
+    },
+  });
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <input
+        className="input"
+        style={{ width: "100%", maxWidth: 360, padding: "8px 12px" }}
+        placeholder="Search transaction text to add…"
+        value={term}
+        onChange={(e) => { setTerm(e.target.value); setErr(""); }}
+      />
+      <p className="muted" style={{ fontSize: 12.5, margin: "6px 0 0" }}>
+        Add labels from your transactions, even if they already belong to another group.
+      </p>
+
+      {err && <p style={{ color: "var(--neg)", fontSize: 12.5, margin: "8px 0 0" }}>{err}</p>}
+
+      {debouncedQuery && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+          {isFetching ? (
+            <span className="muted" style={{ fontSize: 12.5 }}>Searching…</span>
+          ) : matches.length === 0 ? (
+            <span className="muted" style={{ fontSize: 12.5 }}>No available transaction text found.</span>
+          ) : (
+            matches.map((text) => (
+              <button
+                key={text}
+                className="btn btn-soft"
+                style={{ justifyContent: "flex-start", padding: "7px 10px", width: "100%" }}
+                disabled={add.isPending}
+                onClick={() => add.mutate(text)}
+              >
+                {text}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GroupCard({
   group,
   onChanged,
@@ -181,7 +268,7 @@ function GroupCard({
             <button
               className="btn btn-soft"
               style={{ padding: "6px 12px", color: "var(--neg)" }}
-              onClick={() => { if (confirm(`Delete group "${group.name}" and all its mappings?`)) removeGroup.mutate(); }}
+              onClick={() => { if (confirm(`Delete group "${group.name}" and its mappings? Text in other groups will stay there.`)) removeGroup.mutate(); }}
             >
               Delete group
             </button>
@@ -189,8 +276,12 @@ function GroupCard({
         )}
       </div>
 
+      <AddCategoryTextControl group={group} onChanged={onChanged} />
+
       {group.mappings.length === 0 ? (
-        <p className="muted" style={{ fontSize: 13, margin: 0 }}>No mapped category text.</p>
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+          No category text in this group yet. Search your transactions to add some.
+        </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {group.mappings.map((m) => (
@@ -209,8 +300,8 @@ function GroupCard({
               <span style={{ flex: "1 1 120px", fontSize: 13.5, fontWeight: 500 }}>{m.raw_category}</span>
               <button
                 className="x-btn"
-                title="Remove mapping"
-                onClick={() => { if (confirm(`Remove mapping for "${m.raw_category}"?`)) removeMapping.mutate(m.id); }}
+                title="Remove from this group"
+                onClick={() => { if (confirm(`Remove "${m.raw_category}" from "${group.name}"? It may remain in other groups.`)) removeMapping.mutate(m.id); }}
               >
                 <IconX size={14} />
               </button>
@@ -223,6 +314,59 @@ function GroupCard({
 }
 
 // ─── Page ───────────────────────────────────────────────────────────────────
+
+function CustomGroupCard({
+  onCreated,
+}: {
+  onCreated: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [err, setErr] = useState("");
+
+  const create = useMutation({
+    mutationFn: () => {
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("Enter a group name");
+      return createCategoryGroup({ name: trimmed });
+    },
+    onSuccess: () => {
+      setName("");
+      setErr("");
+      onCreated();
+    },
+    onError: (e: unknown) => {
+      setErr(errorMessage(e, "Could not create group"));
+    },
+  });
+
+  return (
+    <div className="card card-pad" style={{ marginTop: 16 }}>
+      <h3 className="card-h" style={{ marginBottom: 4 }}>Custom groups</h3>
+      <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>
+        Create an optional group, then open Groups to search your transaction text and add labels.
+      </p>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <input
+          className="input"
+          style={{ flex: "1 1 180px", maxWidth: 280, height: 36, padding: "7px 10px" }}
+          placeholder="Group name…"
+          value={name}
+          onChange={(e) => { setName(e.target.value); setErr(""); }}
+          onKeyDown={(e) => e.key === "Enter" && create.mutate()}
+        />
+        <button
+          className="btn btn-primary"
+          style={{ padding: "7px 14px", width: "auto", height: 36 }}
+          disabled={create.isPending}
+          onClick={() => create.mutate()}
+        >
+          Create group
+        </button>
+      </div>
+      {err && <p style={{ color: "var(--neg)", fontSize: 12.5, margin: "8px 0 0" }}>{err}</p>}
+    </div>
+  );
+}
 
 export function CategoriesPage() {
   const qc = useQueryClient();
@@ -237,11 +381,6 @@ export function CategoriesPage() {
   const { data: groups = [], isLoading: loadingGroups } = useQuery({
     queryKey: catKeys.groups,
     queryFn: getCategoryGroups,
-  });
-
-  useQuery({
-    queryKey: catKeys.mappings,
-    queryFn: getCategoryMappings,
   });
 
   const refresh = () => invalidateAll(qc);
@@ -288,15 +427,27 @@ export function CategoriesPage() {
         <div className="card card-pad">
           <h3 className="card-h" style={{ marginBottom: 4 }}>Unmapped category text</h3>
           <p className="muted" style={{ fontSize: 12.5, margin: "0 0 16px" }}>
-            These labels appear in your transactions but are not assigned to a group yet.
+            These labels appear in your transactions but are not assigned to any group yet.
           </p>
 
           {loadingUnmapped || loadingGroups ? (
             <p className="muted" style={{ fontSize: 13 }}>Loading…</p>
           ) : filteredUnmapped.length === 0 ? (
-            <p className="muted" style={{ fontSize: 13 }}>
-              {unmapped.length === 0 ? "All category text is mapped." : "No matches."}
-            </p>
+            <>
+              <p className="muted" style={{ fontSize: 13 }}>
+                {unmapped.length === 0
+                  ? "All category text has at least one group. Use custom groups for optional overlap."
+                  : "No matches."}
+              </p>
+              {unmapped.length === 0 && (
+                <CustomGroupCard
+                  onCreated={() => {
+                    refresh();
+                    setTab("groups");
+                  }}
+                />
+              )}
+            </>
           ) : (
             filteredUnmapped.map((text) => (
               <AssignRow key={text} text={text} groups={groups} onDone={refresh} />
@@ -311,7 +462,7 @@ export function CategoriesPage() {
             <div className="card card-pad">
               <p className="muted" style={{ fontSize: 13, margin: 0 }}>
                 {groups.length === 0
-                  ? "No groups yet. Map category text from the Needs mapping tab."
+                  ? "No groups yet. Finish primary mapping, then create a custom group from Needs mapping."
                   : "No matches."}
               </p>
             </div>
@@ -320,62 +471,8 @@ export function CategoriesPage() {
               <GroupCard key={g.id} group={g} onChanged={refresh} />
             ))
           )}
-
-          {/* Existing mappings flat view for edit */}
-          {groups.length > 0 && (
-            <div className="card card-pad" style={{ marginTop: 18 }}>
-              <h3 className="card-h" style={{ marginBottom: 12 }}>All mappings</h3>
-              <MappingsTable groups={groups} onChanged={refresh} />
-            </div>
-          )}
         </>
       )}
     </div>
-  );
-}
-
-function MappingsTable({ groups, onChanged }: { groups: CategoryGroup[]; onChanged: () => void }) {
-  const rows = groups.flatMap((g) =>
-    g.mappings.map((m) => ({ ...m, group_id: g.id, group_name: g.name }))
-  );
-
-  const remove = useMutation({
-    mutationFn: (id: string) => deleteCategoryMapping(id),
-    onSuccess: onChanged,
-  });
-
-  if (rows.length === 0) {
-    return <p className="muted" style={{ fontSize: 13, margin: 0 }}>No mappings yet.</p>;
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {rows.map((r) => (
-        <div
-          key={r.id}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            flexWrap: "wrap",
-            padding: "8px 0",
-            borderBottom: "1px solid var(--border-2)",
-          }}
-        >
-          <span style={{ flex: "1 1 140px", fontSize: 13.5, fontWeight: 500 }}>{r.raw_category}</span>
-          <IconArrowInline />
-          <span style={{ flex: "1 1 120px", fontSize: 13.5, fontWeight: 600 }}>{r.group_name}</span>
-          <button className="x-btn" onClick={() => { if (confirm(`Remove mapping for "${r.raw_category}"?`)) remove.mutate(r.id); }}>
-            <IconX size={14} />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function IconArrowInline() {
-  return (
-    <span className="muted" style={{ fontSize: 12, flex: "none" }}>→</span>
   );
 }

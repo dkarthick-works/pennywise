@@ -33,6 +33,36 @@ WHERE user_id = $1
   AND to_char(txn_date, 'YYYY-MM') = ANY($2::text[])
 GROUP BY 1;
 
+-- name: SumDashboardMonthly :one
+SELECT
+  COALESCE(SUM(amount) FILTER (WHERE section = 'income'), 0)::numeric AS income,
+  COALESCE(SUM(amount) FILTER (
+    WHERE section IN ('essential','flexible','daily')
+      AND kind IN ('cash','settlement')
+  ), 0)::numeric AS cash_flow,
+  COALESCE(SUM(amount) FILTER (
+    WHERE section IN ('essential','flexible','daily')
+      AND kind IN ('cash','credit')
+  ), 0)::numeric AS monthly_cost,
+  COUNT(*) FILTER (
+    WHERE section IN ('essential','flexible','daily')
+      AND kind = 'credit'
+      AND NOT EXISTS (
+        SELECT 1 FROM settlement_links sl WHERE sl.credit_id = transactions.id
+      )
+  )::bigint AS outstanding_credits_count,
+  COALESCE(SUM(amount) FILTER (
+    WHERE section IN ('essential','flexible','daily')
+      AND kind = 'credit'
+      AND NOT EXISTS (
+        SELECT 1 FROM settlement_links sl WHERE sl.credit_id = transactions.id
+      )
+  ), 0)::numeric AS outstanding_credits_total
+FROM transactions
+WHERE user_id = $1
+  AND txn_date >= sqlc.arg(from_date)
+  AND txn_date <  sqlc.arg(to_date);
+
 -- name: GetTransaction :one
 SELECT * FROM transactions
 WHERE id = $1 AND user_id = $2;

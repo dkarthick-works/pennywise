@@ -89,8 +89,10 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/daily-suggestions", s.handleDailySuggestions)
 		pr.Get("/api/income-suggestions", s.handleIncomeSuggestions)
 		pr.Get("/api/insights", s.handleGetInsights)
+		pr.Get("/api/dashboard/monthly", s.handleGetDashboardMonthly)
 
 		pr.Get("/api/categories/unmapped", s.handleListUnmappedCategories)
+		pr.Get("/api/categories/texts", s.handleListTransactionCategoryTexts)
 		pr.Get("/api/category-groups", s.handleListCategoryGroups)
 		pr.Post("/api/category-groups", s.handleCreateCategoryGroup)
 		pr.Patch("/api/category-groups/{id}", s.handleUpdateCategoryGroup)
@@ -98,7 +100,6 @@ func (s *Server) Router() http.Handler {
 
 		pr.Get("/api/category-mappings", s.handleListCategoryMappings)
 		pr.Post("/api/category-mappings", s.handleCreateCategoryMapping)
-		pr.Patch("/api/category-mappings/{id}", s.handleUpdateCategoryMapping)
 		pr.Delete("/api/category-mappings/{id}", s.handleDeleteCategoryMapping)
 
 		pr.Get("/api/months/{month}", s.handleGetMonth)

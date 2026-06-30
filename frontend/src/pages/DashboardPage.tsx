@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getTxnsByMonth, getTxnsByYear, getSettings } from "../api/ledger";
-import { sectionSums, incomeSum } from "../lib/txns";
+import { getDashboardMonthly, getTxnsByMonth, getTxnsByYear, getSettings } from "../api/ledger";
+import { sectionSums } from "../lib/txns";
 import { inr, inrShort, budgetColor } from "../lib/money";
 import { monthLabel, shiftMonth, MONTH_NAMES } from "../lib/dates";
 import { Donut, YearBars, BudgetBars } from "../components/charts/Charts";
@@ -32,7 +32,7 @@ function HeroRow({ label, value, strong, color }: {
 }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "5px 0" }}>
-      <span className="stat-lbl" style={{ color: "var(--ink-2)", fontWeight: 500 }}>{label}</span>
+      <span className="stat-lbl" style={{ color: strong ? "var(--ink)" : "var(--ink-2)", fontWeight: strong ? 650 : 500 }}>{label}</span>
       <span
         className="num"
         style={{ fontWeight: strong ? 700 : 600, fontSize: strong ? 15 : 14.5, color: color ?? "var(--ink)" }}
@@ -58,6 +58,12 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
     enabled: view === "monthly",
   });
 
+  const { data: dashboardMonthly } = useQuery({
+    queryKey: ["dashboard", "monthly", month],
+    queryFn: () => getDashboardMonthly(month),
+    enabled: view === "monthly",
+  });
+
   const { data: yearTxns = [] } = useQuery({
     queryKey: ["txns", "year", year],
     queryFn: () => getTxnsByYear(year),
@@ -66,16 +72,9 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
 
   const budgets = settings?.budgets ?? { essential: 0, flexible: 0, daily: 0 };
 
-  // Income is derived from income-section transactions, not a static setting.
-  const income = incomeSum(monthTxns, month);
-
   // ---- monthly computations ----
   const incBy  = sectionSums(monthTxns, month, "incurred");
-  const cashBy = sectionSums(monthTxns, month, "cashout");
   const spentIncurred = incBy.essential + incBy.flexible + incBy.daily;
-  const cashOut  = cashBy.essential + cashBy.flexible + cashBy.daily;
-  const netSaved = income - cashOut;
-  const monthDiff = income - spentIncurred;
 
   const sectionCards = (["essential", "flexible", "daily"] as const).map((k) => {
     const spent  = incBy[k];
@@ -117,6 +116,19 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
     (a, m) => ({ essential: a.essential + m.sums.essential, flexible: a.flexible + m.sums.flexible, daily: a.daily + m.sums.daily }),
     { essential: 0, flexible: 0, daily: 0 }
   );
+
+  const income = dashboardMonthly?.income ?? 0;
+  const cashFlow = dashboardMonthly?.cash_flow ?? 0;
+  const monthlyCost = dashboardMonthly?.monthly_cost ?? 0;
+  const netSaved = dashboardMonthly?.net_saved ?? 0;
+  const savingsRate = dashboardMonthly?.savings_rate ?? 0;
+  const monthlyDifference = dashboardMonthly?.monthly_difference ?? 0;
+  const outstandingCreditsCount = dashboardMonthly?.outstanding_credits_count ?? 0;
+  const outstandingCreditsTotal = dashboardMonthly?.outstanding_credits_total ?? 0;
+  const outstandingCreditSuffix =
+    outstandingCreditsCount > 0
+      ? ` · ${outstandingCreditsCount} transaction${outstandingCreditsCount === 1 ? "" : "s"}`
+      : "";
 
   return (
     <div className="content fade-in">
@@ -160,14 +172,35 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
                 </span>
               </div>
               <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>Cash that actually moved this month.</p>
-              <HeroRow label="Income in"  value={inr(income)}  color="var(--pos)" />
-              <HeroRow label="Cash out"   value={inr(cashOut)} />
-              <div style={{ height: 1, background: "var(--border-2)", margin: "9px 0" }} />
+              <div
+                style={{
+                  margin: "0 0 10px",
+                  padding: "12px 14px",
+                  borderRadius: 14,
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-2)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
+                  <div>
+                    <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 3 }}>Cash out</div>
+                    <div className="muted" style={{ fontSize: 11.5 }}>cash + settlements</div>
+                  </div>
+                  <div className="num" style={{ fontSize: 29, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--ink)" }}>
+                    {inr(cashFlow)}
+                  </div>
+                </div>
+              </div>
+              <HeroRow label="Income"     value={inr(income)}  color="var(--pos)" />
+              <div style={{ height: 1, background: "var(--border-2)", margin: "10px 0" }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
                 <span className="stat-lbl">Net saved</span>
                 <span className="stat-big num" style={{ color: netSaved >= 0 ? "var(--pos)" : "var(--neg)" }}>
                   {netSaved >= 0 ? "+" : "−"}{inr(Math.abs(netSaved))}
                 </span>
+              </div>
+              <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                <span className="num" style={{ fontWeight: 600 }}>{Math.round(savingsRate)}%</span> savings rate
               </div>
             </div>
 
@@ -181,14 +214,35 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
                 </span>
               </div>
               <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>What you incurred — regardless of when paid.</p>
-              <HeroRow label="Income"           value={inr(income)}        color="var(--pos)" />
-              <HeroRow label="Spent this month" value={inr(spentIncurred)} />
+              <div
+                style={{
+                  margin: "0 0 10px",
+                  padding: "12px 14px",
+                  borderRadius: 14,
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-2)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
+                  <div>
+                    <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 3 }}>Spent this month</div>
+                    <div className="muted" style={{ fontSize: 11.5 }}>cash + credit</div>
+                  </div>
+                  <div className="num" style={{ fontSize: 29, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--ink)" }}>
+                    {inr(monthlyCost)}
+                  </div>
+                </div>
+              </div>
+              <HeroRow label="Income" value={inr(income)} color="var(--pos)" />
               <div style={{ height: 1, background: "var(--border-2)", margin: "9px 0" }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
                 <span className="stat-lbl">Difference</span>
-                <span className="stat-big num" style={{ color: monthDiff >= 0 ? "var(--pos)" : "var(--neg)" }}>
-                  {monthDiff >= 0 ? "+" : "−"}{inr(Math.abs(monthDiff))}
+                <span className="stat-big num" style={{ color: monthlyDifference >= 0 ? "var(--pos)" : "var(--neg)" }}>
+                  {monthlyDifference >= 0 ? "+" : "−"}{inr(Math.abs(monthlyDifference))}
                 </span>
+              </div>
+              <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                Outstanding credits · <span className="num" style={{ fontWeight: 600, color: outstandingCreditsTotal > 0 ? "var(--neg)" : "var(--ink-2)" }}>{inr(outstandingCreditsTotal)}</span>{outstandingCreditSuffix}
               </div>
             </div>
           </div>

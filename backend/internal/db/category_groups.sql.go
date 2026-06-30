@@ -65,25 +65,6 @@ func (q *Queries) DeleteCategoryGroup(ctx context.Context, arg DeleteCategoryGro
 	return err
 }
 
-const deleteCategoryGroupIfEmpty = `-- name: DeleteCategoryGroupIfEmpty :exec
-DELETE FROM category_groups cg
-WHERE cg.id = $1
-  AND cg.user_id = $2
-  AND NOT EXISTS (
-      SELECT 1 FROM category_mappings cm WHERE cm.group_id = cg.id
-  )
-`
-
-type DeleteCategoryGroupIfEmptyParams struct {
-	ID     uuid.UUID `json:"id"`
-	UserID uuid.UUID `json:"user_id"`
-}
-
-func (q *Queries) DeleteCategoryGroupIfEmpty(ctx context.Context, arg DeleteCategoryGroupIfEmptyParams) error {
-	_, err := q.db.Exec(ctx, deleteCategoryGroupIfEmpty, arg.ID, arg.UserID)
-	return err
-}
-
 const deleteCategoryMapping = `-- name: DeleteCategoryMapping :exec
 DELETE FROM category_mappings
 WHERE id = $1 AND user_id = $2
@@ -335,6 +316,55 @@ func (q *Queries) ListCategoryMappingsByGroup(ctx context.Context, arg ListCateg
 	return items, nil
 }
 
+const listTransactionCategoryTexts = `-- name: ListTransactionCategoryTexts :many
+SELECT MIN(t.category)::text AS category
+FROM transactions t
+WHERE t.user_id = $1
+  AND btrim(t.category) <> ''
+  AND ($2::text IS NULL OR t.category ILIKE '%' || $2 || '%')
+  AND ($3::uuid IS NULL OR NOT EXISTS (
+      SELECT 1 FROM category_mappings cm
+      WHERE cm.user_id = t.user_id
+        AND cm.group_id = $3
+        AND cm.normalized_category = lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g'))
+  ))
+GROUP BY lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g'))
+ORDER BY MIN(t.category)
+LIMIT $4
+`
+
+type ListTransactionCategoryTextsParams struct {
+	UserID         uuid.UUID   `json:"user_id"`
+	Search         *string     `json:"search"`
+	ExcludeGroupID pgtype.UUID `json:"exclude_group_id"`
+	Limit          int32       `json:"limit"`
+}
+
+func (q *Queries) ListTransactionCategoryTexts(ctx context.Context, arg ListTransactionCategoryTextsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listTransactionCategoryTexts,
+		arg.UserID,
+		arg.Search,
+		arg.ExcludeGroupID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var category string
+		if err := rows.Scan(&category); err != nil {
+			return nil, err
+		}
+		items = append(items, category)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUnmappedCategoryTexts = `-- name: ListUnmappedCategoryTexts :many
 SELECT DISTINCT t.category
 FROM transactions t
@@ -397,35 +427,6 @@ func (q *Queries) UpdateCategoryGroupName(ctx context.Context, arg UpdateCategor
 		&i.UserID,
 		&i.Name,
 		&i.NormalizedName,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const updateCategoryMappingGroup = `-- name: UpdateCategoryMappingGroup :one
-UPDATE category_mappings
-SET group_id = $3,
-    updated_at = now()
-WHERE id = $1 AND user_id = $2
-RETURNING id, user_id, raw_category, normalized_category, group_id, created_at, updated_at
-`
-
-type UpdateCategoryMappingGroupParams struct {
-	ID      uuid.UUID `json:"id"`
-	UserID  uuid.UUID `json:"user_id"`
-	GroupID uuid.UUID `json:"group_id"`
-}
-
-func (q *Queries) UpdateCategoryMappingGroup(ctx context.Context, arg UpdateCategoryMappingGroupParams) (CategoryMapping, error) {
-	row := q.db.QueryRow(ctx, updateCategoryMappingGroup, arg.ID, arg.UserID, arg.GroupID)
-	var i CategoryMapping
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.RawCategory,
-		&i.NormalizedCategory,
-		&i.GroupID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

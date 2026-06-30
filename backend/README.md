@@ -37,7 +37,7 @@ aggregations (dashboard rollups, etc.).
 | table | purpose |
 |-------|---------|
 | `category_groups` | named bucket per user (`name` + `normalized_name`, unique per user) |
-| `category_mappings` | links a transaction category string to a group (`raw_category` preserved, `normalized_category` for matching) |
+| `category_mappings` | links a transaction category string to a group (`raw_category` preserved, `normalized_category` for matching); one label can belong to multiple groups |
 
 **Normalization** (Go: `internal/category/normalize.go`, SQL: same rules in queries):
 trim whitespace, collapse runs of spaces to one, lowercase. Two labels that normalize
@@ -47,7 +47,7 @@ to the same string are treated as one mapping slot per user.
 `category_mappings.normalized_category`. Creating a mapping requires the normalized
 category to already appear in the user's transactions.
 
-Deleting the last mapping in a group auto-removes the empty group (`DeleteCategoryGroupIfEmpty`).
+Empty groups are allowed and stay around until the user deletes the group.
 
 ## Layout
 
@@ -120,15 +120,16 @@ only ever talks to this origin.
 | DELETE | `/api/transactions/{id}` | delete |
 | GET    | `/api/sections/{section}/open-credits?exclude={id}` | settlement picker candidates |
 | GET    | `/api/daily-suggestions` | ghost-autocomplete categories |
+| GET    | `/api/dashboard/monthly?month=YYYY-MM` | dashboard hero-card totals |
 | GET    | `/api/categories/unmapped` | distinct transaction category strings with no group mapping |
+| GET    | `/api/categories/texts?q=&exclude_group_id=` | searchable transaction category strings; optionally excludes labels already in one group |
 | GET    | `/api/category-groups` | groups with nested mapping briefs |
-| POST   | `/api/category-groups` | create group + first mapping (`name`, `raw_category`) |
+| POST   | `/api/category-groups` | create an empty group (`name`) |
 | PATCH  | `/api/category-groups/{id}` | rename group |
 | DELETE | `/api/category-groups/{id}` | delete group and all its mappings |
 | GET    | `/api/category-mappings` | flat list with `group_name` |
 | POST   | `/api/category-mappings` | map label to existing `group_id` **or** new `group_name` (not both) |
-| PATCH  | `/api/category-mappings/{id}` | move mapping to another group; prunes empty old group |
-| DELETE | `/api/category-mappings/{id}` | remove mapping; prunes empty group |
+| DELETE | `/api/category-mappings/{id}` | remove mapping from one group |
 | GET    | `/api/insights` | emergency fund targets from essential spend |
 | GET    | `/api/months/{month}` | `{closed, seeded}` |
 | PUT    | `/api/months/{month}/closed` | toggle the cosmetic closed flag |
@@ -145,6 +146,39 @@ Mirrors the prototype shape so the frontend port is a pass-through:
 ```
 
 `settles` appears on settlement rows; `settled` is the derived flag on credit rows.
+
+### Dashboard (`GET /api/dashboard/monthly?month=YYYY-MM`)
+
+Returns the monthly hero-card totals for the selected month. Section cards,
+donut charts, budget bars, and the yearly dashboard remain frontend-computed for
+now.
+
+**What counts:**
+
+- `income`: all rows where `section = 'income'`.
+- `cash_flow`: expense rows (`essential`, `flexible`, `daily`) where `kind` is
+  `cash` or `settlement`.
+- `monthly_cost`: expense rows where `kind` is `cash` or `credit`.
+- `outstanding_credits_*`: expense `credit` rows incurred in the selected month
+  that have no `settlement_links` row.
+- `net_saved`, `monthly_difference`, and `savings_rate` are computed in the Go
+  handler from the raw sums. `savings_rate` is `0` when income is `0`.
+
+Response shape:
+
+```json
+{
+  "month": "2026-06",
+  "income": 85000,
+  "cash_flow": 62000,
+  "monthly_cost": 71000,
+  "net_saved": 23000,
+  "savings_rate": 27.06,
+  "monthly_difference": 14000,
+  "outstanding_credits_count": 2,
+  "outstanding_credits_total": 9000
+}
+```
 
 ### Category groups
 
@@ -163,8 +197,9 @@ or create a new group inline:
 { "raw_category": "Swiggy", "group_name": "Food delivery" }
 ```
 
-Returns `409 Conflict` if the normalized category is already mapped or the group name
-collides. Returns `400` if the category text does not exist in any transaction.
+Returns `409 Conflict` if the normalized category is already in that group or the
+group name collides. Returns `400` if the category text does not exist in any
+transaction.
 
 **List unmapped** — `GET /api/categories/unmapped` returns a JSON array of strings,
 sorted alphabetically.

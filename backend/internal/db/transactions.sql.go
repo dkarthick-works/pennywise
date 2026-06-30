@@ -519,6 +519,64 @@ func (q *Queries) SettledCreditIdsByMonth(ctx context.Context, arg SettledCredit
 	return items, nil
 }
 
+const sumDashboardMonthly = `-- name: SumDashboardMonthly :one
+SELECT
+  COALESCE(SUM(amount) FILTER (WHERE section = 'income'), 0)::numeric AS income,
+  COALESCE(SUM(amount) FILTER (
+    WHERE section IN ('essential','flexible','daily')
+      AND kind IN ('cash','settlement')
+  ), 0)::numeric AS cash_flow,
+  COALESCE(SUM(amount) FILTER (
+    WHERE section IN ('essential','flexible','daily')
+      AND kind IN ('cash','credit')
+  ), 0)::numeric AS monthly_cost,
+  COUNT(*) FILTER (
+    WHERE section IN ('essential','flexible','daily')
+      AND kind = 'credit'
+      AND NOT EXISTS (
+        SELECT 1 FROM settlement_links sl WHERE sl.credit_id = transactions.id
+      )
+  )::bigint AS outstanding_credits_count,
+  COALESCE(SUM(amount) FILTER (
+    WHERE section IN ('essential','flexible','daily')
+      AND kind = 'credit'
+      AND NOT EXISTS (
+        SELECT 1 FROM settlement_links sl WHERE sl.credit_id = transactions.id
+      )
+  ), 0)::numeric AS outstanding_credits_total
+FROM transactions
+WHERE user_id = $1
+  AND txn_date >= $2
+  AND txn_date <  $3
+`
+
+type SumDashboardMonthlyParams struct {
+	UserID   uuid.UUID   `json:"user_id"`
+	FromDate pgtype.Date `json:"from_date"`
+	ToDate   pgtype.Date `json:"to_date"`
+}
+
+type SumDashboardMonthlyRow struct {
+	Income                  pgtype.Numeric `json:"income"`
+	CashFlow                pgtype.Numeric `json:"cash_flow"`
+	MonthlyCost             pgtype.Numeric `json:"monthly_cost"`
+	OutstandingCreditsCount int64          `json:"outstanding_credits_count"`
+	OutstandingCreditsTotal pgtype.Numeric `json:"outstanding_credits_total"`
+}
+
+func (q *Queries) SumDashboardMonthly(ctx context.Context, arg SumDashboardMonthlyParams) (SumDashboardMonthlyRow, error) {
+	row := q.db.QueryRow(ctx, sumDashboardMonthly, arg.UserID, arg.FromDate, arg.ToDate)
+	var i SumDashboardMonthlyRow
+	err := row.Scan(
+		&i.Income,
+		&i.CashFlow,
+		&i.MonthlyCost,
+		&i.OutstandingCreditsCount,
+		&i.OutstandingCreditsTotal,
+	)
+	return i, err
+}
+
 const sumEssentialSpendByMonths = `-- name: SumEssentialSpendByMonths :many
 SELECT to_char(txn_date, 'YYYY-MM') AS month,
        COALESCE(SUM(amount), 0)::numeric AS total

@@ -69,21 +69,23 @@ user-defined **groups** for future dashboard rollups. Transaction rows are not m
 | Tab | Purpose |
 |-----|---------|
 | **Needs mapping** | Lists unmapped category strings from `GET /api/categories/unmapped`. Each row can be assigned to an existing group (pill buttons) or a new group name. |
-| **Groups** | Browse groups, rename or delete a group, remove individual mappings. Includes an **All mappings** flat table at the bottom. |
+| **Groups** | Browse groups, rename or delete a group, remove individual mappings, and search transaction text to add labels to a group. |
 
 A search box filters both tabs (category text and group names).
 
 ### API wrappers
 
 Category endpoints are in `src/api/ledger.ts` (`getUnmappedCategories`, `getCategoryGroups`,
-`createCategoryMapping`, `updateCategoryGroup`, `deleteCategoryGroup`, `deleteCategoryMapping`).
+`getTransactionCategoryTexts`, `createCategoryMapping`, `createCategoryGroup`,
+`updateCategoryGroup`, `deleteCategoryGroup`, `deleteCategoryMapping`).
 React Query keys are prefixed with `["categories", …]`; mutations invalidate the whole tree.
 
 ### Constraints (from the API)
 
 - A mapping can only be created for category text that already appears in your transactions.
 - Label matching is case- and whitespace-insensitive (backend normalizes before compare).
-- Deleting the last mapping in a group removes the empty group automatically.
+- A category label can belong to multiple groups, but not twice in the same group.
+- Empty groups stay visible until the user deletes them.
 - `POST /api/category-mappings` accepts `group_id` **or** `group_name`, not both.
 
 ## API client
