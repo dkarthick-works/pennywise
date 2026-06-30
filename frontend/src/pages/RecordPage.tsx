@@ -32,6 +32,7 @@ function invalidateMonthCaches(qc: QueryClient, month: string) {
   qc.invalidateQueries({ queryKey: ["open-month", month] });
   qc.invalidateQueries({ queryKey: ["txns", "month", month] });
   qc.invalidateQueries({ queryKey: ["dashboard", "monthly", month] });
+  qc.invalidateQueries({ queryKey: ["group-spend", month] });
   qc.invalidateQueries({ queryKey: ["daily-suggestions"] });
 }
 

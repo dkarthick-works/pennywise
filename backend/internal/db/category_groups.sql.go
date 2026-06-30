@@ -398,6 +398,55 @@ func (q *Queries) ListUnmappedCategoryTexts(ctx context.Context, userID uuid.UUI
 	return items, nil
 }
 
+const sumSpendByGroupsForMonth = `-- name: SumSpendByGroupsForMonth :many
+SELECT
+    cg.id AS group_id,
+    cg.name AS group_name,
+    COALESCE(SUM(t.amount), 0)::numeric AS total
+FROM category_groups cg
+LEFT JOIN category_mappings cm
+    ON cm.group_id = cg.id AND cm.user_id = cg.user_id
+LEFT JOIN transactions t
+    ON t.user_id = cg.user_id
+    AND lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g')) = cm.normalized_category
+    AND t.txn_date >= $1
+    AND t.txn_date < $2
+WHERE cg.user_id = $3
+GROUP BY cg.id, cg.name
+`
+
+type SumSpendByGroupsForMonthParams struct {
+	FromDate pgtype.Date `json:"from_date"`
+	ToDate   pgtype.Date `json:"to_date"`
+	UserID   uuid.UUID   `json:"user_id"`
+}
+
+type SumSpendByGroupsForMonthRow struct {
+	GroupID   uuid.UUID      `json:"group_id"`
+	GroupName string         `json:"group_name"`
+	Total     pgtype.Numeric `json:"total"`
+}
+
+func (q *Queries) SumSpendByGroupsForMonth(ctx context.Context, arg SumSpendByGroupsForMonthParams) ([]SumSpendByGroupsForMonthRow, error) {
+	rows, err := q.db.Query(ctx, sumSpendByGroupsForMonth, arg.FromDate, arg.ToDate, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SumSpendByGroupsForMonthRow
+	for rows.Next() {
+		var i SumSpendByGroupsForMonthRow
+		if err := rows.Scan(&i.GroupID, &i.GroupName, &i.Total); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateCategoryGroupName = `-- name: UpdateCategoryGroupName :one
 UPDATE category_groups
 SET name = $3,

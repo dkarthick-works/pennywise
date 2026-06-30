@@ -24,6 +24,7 @@ const catKeys = {
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["categories"] });
+  qc.invalidateQueries({ queryKey: ["group-spend"] });
 }
 
 function errorMessage(e: unknown, fallback: string) {

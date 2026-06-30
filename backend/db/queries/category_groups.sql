@@ -29,6 +29,22 @@ SELECT COUNT(*)::bigint AS count
 FROM category_mappings
 WHERE group_id = $1 AND user_id = $2;
 
+-- name: SumSpendByGroupsForMonth :many
+SELECT
+    cg.id AS group_id,
+    cg.name AS group_name,
+    COALESCE(SUM(t.amount), 0)::numeric AS total
+FROM category_groups cg
+LEFT JOIN category_mappings cm
+    ON cm.group_id = cg.id AND cm.user_id = cg.user_id
+LEFT JOIN transactions t
+    ON t.user_id = cg.user_id
+    AND lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g')) = cm.normalized_category
+    AND t.txn_date >= sqlc.arg(from_date)
+    AND t.txn_date < sqlc.arg(to_date)
+WHERE cg.user_id = sqlc.arg(user_id)
+GROUP BY cg.id, cg.name;
+
 -- name: ListUnmappedCategoryTexts :many
 SELECT DISTINCT t.category
 FROM transactions t

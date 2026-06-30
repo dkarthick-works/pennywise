@@ -98,6 +98,12 @@ export interface DashboardMonthly {
   outstanding_credits_total: number;
 }
 
+export interface CategoryGroupSpend {
+  group_id: string;
+  group_name: string;
+  total: number;
+}
+
 // ─── Category grouping ──────────────────────────────────────────────────────
 
 export interface CategoryMappingBrief {

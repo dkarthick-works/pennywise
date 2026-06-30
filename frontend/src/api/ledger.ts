@@ -14,6 +14,7 @@ import type {
   OpenMonthResponse,
   Insights,
   DashboardMonthly,
+  CategoryGroupSpend,
   CategoryGroup,
   CategoryMapping,
 } from "../types";
@@ -119,6 +120,9 @@ export const getInsights = () =>
 
 export const getDashboardMonthly = (month: string) =>
   client.get<DashboardMonthly>("/api/dashboard/monthly", { params: { month } }).then((r) => r.data);
+
+export const getGroupSpend = (month: string): Promise<CategoryGroupSpend[]> =>
+  client.get<CategoryGroupSpend[]>("/api/dashboard/group-spend", { params: { month } }).then((r) => r.data);
 
 // ─── Month state ──────────────────────────────────────────────────────────
 
