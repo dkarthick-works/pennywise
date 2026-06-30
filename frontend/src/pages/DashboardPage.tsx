@@ -4,7 +4,7 @@ import { getDashboardMonthly, getTxnsByMonth, getTxnsByYear, getSettings } from 
 import { sectionSums } from "../lib/txns";
 import { inr, inrShort, budgetColor } from "../lib/money";
 import { monthLabel, shiftMonth, MONTH_NAMES } from "../lib/dates";
-import { Donut, YearBars, BudgetBars } from "../components/charts/Charts";
+import { Donut, YearBars } from "../components/charts/Charts";
 import { IconChevL, IconChevR, IconWallet, IconTrend } from "../components/ui/Icons";
 
 const SECMETA = {
@@ -83,8 +83,6 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
     const pctOfTotal = spentIncurred ? (spent / spentIncurred) * 100 : 0;
     return { k, ...SECMETA[k], spent, budget, ratio, pctOfTotal };
   });
-
-  const donutSegs = sectionCards.map((s) => ({ label: s.label, value: s.spent, color: s.color }));
 
   // ---- yearly computations ----
   const perMonth = MONTH_NAMES.map((nm, i) => {
@@ -278,29 +276,6 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
                 </div>
               </div>
             ))}
-          </div>
-
-          {/* donut + budget bars */}
-          <div className="grid" style={{ gridTemplateColumns: "minmax(260px, 1fr) minmax(300px, 1.5fr)" }}>
-            <div className="card card-pad">
-              <h3 className="card-h" style={{ marginBottom: 16 }}>Spend mix</h3>
-              <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
-                <Donut segments={donutSegs} centerTop={inrShort(spentIncurred)} centerBot="total spent" />
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minWidth: 130 }}>
-                  {sectionCards.map((s) => (
-                    <div key={s.k} style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                      <span className="dot" style={{ background: s.color, width: 10, height: 10 }} />
-                      <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>{s.label}</span>
-                      <span className="num" style={{ fontSize: 13, fontWeight: 600 }}>{Math.round(s.pctOfTotal)}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="card card-pad">
-              <h3 className="card-h" style={{ marginBottom: 20 }}>Budget vs actual</h3>
-              <BudgetBars rows={sectionCards.map((s) => ({ label: s.label, color: s.color, actual: s.spent, budget: s.budget }))} />
-            </div>
           </div>
         </div>
       ) : (

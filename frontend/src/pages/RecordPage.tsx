@@ -850,9 +850,25 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
           <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ink-3)" }}>
             Open month
           </span>
+          <button
+            className="btn btn-soft"
+            style={{ padding: "7px 10px" }}
+            onClick={() => { setMonth(shiftMonth(month, -1)); setTile(null); }}
+            aria-label="Previous month"
+          >
+            <IconChevL size={15} />
+          </button>
           <span className="num" style={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.01em", color: closed ? "var(--ink-3)" : "var(--ink)" }}>
             {monthCode(month)}
           </span>
+          <button
+            className="btn btn-soft"
+            style={{ padding: "7px 10px" }}
+            onClick={() => { setMonth(shiftMonth(month, 1)); setTile(null); }}
+            aria-label="Next month"
+          >
+            <IconChevR size={15} />
+          </button>
           <MonthDropdown month={month} setMonth={(m) => { setMonth(m); setTile(null); }} />
         </div>
         <div style={{ flex: 1 }} />
