@@ -59,6 +59,7 @@ type Querier interface {
 	OpenCreditsForSection(ctx context.Context, arg OpenCreditsForSectionParams) ([]Transaction, error)
 	// Credit ids (in this month) that some settlement references — for "Settled" chips.
 	SettledCreditIdsByMonth(ctx context.Context, arg SettledCreditIdsByMonthParams) ([]uuid.UUID, error)
+	SumDashboardMonthly(ctx context.Context, arg SumDashboardMonthlyParams) (SumDashboardMonthlyRow, error)
 	SumEssentialSpendByMonths(ctx context.Context, arg SumEssentialSpendByMonthsParams) ([]SumEssentialSpendByMonthsRow, error)
 	UpdateBudgets(ctx context.Context, arg UpdateBudgetsParams) (UserSetting, error)
 	UpdateCategoryGroupName(ctx context.Context, arg UpdateCategoryGroupNameParams) (CategoryGroup, error)

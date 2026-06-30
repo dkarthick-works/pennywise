@@ -120,6 +120,7 @@ only ever talks to this origin.
 | DELETE | `/api/transactions/{id}` | delete |
 | GET    | `/api/sections/{section}/open-credits?exclude={id}` | settlement picker candidates |
 | GET    | `/api/daily-suggestions` | ghost-autocomplete categories |
+| GET    | `/api/dashboard/monthly?month=YYYY-MM` | dashboard hero-card totals |
 | GET    | `/api/categories/unmapped` | distinct transaction category strings with no group mapping |
 | GET    | `/api/categories/texts?q=&exclude_group_id=` | searchable transaction category strings; optionally excludes labels already in one group |
 | GET    | `/api/category-groups` | groups with nested mapping briefs |
@@ -145,6 +146,39 @@ Mirrors the prototype shape so the frontend port is a pass-through:
 ```
 
 `settles` appears on settlement rows; `settled` is the derived flag on credit rows.
+
+### Dashboard (`GET /api/dashboard/monthly?month=YYYY-MM`)
+
+Returns the monthly hero-card totals for the selected month. Section cards,
+donut charts, budget bars, and the yearly dashboard remain frontend-computed for
+now.
+
+**What counts:**
+
+- `income`: all rows where `section = 'income'`.
+- `cash_flow`: expense rows (`essential`, `flexible`, `daily`) where `kind` is
+  `cash` or `settlement`.
+- `monthly_cost`: expense rows where `kind` is `cash` or `credit`.
+- `outstanding_credits_*`: expense `credit` rows incurred in the selected month
+  that have no `settlement_links` row.
+- `net_saved`, `monthly_difference`, and `savings_rate` are computed in the Go
+  handler from the raw sums. `savings_rate` is `0` when income is `0`.
+
+Response shape:
+
+```json
+{
+  "month": "2026-06",
+  "income": 85000,
+  "cash_flow": 62000,
+  "monthly_cost": 71000,
+  "net_saved": 23000,
+  "savings_rate": 27.06,
+  "monthly_difference": 14000,
+  "outstanding_credits_count": 2,
+  "outstanding_credits_total": 9000
+}
+```
 
 ### Category groups
 

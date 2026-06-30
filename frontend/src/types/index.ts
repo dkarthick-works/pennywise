@@ -84,6 +84,20 @@ export interface Insights {
   emergency_fund: EmergencyFundTiers;
 }
 
+// ─── Dashboard ─────────────────────────────────────────────────────────────
+
+export interface DashboardMonthly {
+  month: string;
+  income: number;
+  cash_flow: number;
+  monthly_cost: number;
+  net_saved: number;
+  savings_rate: number;
+  monthly_difference: number;
+  outstanding_credits_count: number;
+  outstanding_credits_total: number;
+}
+
 // ─── Category grouping ──────────────────────────────────────────────────────
 
 export interface CategoryMappingBrief {

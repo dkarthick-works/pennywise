@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   openMonth, setMonthClosed, getSettings, updateBudgets,
   createTxn, updateTxn, deleteTxn, getDailySuggestions, getIncomeSuggestions,
@@ -27,6 +27,13 @@ import type { Transaction, Section, Budgets } from "../types";
 // The months array is anchored to the current month (always at index ANCHOR).
 const MONTH_WINDOW_BACK = 24;
 const MONTH_WINDOW_FWD  = 12;
+
+function invalidateMonthCaches(qc: QueryClient, month: string) {
+  qc.invalidateQueries({ queryKey: ["open-month", month] });
+  qc.invalidateQueries({ queryKey: ["txns", "month", month] });
+  qc.invalidateQueries({ queryKey: ["dashboard", "monthly", month] });
+  qc.invalidateQueries({ queryKey: ["daily-suggestions"] });
+}
 
 function MonthDropdown({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
   // Stable list — only recomputed when the selected month changes.
@@ -267,10 +274,7 @@ function TileBudgetHead({ meta, spent, budget, onBudget, onBack }: {
 
 function useRowMutations(month: string) {
   const qc = useQueryClient();
-  const inv = () => {
-    qc.invalidateQueries({ queryKey: ["open-month", month] });
-    qc.invalidateQueries({ queryKey: ["daily-suggestions"] });
-  };
+  const inv = () => invalidateMonthCaches(qc, month);
   const upd = useMutation({ mutationFn: ({ id, patch }: { id: string; patch: Partial<Transaction> }) => updateTxn(id, patch), onSuccess: inv });
   const del = useMutation({ mutationFn: (id: string) => deleteTxn(id), onSuccess: inv });
   const add = useMutation({ mutationFn: (t: Omit<Transaction, "id" | "settled">) => createTxn(t), onSuccess: inv });
@@ -302,7 +306,7 @@ function EssentialTile({ rows, section, month, settledSet, templates }: {
           createTxn({ section, category: label, amount: 0, date: `${month}-01`, kind: "cash" })
         )
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["open-month", month] }),
+    onSuccess: () => invalidateMonthCaches(qc, month),
   });
 
   return (
@@ -394,7 +398,7 @@ function FlexibleTile({ rows, section, month, settledSet, templates }: {
           createTxn({ section, category: label, amount: 0, date: `${month}-01`, kind: "cash" })
         )
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["open-month", month] }),
+    onSuccess: () => invalidateMonthCaches(qc, month),
   });
 
   return (

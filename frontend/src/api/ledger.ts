@@ -13,6 +13,7 @@ import type {
   MonthState,
   OpenMonthResponse,
   Insights,
+  DashboardMonthly,
   CategoryGroup,
   CategoryMapping,
 } from "../types";
@@ -113,6 +114,11 @@ export const getIncomeSuggestions = () =>
 
 export const getInsights = () =>
   client.get<Insights>("/api/insights").then((r) => r.data);
+
+// ─── Dashboard ─────────────────────────────────────────────────────────────
+
+export const getDashboardMonthly = (month: string) =>
+  client.get<DashboardMonthly>("/api/dashboard/monthly", { params: { month } }).then((r) => r.data);
 
 // ─── Month state ──────────────────────────────────────────────────────────
 

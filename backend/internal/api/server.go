@@ -89,6 +89,7 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/daily-suggestions", s.handleDailySuggestions)
 		pr.Get("/api/income-suggestions", s.handleIncomeSuggestions)
 		pr.Get("/api/insights", s.handleGetInsights)
+		pr.Get("/api/dashboard/monthly", s.handleGetDashboardMonthly)
 
 		pr.Get("/api/categories/unmapped", s.handleListUnmappedCategories)
 		pr.Get("/api/categories/texts", s.handleListTransactionCategoryTexts)
