@@ -36,7 +36,7 @@ export function CategoryGroupPage({ month }: { month: string }) {
       <button
         className="btn btn-soft"
         style={{ padding: "6px 12px", marginBottom: 16 }}
-        onClick={() => navigate("/dashboard")}
+        onClick={() => navigate("/dashboard#category-groups")}
       >
         <IconChevL size={15} /> Dashboard
       </button>

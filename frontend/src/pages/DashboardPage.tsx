@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { getDashboardMonthly, getGroupSpend, getTxnsByMonth, getTxnsByYear, getSettings } from "../api/ledger";
 import { sectionSums } from "../lib/txns";
 import { inr, inrShort, budgetColor } from "../lib/money";
@@ -46,8 +46,8 @@ function HeroRow({ label, value, strong, color }: {
 
 export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [view, setView] = useState<"monthly" | "yearly">("monthly");
-  const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[] | null>(null);
   const year = month.slice(0, 4);
 
@@ -89,6 +89,11 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
       return prev.filter((id) => validIds.has(id));
     });
   }, [groupSpend]);
+
+  useEffect(() => {
+    if (location.hash !== "#category-groups" || groupSpend.length === 0) return;
+    document.getElementById("category-groups")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [location.hash, groupSpend.length]);
 
   const budgets = settings?.budgets ?? { essential: 0, flexible: 0, daily: 0 };
 
@@ -318,116 +323,93 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
           </div>
 
           {groupSpend.length > 0 && (
-            <div className="card card-pad">
-              <button
-                className="btn btn-soft"
-                style={{
-                  width: "100%",
-                  justifyContent: "space-between",
-                  padding: 0,
-                  background: "transparent",
-                  border: 0,
-                  boxShadow: "none",
-                }}
-                onClick={() => setGroupsExpanded((open) => !open)}
-                aria-expanded={groupsExpanded}
-              >
-                <span>
-                  <h3 className="card-h" style={{ margin: 0 }}>Category Groups</h3>
-                  <span className="muted" style={{ display: "block", fontSize: 12.5, marginTop: 4 }}>
-                    Custom group spend for {monthLabel(month)}
-                  </span>
+            <div id="category-groups" className="card card-pad">
+              <div>
+                <h3 className="card-h" style={{ margin: 0 }}>Category Groups</h3>
+                <span className="muted" style={{ display: "block", fontSize: 12.5, marginTop: 4 }}>
+                  Custom group spend for {monthLabel(month)}
                 </span>
-                <IconChevR
-                  size={17}
-                  style={{
-                    transform: groupsExpanded ? "rotate(90deg)" : undefined,
-                    transition: "transform 160ms ease",
-                  }}
-                />
-              </button>
+              </div>
 
-              {groupsExpanded && (
-                <div style={{ marginTop: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-                    <details style={{ position: "relative" }}>
-                      <summary
-                        className="btn btn-soft"
-                        style={{ listStyle: "none", cursor: "pointer", minWidth: 170, justifyContent: "space-between" }}
-                      >
-                        {groupSelectionLabel}
-                        <IconChevR size={14} style={{ transform: "rotate(90deg)" }} />
-                      </summary>
-                      <div
-                        className="card"
-                        style={{
-                          position: "absolute",
-                          zIndex: 5,
-                          top: "calc(100% + 8px)",
-                          left: 0,
-                          width: 260,
-                          padding: 10,
-                          boxShadow: "var(--shadow)",
-                        }}
-                      >
-                        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                          <button className="btn btn-soft" style={{ padding: "5px 9px", fontSize: 12 }} onClick={() => setSelectedGroupIds(allGroupIds)}>
-                            All
-                          </button>
-                          <button className="btn btn-soft" style={{ padding: "5px 9px", fontSize: 12 }} onClick={() => setSelectedGroupIds([])}>
-                            Clear
-                          </button>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 7, maxHeight: 240, overflow: "auto" }}>
-                          {groupSpend.map((g) => (
-                            <label key={g.group_id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>
-                              <input
-                                type="checkbox"
-                                checked={selectedGroupIdSet.has(g.group_id)}
-                                onChange={() => toggleGroup(g.group_id)}
-                              />
-                              <span style={{ flex: 1 }}>{g.group_name}</span>
-                              <span className="muted num" style={{ fontSize: 12 }}>{inr(g.total)}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    </details>
-                    <span className="muted" style={{ fontSize: 12.5 }}>
-                      Groups can overlap when the same category text is mapped more than once.
-                    </span>
-                  </div>
-
-                  {selectedGroupSpend.length === 0 ? (
-                    <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-                      Select at least one group to see spend cards.
-                    </p>
-                  ) : (
-                    <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-                      {selectedGroupSpend.map((g) => (
-                        <button
-                          key={g.group_id}
-                          type="button"
-                          className="group-card-link"
-                          onClick={() => navigate(`/dashboard/groups/${g.group_id}`)}
-                          aria-label={`View ${g.group_name} transactions`}
-                        >
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                            <span style={{ fontWeight: 650, fontSize: 14 }}>{g.group_name}</span>
-                            <IconChevR size={14} style={{ color: "var(--ink-3)" }} />
-                          </div>
-                          <div className="num" style={{ fontSize: 24, fontWeight: 750, letterSpacing: "-0.02em", marginBottom: 13 }}>
-                            {inr(g.total)}
-                          </div>
-                          <div className="bar">
-                            <i style={{ width: `${maxGroupSpend ? (g.total / maxGroupSpend) * 100 : 0}%`, background: "var(--accent)" }} />
-                          </div>
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+                  <details style={{ position: "relative" }}>
+                    <summary
+                      className="btn btn-soft"
+                      style={{ listStyle: "none", cursor: "pointer", minWidth: 170, justifyContent: "space-between" }}
+                    >
+                      {groupSelectionLabel}
+                      <IconChevR size={14} style={{ transform: "rotate(90deg)" }} />
+                    </summary>
+                    <div
+                      className="card"
+                      style={{
+                        position: "absolute",
+                        zIndex: 5,
+                        top: "calc(100% + 8px)",
+                        left: 0,
+                        width: 260,
+                        padding: 10,
+                        boxShadow: "var(--shadow)",
+                      }}
+                    >
+                      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                        <button className="btn btn-soft" style={{ padding: "5px 9px", fontSize: 12 }} onClick={() => setSelectedGroupIds(allGroupIds)}>
+                          All
                         </button>
-                      ))}
+                        <button className="btn btn-soft" style={{ padding: "5px 9px", fontSize: 12 }} onClick={() => setSelectedGroupIds([])}>
+                          Clear
+                        </button>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 7, maxHeight: 240, overflow: "auto" }}>
+                        {groupSpend.map((g) => (
+                          <label key={g.group_id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedGroupIdSet.has(g.group_id)}
+                              onChange={() => toggleGroup(g.group_id)}
+                            />
+                            <span style={{ flex: 1 }}>{g.group_name}</span>
+                            <span className="muted num" style={{ fontSize: 12 }}>{inr(g.total)}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  )}
+                  </details>
+                  <span className="muted" style={{ fontSize: 12.5 }}>
+                    Groups can overlap when the same category text is mapped more than once.
+                  </span>
                 </div>
-              )}
+
+                {selectedGroupSpend.length === 0 ? (
+                  <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+                    Select at least one group to see spend cards.
+                  </p>
+                ) : (
+                  <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                    {selectedGroupSpend.map((g) => (
+                      <button
+                        key={g.group_id}
+                        type="button"
+                        className="group-card-link"
+                        onClick={() => navigate(`/dashboard/groups/${g.group_id}`)}
+                        aria-label={`View ${g.group_name} transactions`}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                          <span style={{ fontWeight: 650, fontSize: 14 }}>{g.group_name}</span>
+                          <IconChevR size={14} style={{ color: "var(--ink-3)" }} />
+                        </div>
+                        <div className="num" style={{ fontSize: 24, fontWeight: 750, letterSpacing: "-0.02em", marginBottom: 13 }}>
+                          {inr(g.total)}
+                        </div>
+                        <div className="bar">
+                          <i style={{ width: `${maxGroupSpend ? (g.total / maxGroupSpend) * 100 : 0}%`, background: "var(--accent)" }} />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
