@@ -45,6 +45,33 @@ LEFT JOIN transactions t
 WHERE cg.user_id = sqlc.arg(user_id)
 GROUP BY cg.id, cg.name;
 
+-- name: ListTransactionsByGroupForMonth :many
+SELECT t.*
+FROM transactions t
+WHERE t.user_id = sqlc.arg(user_id)
+  AND t.txn_date >= sqlc.arg(from_date)
+  AND t.txn_date < sqlc.arg(to_date)
+  AND EXISTS (
+      SELECT 1 FROM category_mappings cm
+      WHERE cm.group_id = sqlc.arg(group_id)
+        AND cm.user_id = sqlc.arg(user_id)
+        AND cm.normalized_category = lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g'))
+  )
+ORDER BY t.txn_date DESC, t.created_at DESC;
+
+-- name: SumTransactionsByGroupForMonth :one
+SELECT COALESCE(SUM(t.amount), 0)::numeric AS total
+FROM transactions t
+WHERE t.user_id = sqlc.arg(user_id)
+  AND t.txn_date >= sqlc.arg(from_date)
+  AND t.txn_date < sqlc.arg(to_date)
+  AND EXISTS (
+      SELECT 1 FROM category_mappings cm
+      WHERE cm.group_id = sqlc.arg(group_id)
+        AND cm.user_id = sqlc.arg(user_id)
+        AND cm.normalized_category = lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g'))
+  );
+
 -- name: ListUnmappedCategoryTexts :many
 SELECT DISTINCT t.category
 FROM transactions t

@@ -365,6 +365,63 @@ func (q *Queries) ListTransactionCategoryTexts(ctx context.Context, arg ListTran
 	return items, nil
 }
 
+const listTransactionsByGroupForMonth = `-- name: ListTransactionsByGroupForMonth :many
+SELECT t.id, t.user_id, t.section, t.category, t.amount, t.txn_date, t.kind, t.created_at, t.updated_at
+FROM transactions t
+WHERE t.user_id = $1
+  AND t.txn_date >= $2
+  AND t.txn_date < $3
+  AND EXISTS (
+      SELECT 1 FROM category_mappings cm
+      WHERE cm.group_id = $4
+        AND cm.user_id = $1
+        AND cm.normalized_category = lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g'))
+  )
+ORDER BY t.txn_date DESC, t.created_at DESC
+`
+
+type ListTransactionsByGroupForMonthParams struct {
+	UserID   uuid.UUID   `json:"user_id"`
+	FromDate pgtype.Date `json:"from_date"`
+	ToDate   pgtype.Date `json:"to_date"`
+	GroupID  uuid.UUID   `json:"group_id"`
+}
+
+func (q *Queries) ListTransactionsByGroupForMonth(ctx context.Context, arg ListTransactionsByGroupForMonthParams) ([]Transaction, error) {
+	rows, err := q.db.Query(ctx, listTransactionsByGroupForMonth,
+		arg.UserID,
+		arg.FromDate,
+		arg.ToDate,
+		arg.GroupID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Transaction
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Section,
+			&i.Category,
+			&i.Amount,
+			&i.TxnDate,
+			&i.Kind,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUnmappedCategoryTexts = `-- name: ListUnmappedCategoryTexts :many
 SELECT DISTINCT t.category
 FROM transactions t
@@ -445,6 +502,39 @@ func (q *Queries) SumSpendByGroupsForMonth(ctx context.Context, arg SumSpendByGr
 		return nil, err
 	}
 	return items, nil
+}
+
+const sumTransactionsByGroupForMonth = `-- name: SumTransactionsByGroupForMonth :one
+SELECT COALESCE(SUM(t.amount), 0)::numeric AS total
+FROM transactions t
+WHERE t.user_id = $1
+  AND t.txn_date >= $2
+  AND t.txn_date < $3
+  AND EXISTS (
+      SELECT 1 FROM category_mappings cm
+      WHERE cm.group_id = $4
+        AND cm.user_id = $1
+        AND cm.normalized_category = lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g'))
+  )
+`
+
+type SumTransactionsByGroupForMonthParams struct {
+	UserID   uuid.UUID   `json:"user_id"`
+	FromDate pgtype.Date `json:"from_date"`
+	ToDate   pgtype.Date `json:"to_date"`
+	GroupID  uuid.UUID   `json:"group_id"`
+}
+
+func (q *Queries) SumTransactionsByGroupForMonth(ctx context.Context, arg SumTransactionsByGroupForMonthParams) (pgtype.Numeric, error) {
+	row := q.db.QueryRow(ctx, sumTransactionsByGroupForMonth,
+		arg.UserID,
+		arg.FromDate,
+		arg.ToDate,
+		arg.GroupID,
+	)
+	var total pgtype.Numeric
+	err := row.Scan(&total)
+	return total, err
 }
 
 const updateCategoryGroupName = `-- name: UpdateCategoryGroupName :one

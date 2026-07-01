@@ -95,6 +95,7 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/categories/unmapped", s.handleListUnmappedCategories)
 		pr.Get("/api/categories/texts", s.handleListTransactionCategoryTexts)
 		pr.Get("/api/category-groups", s.handleListCategoryGroups)
+		pr.Get("/api/category-groups/{id}/transactions", s.handleGetCategoryGroupTransactions)
 		pr.Post("/api/category-groups", s.handleCreateCategoryGroup)
 		pr.Patch("/api/category-groups/{id}", s.handleUpdateCategoryGroup)
 		pr.Delete("/api/category-groups/{id}", s.handleDeleteCategoryGroup)

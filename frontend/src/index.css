@@ -203,6 +203,18 @@ input, button { font-family: inherit; }
 .card-pad { padding: var(--pad-y) var(--pad-x); }
 .card-h   { font-size: 13px; font-weight: 600; color: var(--ink-2); letter-spacing: 0.01em; margin: 0; display: flex; align-items: center; gap: 8px; }
 .grid     { display: grid; gap: var(--card-gap); }
+.group-card-link {
+  width: 100%; padding: 14px; border-radius: 14px; background: var(--surface-2);
+  border: 1px solid var(--border-2); color: var(--ink); text-align: left;
+  transition: .15s; box-shadow: none;
+}
+.group-card-link:hover {
+  background: var(--surface); border-color: var(--accent); box-shadow: var(--sh-sm);
+  transform: translateY(-1px);
+}
+.group-card-link:focus-visible {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3.5px var(--accent-soft);
+}
 
 /* ============ SEGMENTED CONTROL ============ */
 .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 3px; gap: 2px; }

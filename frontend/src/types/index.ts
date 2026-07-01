@@ -104,6 +104,14 @@ export interface CategoryGroupSpend {
   total: number;
 }
 
+export interface CategoryGroupTransactions {
+  group_id: string;
+  group_name: string;
+  month: string;
+  total: number;
+  transactions: Transaction[];
+}
+
 // ─── Category grouping ──────────────────────────────────────────────────────
 
 export interface CategoryMappingBrief {

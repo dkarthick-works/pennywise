@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { getDashboardMonthly, getGroupSpend, getTxnsByMonth, getTxnsByYear, getSettings } from "../api/ledger";
 import { sectionSums } from "../lib/txns";
 import { inr, inrShort, budgetColor } from "../lib/money";
@@ -44,6 +45,7 @@ function HeroRow({ label, value, strong, color }: {
 }
 
 export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
+  const navigate = useNavigate();
   const [view, setView] = useState<"monthly" | "yearly">("monthly");
   const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[] | null>(null);
@@ -403,9 +405,16 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
                   ) : (
                     <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
                       {selectedGroupSpend.map((g) => (
-                        <div key={g.group_id} style={{ padding: 14, borderRadius: 14, background: "var(--surface-2)", border: "1px solid var(--border-2)" }}>
+                        <button
+                          key={g.group_id}
+                          type="button"
+                          className="group-card-link"
+                          onClick={() => navigate(`/dashboard/groups/${g.group_id}`)}
+                          aria-label={`View ${g.group_name} transactions`}
+                        >
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 12 }}>
                             <span style={{ fontWeight: 650, fontSize: 14 }}>{g.group_name}</span>
+                            <IconChevR size={14} style={{ color: "var(--ink-3)" }} />
                           </div>
                           <div className="num" style={{ fontSize: 24, fontWeight: 750, letterSpacing: "-0.02em", marginBottom: 13 }}>
                             {inr(g.total)}
@@ -413,7 +422,7 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
                           <div className="bar">
                             <i style={{ width: `${maxGroupSpend ? (g.total / maxGroupSpend) * 100 : 0}%`, background: "var(--accent)" }} />
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}

@@ -15,6 +15,7 @@ import type {
   Insights,
   DashboardMonthly,
   CategoryGroupSpend,
+  CategoryGroupTransactions,
   CategoryGroup,
   CategoryMapping,
 } from "../types";
@@ -123,6 +124,11 @@ export const getDashboardMonthly = (month: string) =>
 
 export const getGroupSpend = (month: string): Promise<CategoryGroupSpend[]> =>
   client.get<CategoryGroupSpend[]>("/api/dashboard/group-spend", { params: { month } }).then((r) => r.data);
+
+export const getCategoryGroupTransactions = (groupId: string, month: string) =>
+  client
+    .get<CategoryGroupTransactions>(`/api/category-groups/${groupId}/transactions`, { params: { month } })
+    .then((r) => r.data);
 
 // ─── Month state ──────────────────────────────────────────────────────────
 

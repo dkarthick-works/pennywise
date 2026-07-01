@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
@@ -48,6 +49,7 @@ type Querier interface {
 	ListTemplatesBySection(ctx context.Context, arg ListTemplatesBySectionParams) ([]Template, error)
 	ListTransactionCategoryTexts(ctx context.Context, arg ListTransactionCategoryTextsParams) ([]string, error)
 	ListTransactionsByDateRange(ctx context.Context, arg ListTransactionsByDateRangeParams) ([]Transaction, error)
+	ListTransactionsByGroupForMonth(ctx context.Context, arg ListTransactionsByGroupForMonthParams) ([]Transaction, error)
 	ListTransactionsByMonth(ctx context.Context, arg ListTransactionsByMonthParams) ([]Transaction, error)
 	ListTransactionsByMonthSection(ctx context.Context, arg ListTransactionsByMonthSectionParams) ([]Transaction, error)
 	ListTransactionsByYear(ctx context.Context, arg ListTransactionsByYearParams) ([]Transaction, error)
@@ -62,6 +64,7 @@ type Querier interface {
 	SumDashboardMonthly(ctx context.Context, arg SumDashboardMonthlyParams) (SumDashboardMonthlyRow, error)
 	SumEssentialSpendByMonths(ctx context.Context, arg SumEssentialSpendByMonthsParams) ([]SumEssentialSpendByMonthsRow, error)
 	SumSpendByGroupsForMonth(ctx context.Context, arg SumSpendByGroupsForMonthParams) ([]SumSpendByGroupsForMonthRow, error)
+	SumTransactionsByGroupForMonth(ctx context.Context, arg SumTransactionsByGroupForMonthParams) (pgtype.Numeric, error)
 	UpdateBudgets(ctx context.Context, arg UpdateBudgetsParams) (UserSetting, error)
 	UpdateCategoryGroupName(ctx context.Context, arg UpdateCategoryGroupNameParams) (CategoryGroup, error)
 	UpdatePreferences(ctx context.Context, arg UpdatePreferencesParams) (UserSetting, error)
