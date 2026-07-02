@@ -11,7 +11,7 @@ const NAV = [
   { path: "/dashboard", label: "Dashboard",        Icon: IconDashboard },
   { path: "/insights",  label: "Insights",          Icon: IconInsights },
   { path: "/categories", label: "Map Categories",   Icon: IconCategories },
-  { path: "/export",    label: "Export",            Icon: IconExport },
+  { path: "/export",    label: "Import / Export", Icon: IconExport },
   { path: "/settings",  label: "Settings",          Icon: IconSettings },
   { path: "/profile",   label: "Profile",           Icon: IconProfile },
 ];

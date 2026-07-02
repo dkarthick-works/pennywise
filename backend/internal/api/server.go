@@ -81,6 +81,7 @@ func (s *Server) Router() http.Handler {
 
 		pr.Get("/api/transactions", s.handleListTransactions)
 		pr.Get("/api/transactions/export", s.handleExportTransactions)
+		pr.Post("/api/transactions/import", s.handleImportTransactions)
 		pr.Post("/api/transactions", s.handleCreateTransaction)
 		pr.Patch("/api/transactions/{id}", s.handleUpdateTransaction)
 		pr.Delete("/api/transactions/{id}", s.handleDeleteTransaction)

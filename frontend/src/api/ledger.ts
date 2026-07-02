@@ -18,6 +18,8 @@ import type {
   CategoryGroupTransactions,
   CategoryGroup,
   CategoryMapping,
+  ImportRowPayload,
+  ImportResult,
 } from "../types";
 
 // ─── Profile ─────────────────────────────────────────────────────────────
@@ -88,6 +90,15 @@ export async function exportTransactions(
 
 export const createTxn = (body: Omit<Transaction, "id" | "settled">) =>
   client.post<Transaction>("/api/transactions", body).then((r) => r.data);
+
+export const importTransactions = (rows: ImportRowPayload[]) =>
+  client.post<ImportResult>("/api/transactions/import", { rows }).then((r) => r.data).catch((e) => {
+    if (axios.isAxiosError(e) && e.response?.data && typeof e.response.data === "object") {
+      const body = e.response.data as { error?: string };
+      throw new Error(body.error ?? "Import failed");
+    }
+    throw e;
+  });
 
 export const updateTxn = (id: string, patch: Partial<Omit<Transaction, "id">>) =>
   client.patch<Transaction>(`/api/transactions/${id}`, patch).then((r) => r.data);

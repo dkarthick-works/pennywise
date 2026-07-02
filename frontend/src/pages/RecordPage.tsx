@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
-import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   openMonth, setMonthClosed, getSettings, updateBudgets,
   createTxn, updateTxn, deleteTxn, getDailySuggestions, getIncomeSuggestions,
@@ -8,6 +8,7 @@ import { inr } from "../lib/money";
 import { budgetColor } from "../lib/money";
 import { monthCode, shiftMonth, MONTH_NAMES, monthLabel } from "../lib/dates";
 import { settledCreditIds } from "../lib/txns";
+import { invalidateMonthCaches } from "../lib/monthCaches";
 import { StatusCell } from "../components/record/StatusCell";
 import {
   StatusFilterHeader,
@@ -27,14 +28,6 @@ import type { Transaction, Section, Budgets } from "../types";
 // The months array is anchored to the current month (always at index ANCHOR).
 const MONTH_WINDOW_BACK = 24;
 const MONTH_WINDOW_FWD  = 12;
-
-function invalidateMonthCaches(qc: QueryClient, month: string) {
-  qc.invalidateQueries({ queryKey: ["open-month", month] });
-  qc.invalidateQueries({ queryKey: ["txns", "month", month] });
-  qc.invalidateQueries({ queryKey: ["dashboard", "monthly", month] });
-  qc.invalidateQueries({ queryKey: ["group-spend", month] });
-  qc.invalidateQueries({ queryKey: ["daily-suggestions"] });
-}
 
 function MonthDropdown({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
   // Stable list — only recomputed when the selected month changes.

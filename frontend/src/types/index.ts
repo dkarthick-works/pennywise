@@ -14,6 +14,24 @@ export interface Transaction {
   settled?: boolean;  // credit rows: cleared by a settlement
 }
 
+export interface ImportRowPayload {
+  date: string;
+  section: Section;
+  category: string;
+  amount: number;
+  kind: TxnKind;
+}
+
+export interface ImportResult {
+  imported: number;
+  months: string[];
+}
+
+export interface ImportValidationError {
+  error: string;
+  rows?: { index: number; fields: Record<string, string> }[];
+}
+
 // ─── Settings / templates ─────────────────────────────────────────────────
 
 export interface Budgets {
