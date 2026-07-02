@@ -831,7 +831,7 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
     <div className="content fade-in">
       <div className="page-head">
         <div>
-          <h1 className="page-title">Record &amp; Expense</h1>
+          <h1 className="page-title">Record Expense</h1>
           <p className="page-sub">
             Log this month's money. One date per row — flag Credit when cash hasn't left, Settlement when it clears a credit.
           </p>

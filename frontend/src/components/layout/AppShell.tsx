@@ -7,7 +7,7 @@ import {
 } from "../ui/Icons";
 
 const NAV = [
-  { path: "/record",    label: "Record & Expense",  Icon: IconRecord },
+  { path: "/record",    label: "Record Expense",  Icon: IconRecord },
   { path: "/dashboard", label: "Dashboard",        Icon: IconDashboard },
   { path: "/insights",  label: "Insights",          Icon: IconInsights },
   { path: "/categories", label: "Map Categories",   Icon: IconCategories },
