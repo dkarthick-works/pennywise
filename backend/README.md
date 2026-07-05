@@ -31,8 +31,8 @@ without double-counting:
 
 Transaction rows store free-text `category` labels. **Category groups** are a separate
 metadata layer that maps those labels to high-level group names (e.g. `"Netflix"` →
-`"Streaming"`). Mappings do **not** rewrite transaction rows — they exist for future
-aggregations (dashboard rollups, etc.).
+`"Streaming"`). Mappings do **not** rewrite transaction rows — they power dashboard
+group-spend rollups and per-group drilldowns.
 
 | table | purpose |
 |-------|---------|
@@ -115,15 +115,20 @@ only ever talks to this origin.
 | GET    | `/api/templates` | template lists |
 | PUT    | `/api/templates/{section}` | replace a section's ordered template list |
 | GET    | `/api/transactions?month=YYYY-MM` \| `?year=YYYY` | rows + `settles`/`settled` |
+| GET    | `/api/transactions/export?from=YYYY-MM-DD&to=YYYY-MM-DD` | CSV download (cash + credit; no settlements) |
+| POST   | `/api/transactions/import` | bulk create from validated rows |
 | POST   | `/api/transactions` | create (settlement may include `settles[]`) |
 | PATCH  | `/api/transactions/{id}` | partial update; reconciles settlement links |
 | DELETE | `/api/transactions/{id}` | delete |
 | GET    | `/api/sections/{section}/open-credits?exclude={id}` | settlement picker candidates |
 | GET    | `/api/daily-suggestions` | ghost-autocomplete categories |
+| GET    | `/api/income-suggestions` | ghost-autocomplete income category labels |
 | GET    | `/api/dashboard/monthly?month=YYYY-MM` | dashboard hero-card totals |
+| GET    | `/api/dashboard/group-spend?month=YYYY-MM` | per-group spend totals for the month |
 | GET    | `/api/categories/unmapped` | distinct transaction category strings with no group mapping |
 | GET    | `/api/categories/texts?q=&exclude_group_id=` | searchable transaction category strings; optionally excludes labels already in one group |
 | GET    | `/api/category-groups` | groups with nested mapping briefs |
+| GET    | `/api/category-groups/{id}/transactions?month=YYYY-MM` | transactions mapped to one group in a month |
 | POST   | `/api/category-groups` | create an empty group (`name`) |
 | PATCH  | `/api/category-groups/{id}` | rename group |
 | DELETE | `/api/category-groups/{id}` | delete group and all its mappings |
@@ -147,11 +152,40 @@ Mirrors the prototype shape so the frontend port is a pass-through:
 
 `settles` appears on settlement rows; `settled` is the derived flag on credit rows.
 
+### Transaction import / export
+
+**Export** — `GET /api/transactions/export?from=YYYY-MM-DD&to=YYYY-MM-DD`
+
+Returns a CSV attachment. Columns: `id`, `date`, `section`, `category`, `amount`,
+`currency`, `kind`. Settlement rows are omitted. Income is included. Both dates are
+inclusive. The range must span at most **6 calendar months** (inclusive). Returns
+`404` with `no transactions to export for the selected date range` when every row
+in range is a settlement (or the range is empty).
+
+**Import** — `POST /api/transactions/import`:
+
+```json
+{
+  "rows": [
+    { "date": "2026-06-01", "section": "daily", "category": "Coffee", "amount": 120, "kind": "cash" }
+  ]
+}
+```
+
+- At most **2000** rows per request.
+- Allowed kinds: `cash`, `credit` only — `settlement` is rejected.
+- `income` rows must be `cash`; `credit` cannot pair with `income`.
+- Each row is inserted in a single transaction; affected months are marked seeded.
+- Returns `201` with `{ "imported": N, "months": ["YYYY-MM", …] }`.
+- Validation errors return `400` with `{ "error": "validation failed", "rows": [{ "index": 0, "fields": { … } }] }`.
+
+The SPA accepts Pennywise export CSVs (same columns minus `id`/`currency` on import
+parse) and runs client-side validation before POST.
+
 ### Dashboard (`GET /api/dashboard/monthly?month=YYYY-MM`)
 
-Returns the monthly hero-card totals for the selected month. Section cards,
-donut charts, budget bars, and the yearly dashboard remain frontend-computed for
-now.
+Returns the monthly hero-card totals for the selected month. Section budget cards,
+category-group spend, and the yearly dashboard are computed separately (see below).
 
 **What counts:**
 
@@ -180,10 +214,46 @@ Response shape:
 }
 ```
 
+### Group spend (`GET /api/dashboard/group-spend?month=YYYY-MM`)
+
+Returns per-group incurred spend for the selected month. One row per category group
+(even when total is `0`):
+
+```json
+[
+  { "group_id": "uuid", "group_name": "Streaming", "total": 1298 }
+]
+```
+
+**What counts:** sum of `transactions.amount` in the month where the row's normalized
+category matches a mapping in that group. All kinds are included (`cash`, `credit`,
+`settlement`, and `income` if mapped). A label mapped to multiple groups contributes
+to each group's total.
+
+Handler: `internal/api/group_spend.go`; query: `SumSpendByGroupsForMonth` in
+`db/queries/category_groups.sql`.
+
+### Category group drilldown (`GET /api/category-groups/{id}/transactions?month=YYYY-MM`)
+
+Returns one group's transactions for the month plus a total:
+
+```json
+{
+  "group_id": "uuid",
+  "group_name": "Streaming",
+  "month": "2026-06",
+  "total": 1298,
+  "transactions": [ { "id": "…", "section": "flexible", "category": "Netflix", … } ]
+}
+```
+
+Rows are ordered by date descending. Returns `404` when the group id does not belong
+to the user. Handler: `internal/api/group_transactions.go`.
+
 ### Category groups
 
 Handlers live in `internal/api/categories.go`; queries in `db/queries/category_groups.sql`.
-Migration: `0004_category_groups`.
+Migrations: `0004_category_groups`, `0005_category_mappings_many_to_many`.
 
 **Create mapping** — `POST /api/category-mappings`:
 
