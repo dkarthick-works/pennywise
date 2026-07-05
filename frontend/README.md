@@ -21,10 +21,12 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 
 | Path | Page | Notes |
 |------|------|-------|
-| `/record` | Record & Expense | **Default landing page** after login (`/` redirects here) |
-| `/dashboard` | Dashboard | Month/year charts and summaries |
+| `/record` | Record Expense | **Default landing page** after login (`/` redirects here) |
+| `/dashboard` | Dashboard | Monthly/yearly spend; category-group rollups |
+| `/dashboard/groups/:groupId` | Category group drilldown | Transactions for one mapped group in the shared month |
 | `/insights` | Insights | Emergency fund targets (from `GET /api/insights`) |
 | `/categories` | Map Categories | Assign transaction labels to high-level groups |
+| `/export` | Import / Export | CSV export and import with review table |
 | `/settings` | Settings | Budgets, templates, preferences |
 | `/profile` | Profile | Display name and email |
 | `/login` | Auth | Sign up / log in (password field has show/hide toggle) |
@@ -36,6 +38,12 @@ Unknown authenticated paths fall back to `/record`.
 The primary workflow surface. Three section tiles — **Essential**, **Flexible**,
 and **Daily / Running** — each with an editable transaction table for the
 selected month.
+
+### Month navigation
+
+The header shows the open month with **previous / next chevrons** and a dropdown
+to jump to any month. Month state is shared with Dashboard via `App.tsx`. Closing
+a month is a cosmetic bookkeeping flag — editing still works.
 
 ### Status filter
 
@@ -62,7 +70,8 @@ the formatted date and entry count. The quick-add row stays pinned at the top.
 ## Categories page
 
 Nav item: **Map Categories** (`/categories`). Maps free-text transaction labels to
-user-defined **groups** for future dashboard rollups. Transaction rows are not modified.
+user-defined **groups** for dashboard rollups. Transaction rows are not modified.
+Mapping changes invalidate the `group-spend` query used on Dashboard.
 
 ### Tabs
 
@@ -87,6 +96,54 @@ React Query keys are prefixed with `["categories", …]`; mutations invalidate t
 - A category label can belong to multiple groups, but not twice in the same group.
 - Empty groups stay visible until the user deletes them.
 - `POST /api/category-mappings` accepts `group_id` **or** `group_name`, not both.
+
+## Dashboard page
+
+Nav item: **Dashboard** (`/dashboard`). Toggle **Monthly** vs **Yearly** at the top.
+
+### Monthly view
+
+- **Cash Flow** and **Monthly Cost** hero cards use `GET /api/dashboard/monthly`
+  (payment-date cash out vs incurred spend).
+- **Section cards** (Essential / Flexible / Daily) are frontend-computed from month
+  transactions with budget bars from settings.
+- **Category Groups** (when the user has mapped groups): bar cards from
+  `GET /api/dashboard/group-spend`. A filter dropdown selects which groups to show;
+  groups can overlap when one label maps to multiple groups. Click a card to open
+  `/dashboard/groups/:groupId`. The section scrolls into view when linked as
+  `/dashboard#category-groups`.
+
+### Yearly view
+
+Loads all transactions for the selected year. Shows income/spend totals, a monthly
+bar chart, section donut, and top categories — all client-side.
+
+## Category group drilldown
+
+Route: `/dashboard/groups/:groupId`. Lists transactions for one group in the
+shared month (`getCategoryGroupTransactions`). **Dashboard** link returns to
+`/dashboard#category-groups`.
+
+## Import / Export page
+
+Nav item: **Import / Export** (`/export`).
+
+### Export
+
+Pick an inclusive date range (max **6 months**). Downloads a Pennywise CSV via
+`GET /api/transactions/export`. Settlement rows are excluded; income is included.
+Default range is the current calendar month.
+
+### Import
+
+Upload a CSV with columns `date`, `section`, `category`, `amount`, `kind`
+(Pennywise export format works; `id` and `currency` are ignored). Parsing and
+validation live in `src/lib/import.ts` (max **2000** rows). Invalid rows are
+highlighted in an editable review table; import is blocked until all rows pass.
+`POST /api/transactions/import` on confirm. Settlement rows are rejected.
+Category mappings are **not** applied — map new labels on the Categories page
+after import. Successful import invalidates transaction, dashboard, and
+category caches for affected months/sections (`src/lib/monthCaches.ts`).
 
 ## API client
 

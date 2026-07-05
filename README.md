@@ -57,18 +57,22 @@ Health check: `GET /health` (also used by the container `HEALTHCHECK`).
 
 ```
 backend/              Go API, migrations, sqlc queries, dev Postgres compose
-frontend/             React SPA (Record, Dashboard, Insights, Categories, Settings, Profile)
+frontend/             React SPA (Record, Dashboard, Insights, Categories, Import/Export, Settings, Profile)
 auth-api-spec.json    Goauth OpenAPI spec (signup, login, refresh, …)
 Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine runtime
 ```
 
 ## Recent features (see sub-READMEs for detail)
 
-- **Record page** — default landing route; per-section status filter; daily rows grouped by date
+- **Record page** — default landing route; month chevrons; per-section status filter; daily rows grouped by date
   ([frontend/README.md § Record page](frontend/README.md))
-- **Category mapping** — map transaction labels to high-level groups for future dashboards
+- **Category mapping & dashboard rollups** — map labels to groups; monthly group-spend cards and drilldowns
   ([frontend/README.md § Categories page](frontend/README.md),
+  [frontend/README.md § Dashboard page](frontend/README.md),
   [backend/README.md § Category groups](backend/README.md))
+- **CSV import / export** — export up to 6 months; import with client-side review
+  ([frontend/README.md § Import / Export page](frontend/README.md),
+  [backend/README.md § Transaction import / export](backend/README.md))
 - **Insights** — emergency fund targets from essential spend lookback
   ([backend/README.md § Insights](backend/README.md))
 - **PWA** — installable, offline-capable app shell ([frontend/README.md § PWA](frontend/README.md))
