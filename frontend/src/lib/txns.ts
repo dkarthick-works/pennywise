@@ -1,6 +1,16 @@
 // Transaction aggregation helpers — port of data.jsx countsIn / sectionSums
 
-import type { Transaction } from "../types";
+import type { Section, Transaction } from "../types";
+
+export const EXPENSE_SECTIONS = ["essential", "flexible", "daily"] as const;
+
+export function isExpenseSection(section: Section): section is typeof EXPENSE_SECTIONS[number] {
+  return (EXPENSE_SECTIONS as readonly Section[]).includes(section);
+}
+
+export function creditExpenseTransactions(txns: Transaction[]): Transaction[] {
+  return txns.filter((t) => t.kind === "credit" && isExpenseSection(t.section));
+}
 
 export type ViewMode = "incurred" | "cashout";
 

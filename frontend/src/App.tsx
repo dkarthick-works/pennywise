@@ -5,6 +5,7 @@ import { AppShell } from "./components/layout/AppShell";
 import { AuthPage }      from "./pages/AuthPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { CategoryGroupPage } from "./pages/CategoryGroupPage";
+import { CreditTransactionsPage } from "./pages/CreditTransactionsPage";
 import { RecordPage }    from "./pages/RecordPage";
 import { SettingsPage }  from "./pages/SettingsPage";
 import { ProfilePage }   from "./pages/ProfilePage";
@@ -37,6 +38,7 @@ export default function App() {
               <Routes>
                 <Route path="/dashboard" element={<DashboardPage month={month} setMonth={setMonth} />} />
                 <Route path="/dashboard/groups/:groupId" element={<CategoryGroupPage month={month} />} />
+                <Route path="/dashboard/credits" element={<CreditTransactionsPage month={month} />} />
                 <Route path="/record"    element={<RecordPage month={month} setMonth={setMonth} />} />
                 <Route path="/insights"  element={<InsightsPage />} />
                 <Route path="/categories" element={<CategoriesPage />} />

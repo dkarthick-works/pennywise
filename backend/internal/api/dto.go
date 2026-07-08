@@ -12,7 +12,7 @@ type TransactionDTO struct {
 	Date     string   `json:"date"`
 	Kind     string   `json:"kind"`
 	Settles  []string `json:"settles,omitempty"` // settlement rows: linked credit ids
-	Settled  bool     `json:"settled,omitempty"` // credit rows: cleared by a settlement
+	Settled  bool     `json:"settled"` // credit rows: cleared by a settlement
 }
 
 func txnToDTO(t db.Transaction) TransactionDTO {

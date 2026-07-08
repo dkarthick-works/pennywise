@@ -215,6 +215,16 @@ input, button { font-family: inherit; }
 .group-card-link:focus-visible {
   outline: none; border-color: var(--accent); box-shadow: 0 0 0 3.5px var(--accent-soft);
 }
+.hero-card-link {
+  margin: 0; font: inherit; color: inherit; text-align: left;
+  cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.hero-card-link:hover {
+  border-color: var(--accent); box-shadow: var(--sh-sm); transform: translateY(-1px);
+}
+.hero-card-link:focus-visible {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3.5px var(--accent-soft);
+}
 
 /* ============ SEGMENTED CONTROL ============ */
 .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 3px; gap: 2px; }

@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getDashboardMonthly, getGroupSpend, getTxnsByMonth, getTxnsByYear, getSettings } from "../api/ledger";
-import { sectionSums } from "../lib/txns";
+import { sectionSums, creditExpenseTransactions } from "../lib/txns";
 import { inr, inrShort, budgetColor } from "../lib/money";
 import { monthLabel, shiftMonth, MONTH_NAMES } from "../lib/dates";
 import { Donut, YearBars } from "../components/charts/Charts";
-import { IconChevL, IconChevR, IconWallet, IconTrend } from "../components/ui/Icons";
+import { IconChevL, IconChevR, IconWallet, IconTrend, IconCreditCard } from "../components/ui/Icons";
 
 const SECMETA = {
   essential: { label: "Essential", color: "var(--c-essential)" },
@@ -146,12 +146,9 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
   const netSaved = dashboardMonthly?.net_saved ?? 0;
   const savingsRate = dashboardMonthly?.savings_rate ?? 0;
   const monthlyDifference = dashboardMonthly?.monthly_difference ?? 0;
-  const outstandingCreditsCount = dashboardMonthly?.outstanding_credits_count ?? 0;
-  const outstandingCreditsTotal = dashboardMonthly?.outstanding_credits_total ?? 0;
-  const outstandingCreditSuffix =
-    outstandingCreditsCount > 0
-      ? ` · ${outstandingCreditsCount} transaction${outstandingCreditsCount === 1 ? "" : "s"}`
-      : "";
+  const creditTxns = creditExpenseTransactions(monthTxns);
+  const creditCount = creditTxns.length;
+  const creditTotal = creditTxns.reduce((s, t) => s + t.amount, 0);
   const allGroupIds = groupSpend.map((g) => g.group_id);
   const effectiveSelectedGroupIds = selectedGroupIds ?? allGroupIds;
   const selectedGroupIdSet = new Set(effectiveSelectedGroupIds);
@@ -207,6 +204,45 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
             <div className="card card-pad">
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
                 <h3 className="card-h" style={{ whiteSpace: "nowrap" }}>
+                  <IconTrend size={16} style={{ color: "var(--c-flexible)" }} /> Monthly Cost
+                </h3>
+                <span className="chip" style={{ background: "oklch(0.95 0.03 265)", color: "oklch(0.5 0.1 265)", whiteSpace: "nowrap", flex: "none" }}>
+                  by transaction date
+                </span>
+              </div>
+              <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>What you incurred — regardless of when paid.</p>
+              <div
+                style={{
+                  margin: "0 0 10px",
+                  padding: "12px 14px",
+                  borderRadius: 14,
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-2)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
+                  <div>
+                    <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 3 }}>Spent this month</div>
+                    <div className="muted" style={{ fontSize: 11.5 }}>cash + credit</div>
+                  </div>
+                  <div className="num" style={{ fontSize: 29, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--ink)" }}>
+                    {inr(monthlyCost)}
+                  </div>
+                </div>
+              </div>
+              <HeroRow label="Income" value={inr(income)} color="var(--pos)" />
+              <div style={{ height: 1, background: "var(--border-2)", margin: "9px 0" }} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                <span className="stat-lbl">Difference</span>
+                <span className="stat-big num" style={{ color: monthlyDifference >= 0 ? "var(--pos)" : "var(--neg)" }}>
+                  {monthlyDifference >= 0 ? "+" : "−"}{inr(Math.abs(monthlyDifference))}
+                </span>
+              </div>
+            </div>
+
+            <div className="card card-pad">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
+                <h3 className="card-h" style={{ whiteSpace: "nowrap" }}>
                   <IconWallet size={16} style={{ color: "var(--accent)" }} /> Cash Flow
                 </h3>
                 <span className="chip" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)", whiteSpace: "nowrap", flex: "none" }}>
@@ -246,16 +282,27 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
               </div>
             </div>
 
-            <div className="card card-pad">
+            <div
+              role="button"
+              tabIndex={0}
+              className="card card-pad hero-card-link"
+              onClick={() => navigate("/dashboard/credits")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  navigate("/dashboard/credits");
+                }
+              }}
+            >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
                 <h3 className="card-h" style={{ whiteSpace: "nowrap" }}>
-                  <IconTrend size={16} style={{ color: "var(--c-flexible)" }} /> Monthly Cost
+                  <IconCreditCard size={16} style={{ color: "var(--c-daily)" }} /> Credit Card Usage
                 </h3>
                 <span className="chip" style={{ background: "oklch(0.95 0.03 265)", color: "oklch(0.5 0.1 265)", whiteSpace: "nowrap", flex: "none" }}>
                   by transaction date
                 </span>
               </div>
-              <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>What you incurred — regardless of when paid.</p>
+              <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>What you charged to credit this month.</p>
               <div
                 style={{
                   margin: "0 0 10px",
@@ -267,24 +314,21 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
                   <div>
-                    <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 3 }}>Spent this month</div>
-                    <div className="muted" style={{ fontSize: 11.5 }}>cash + credit</div>
+                    <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 3 }}>Credit spent</div>
+                    <div className="muted" style={{ fontSize: 11.5 }}>credit transactions</div>
                   </div>
                   <div className="num" style={{ fontSize: 29, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--ink)" }}>
-                    {inr(monthlyCost)}
+                    {inr(creditTotal)}
                   </div>
                 </div>
               </div>
-              <HeroRow label="Income" value={inr(income)} color="var(--pos)" />
-              <div style={{ height: 1, background: "var(--border-2)", margin: "9px 0" }} />
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                <span className="stat-lbl">Difference</span>
-                <span className="stat-big num" style={{ color: monthlyDifference >= 0 ? "var(--pos)" : "var(--neg)" }}>
-                  {monthlyDifference >= 0 ? "+" : "−"}{inr(Math.abs(monthlyDifference))}
-                </span>
-              </div>
-              <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-                Outstanding credits · <span className="num" style={{ fontWeight: 600, color: outstandingCreditsTotal > 0 ? "var(--neg)" : "var(--ink-2)" }}>{inr(outstandingCreditsTotal)}</span>{outstandingCreditSuffix}
+              <HeroRow label="Transactions" value={String(creditCount)} />
+              <div
+                className="muted"
+                style={{ fontSize: 12, marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
+              >
+                View all credit transactions
+                <IconChevR size={14} style={{ color: "var(--ink-3)", flex: "none" }} />
               </div>
             </div>
           </div>
