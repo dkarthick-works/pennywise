@@ -121,9 +121,11 @@ only ever talks to this origin.
 | GET    | `/api/sections/{section}/open-credits?exclude={id}` | settlement picker candidates |
 | GET    | `/api/daily-suggestions` | ghost-autocomplete categories |
 | GET    | `/api/dashboard/monthly?month=YYYY-MM` | dashboard hero-card totals |
+| GET    | `/api/dashboard/group-spend?month=YYYY-MM` | per-group spend for dashboard category cards |
 | GET    | `/api/categories/unmapped` | distinct transaction category strings with no group mapping |
 | GET    | `/api/categories/texts?q=&exclude_group_id=` | searchable transaction category strings; optionally excludes labels already in one group |
 | GET    | `/api/category-groups` | groups with nested mapping briefs |
+| GET    | `/api/category-groups/{id}/transactions?month=YYYY-MM` | transactions mapped to one group in a month |
 | POST   | `/api/category-groups` | create an empty group (`name`) |
 | PATCH  | `/api/category-groups/{id}` | rename group |
 | DELETE | `/api/category-groups/{id}` | delete group and all its mappings |
@@ -145,7 +147,9 @@ Mirrors the prototype shape so the frontend port is a pass-through:
   "settles": ["credit-id", "…"], "settled": false }
 ```
 
-`settles` appears on settlement rows; `settled` is the derived flag on credit rows.
+`settles` appears on settlement rows (omitted when empty). `settled` is always
+present: `true` when a credit row is linked from a settlement, otherwise `false`
+(including non-credit rows).
 
 ### Dashboard (`GET /api/dashboard/monthly?month=YYYY-MM`)
 
@@ -179,6 +183,43 @@ Response shape:
   "outstanding_credits_total": 9000
 }
 ```
+
+### Group spend (`GET /api/dashboard/group-spend?month=YYYY-MM`)
+
+Returns one row per category group for the user, sorted by group name. Spend is
+the sum of transaction `amount` in the month whose normalized category label
+matches any mapping in that group. All transaction kinds are included (no
+`kind` filter). Groups with no matching transactions return `total: 0`.
+
+Response shape — JSON array:
+
+```json
+[
+  { "group_id": "uuid", "group_name": "Streaming", "total": 3245.0 }
+]
+```
+
+Handlers: `internal/api/group_spend.go`; query `SumSpendByGroupsForMonth` in
+`db/queries/category_groups.sql`.
+
+### Category group transactions (`GET /api/category-groups/{id}/transactions?month=YYYY-MM`)
+
+Returns the group's name, month, total spend, and matching transactions for the
+month (newest first). Same category-matching rules as group spend. Returns
+`404` when the group id does not belong to the user.
+
+```json
+{
+  "group_id": "uuid",
+  "group_name": "Streaming",
+  "month": "2026-06",
+  "total": 3245.0,
+  "transactions": [ { "id": "…", "section": "flexible", "category": "Netflix", "amount": 649, "date": "2026-06-06", "kind": "credit", "settled": false } ]
+}
+```
+
+Handler: `internal/api/group_transactions.go`; queries
+`ListTransactionsByGroupForMonth` and `SumTransactionsByGroupForMonth`.
 
 ### Category groups
 
