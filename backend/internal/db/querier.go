@@ -18,6 +18,8 @@ type Querier interface {
 	DailyCategorySuggestions(ctx context.Context, userID uuid.UUID) ([]string, error)
 	DeleteCategoryGroup(ctx context.Context, arg DeleteCategoryGroupParams) error
 	DeleteCategoryMapping(ctx context.Context, arg DeleteCategoryMappingParams) error
+	DeleteLent(ctx context.Context, arg DeleteLentParams) (int64, error)
+	DeleteRepayment(ctx context.Context, arg DeleteRepaymentParams) (int64, error)
 	DeleteSettlementLinks(ctx context.Context, settlementID uuid.UUID) error
 	DeleteTemplatesBySection(ctx context.Context, arg DeleteTemplatesBySectionParams) error
 	DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) error
@@ -25,6 +27,7 @@ type Querier interface {
 	EnsureSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
 	GetCategoryGroup(ctx context.Context, arg GetCategoryGroupParams) (CategoryGroup, error)
 	GetCategoryMapping(ctx context.Context, arg GetCategoryMappingParams) (CategoryMapping, error)
+	GetLent(ctx context.Context, arg GetLentParams) (GetLentRow, error)
 	GetMonthState(ctx context.Context, arg GetMonthStateParams) (MonthState, error)
 	GetSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
 	GetTransaction(ctx context.Context, arg GetTransactionParams) (Transaction, error)
@@ -33,14 +36,18 @@ type Querier interface {
 	IncomeCategorySuggestions(ctx context.Context, userID uuid.UUID) ([]string, error)
 	InsertCategoryGroup(ctx context.Context, arg InsertCategoryGroupParams) (CategoryGroup, error)
 	InsertCategoryMapping(ctx context.Context, arg InsertCategoryMappingParams) (CategoryMapping, error)
+	InsertLent(ctx context.Context, arg InsertLentParams) (Lent, error)
+	InsertRepayment(ctx context.Context, arg InsertRepaymentParams) (LentRepayment, error)
 	InsertSettlementLink(ctx context.Context, arg InsertSettlementLinkParams) error
 	InsertTemplate(ctx context.Context, arg InsertTemplateParams) (Template, error)
 	InsertTransaction(ctx context.Context, arg InsertTransactionParams) (Transaction, error)
 	ListCategoryGroups(ctx context.Context, userID uuid.UUID) ([]CategoryGroup, error)
 	ListCategoryMappings(ctx context.Context, userID uuid.UUID) ([]ListCategoryMappingsRow, error)
 	ListCategoryMappingsByGroup(ctx context.Context, arg ListCategoryMappingsByGroupParams) ([]CategoryMapping, error)
+	ListLents(ctx context.Context, arg ListLentsParams) ([]ListLentsRow, error)
 	ListLinksForSettlement(ctx context.Context, settlementID uuid.UUID) ([]uuid.UUID, error)
 	ListMonthStates(ctx context.Context, userID uuid.UUID) ([]MonthState, error)
+	ListRepaymentsForLent(ctx context.Context, arg ListRepaymentsForLentParams) ([]ListRepaymentsForLentRow, error)
 	// ---- settlement links --------------------------------------------------
 	// All (settlement_id, credit_id) pairs where the SETTLEMENT falls in the month.
 	ListSettlementLinksByMonth(ctx context.Context, arg ListSettlementLinksByMonthParams) ([]SettlementLink, error)
@@ -63,11 +70,17 @@ type Querier interface {
 	SettledCreditIdsByMonth(ctx context.Context, arg SettledCreditIdsByMonthParams) ([]uuid.UUID, error)
 	SumDashboardMonthly(ctx context.Context, arg SumDashboardMonthlyParams) (SumDashboardMonthlyRow, error)
 	SumEssentialSpendByMonths(ctx context.Context, arg SumEssentialSpendByMonthsParams) ([]SumEssentialSpendByMonthsRow, error)
+	SumLentOutstanding(ctx context.Context, userID uuid.UUID) (SumLentOutstandingRow, error)
+	// Total already repaid against a lent, optionally excluding one repayment row
+	// (used when editing an existing repayment so it does not count against itself).
+	SumRepaymentsForLent(ctx context.Context, arg SumRepaymentsForLentParams) (pgtype.Numeric, error)
 	SumSpendByGroupsForMonth(ctx context.Context, arg SumSpendByGroupsForMonthParams) ([]SumSpendByGroupsForMonthRow, error)
 	SumTransactionsByGroupForMonth(ctx context.Context, arg SumTransactionsByGroupForMonthParams) (pgtype.Numeric, error)
 	UpdateBudgets(ctx context.Context, arg UpdateBudgetsParams) (UserSetting, error)
 	UpdateCategoryGroupName(ctx context.Context, arg UpdateCategoryGroupNameParams) (CategoryGroup, error)
+	UpdateLent(ctx context.Context, arg UpdateLentParams) (Lent, error)
 	UpdatePreferences(ctx context.Context, arg UpdatePreferencesParams) (UserSetting, error)
+	UpdateRepayment(ctx context.Context, arg UpdateRepaymentParams) (LentRepayment, error)
 	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertMonthClosed(ctx context.Context, arg UpsertMonthClosedParams) (MonthState, error)

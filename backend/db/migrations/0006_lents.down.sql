@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS lent_repayments;
+DROP TABLE IF EXISTS lents;
