@@ -39,3 +39,10 @@ export function currentMonth(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
+
+/** Latest date among entries, or today-in-month when the table is empty. */
+export function defaultDraftDate(month: string, dates: string[]): string {
+  if (dates.length > 0) return dates.reduce((a, b) => (a > b ? a : b));
+  const today = new Date();
+  return `${month}-${String(today.getDate()).padStart(2, "0")}`.slice(0, 10);
+}

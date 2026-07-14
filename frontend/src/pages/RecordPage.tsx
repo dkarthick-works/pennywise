@@ -6,7 +6,7 @@ import {
 } from "../api/ledger";
 import { inr } from "../lib/money";
 import { budgetColor } from "../lib/money";
-import { monthCode, shiftMonth, MONTH_NAMES, monthLabel } from "../lib/dates";
+import { monthCode, shiftMonth, MONTH_NAMES, monthLabel, defaultDraftDate } from "../lib/dates";
 import { settledCreditIds } from "../lib/txns";
 import { invalidateMonthCaches } from "../lib/monthCaches";
 import { StatusCell } from "../components/record/StatusCell";
@@ -514,8 +514,7 @@ function DailyTile({ rows, section, month, settledSet }: {
   const { upd, del, add } = useRowMutations(month);
   const [statusFilter, setStatusFilter] = useState<Set<StatusDisplay>>(new Set());
   const statusOptions = useMemo(() => availableStatuses(rows, settledSet), [rows, settledSet]);
-  const today = new Date();
-  const blank = { date: `${month}-${String(today.getDate()).padStart(2, "0")}`.slice(0, 10), category: "", amount: 0 };
+  const blank = { date: defaultDraftDate(month, rows.map((r) => r.date)), category: "", amount: 0 };
   const [draft, setDraft] = useState(blank);
 
   const { data: suggestions = [] } = useQuery({
@@ -545,7 +544,7 @@ function DailyTile({ rows, section, month, settledSet }: {
     if (!draft.category.trim() || !draft.amount) return;
     add.mutate(
       { section, category: draft.category.trim(), amount: draft.amount, date: draft.date || `${month}-01`, kind: "cash" },
-      { onSuccess: () => setDraft({ ...blank }) }
+      { onSuccess: () => setDraft((d) => ({ date: d.date, category: "", amount: 0 })) }
     );
   }
 
@@ -578,7 +577,7 @@ function DailyTile({ rows, section, month, settledSet }: {
                   if (!draft.category.trim() || !parsed) return;
                   add.mutate(
                     { section, category: draft.category.trim(), amount: parsed, date: draft.date || `${month}-01`, kind: "cash" },
-                    { onSuccess: () => setDraft({ ...blank }) }
+                    { onSuccess: () => setDraft((d) => ({ date: d.date, category: "", amount: 0 })) }
                   );
                 }}
               /></td>
@@ -645,8 +644,7 @@ function DailyTile({ rows, section, month, settledSet }: {
 
 function IncomeTile({ rows, month }: { rows: Transaction[]; month: string }) {
   const { upd, del, add } = useRowMutations(month);
-  const today = new Date();
-  const blank = { date: `${month}-${String(today.getDate()).padStart(2, "0")}`.slice(0, 10), category: "", amount: 0 };
+  const blank = { date: defaultDraftDate(month, rows.map((r) => r.date)), category: "", amount: 0 };
   const [draft, setDraft] = useState(blank);
 
   const { data: suggestions = [] } = useQuery({
@@ -660,7 +658,7 @@ function IncomeTile({ rows, month }: { rows: Transaction[]; month: string }) {
     if (!draft.category.trim() || !draft.amount) return;
     add.mutate(
       { section: "income", category: draft.category.trim(), amount: draft.amount, date: draft.date || `${month}-01`, kind: "cash" },
-      { onSuccess: () => setDraft({ ...blank }) }
+      { onSuccess: () => setDraft((d) => ({ date: d.date, category: "", amount: 0 })) }
     );
   }
 
@@ -692,7 +690,7 @@ function IncomeTile({ rows, month }: { rows: Transaction[]; month: string }) {
                   if (!draft.category.trim() || !parsed) return;
                   add.mutate(
                     { section: "income", category: draft.category.trim(), amount: parsed, date: draft.date || `${month}-01`, kind: "cash" },
-                    { onSuccess: () => setDraft({ ...blank }) }
+                    { onSuccess: () => setDraft((d) => ({ date: d.date, category: "", amount: 0 })) }
                   );
                 }}
               /></td>
