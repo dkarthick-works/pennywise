@@ -149,3 +149,43 @@ export interface CategoryMapping {
   group_id: string;
   group_name?: string;
 }
+
+// ─── Lent tracking ─────────────────────────────────────────────────────────
+
+export type LentStatus = "open" | "settled";
+export type LentListStatus = "open" | "settled" | "all";
+
+export interface Lent {
+  id: string;
+  counterparty: string;
+  amount: number;
+  lent_on: string;
+  due_on: string | null;
+  note: string;
+  repaid_total: number;
+  outstanding: number;
+  status: LentStatus;
+  repayments?: LentRepayment[]; // only present on GET /:id
+}
+
+export interface LentRepayment {
+  id: string;
+  lent_id: string;
+  amount: number;
+  repaid_on: string;
+  note: string;
+}
+
+export interface LentInput {
+  counterparty: string;
+  amount: number;
+  lent_on: string;
+  due_on?: string | null;
+  note: string;
+}
+
+export interface RepaymentInput {
+  amount: number;
+  repaid_on: string;
+  note: string;
+}
