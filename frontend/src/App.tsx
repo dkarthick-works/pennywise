@@ -12,6 +12,8 @@ import { ProfilePage }   from "./pages/ProfilePage";
 import { InsightsPage }  from "./pages/InsightsPage";
 import { CategoriesPage } from "./pages/CategoriesPage";
 import { ImportExportPage } from "./pages/ImportExportPage";
+import { LentsPage } from "./pages/LentsPage";
+import { LentDetailPage } from "./pages/LentDetailPage";
 import { currentMonth }  from "./lib/dates";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -40,6 +42,8 @@ export default function App() {
                 <Route path="/dashboard/groups/:groupId" element={<CategoryGroupPage month={month} />} />
                 <Route path="/dashboard/credits" element={<CreditTransactionsPage month={month} />} />
                 <Route path="/record"    element={<RecordPage month={month} setMonth={setMonth} />} />
+                <Route path="/lents"     element={<LentsPage />} />
+                <Route path="/lents/:id" element={<LentDetailPage />} />
                 <Route path="/insights"  element={<InsightsPage />} />
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/export"    element={<ImportExportPage />} />

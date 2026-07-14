@@ -148,3 +148,10 @@ export const IconCategories = (p: IcProps) => (
     <path d="M14 7l6 3-6 3V7z" />
   </Ic>
 );
+export const IconLent = (p: IcProps) => (
+  <Ic {...p}>
+    <path d="M12 3v12" />
+    <path d="M8 11l4 4 4-4" />
+    <path d="M5 19h14" />
+  </Ic>
+);

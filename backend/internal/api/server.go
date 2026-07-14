@@ -105,6 +105,17 @@ func (s *Server) Router() http.Handler {
 		pr.Post("/api/category-mappings", s.handleCreateCategoryMapping)
 		pr.Delete("/api/category-mappings/{id}", s.handleDeleteCategoryMapping)
 
+		pr.Get("/api/lents", s.handleListLents)
+		pr.Post("/api/lents", s.handleCreateLent)
+		pr.Get("/api/lents/{id}", s.handleGetLent)
+		pr.Patch("/api/lents/{id}", s.handleUpdateLent)
+		pr.Delete("/api/lents/{id}", s.handleDeleteLent)
+
+		pr.Get("/api/lents/{id}/repayments", s.handleListRepayments)
+		pr.Post("/api/lents/{id}/repayments", s.handleCreateRepayment)
+		pr.Patch("/api/lents/{id}/repayments/{rid}", s.handleUpdateRepayment)
+		pr.Delete("/api/lents/{id}/repayments/{rid}", s.handleDeleteRepayment)
+
 		pr.Get("/api/months/{month}", s.handleGetMonth)
 		pr.Put("/api/months/{month}/closed", s.handleSetMonthClosed)
 		pr.Post("/api/months/{month}/open", s.handleOpenMonth)

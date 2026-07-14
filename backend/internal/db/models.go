@@ -118,6 +118,27 @@ type CategoryMapping struct {
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Lent struct {
+	ID           uuid.UUID          `json:"id"`
+	UserID       uuid.UUID          `json:"user_id"`
+	Counterparty string             `json:"counterparty"`
+	Amount       pgtype.Numeric     `json:"amount"`
+	LentOn       pgtype.Date        `json:"lent_on"`
+	DueOn        pgtype.Date        `json:"due_on"`
+	Note         string             `json:"note"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+type LentRepayment struct {
+	ID        uuid.UUID          `json:"id"`
+	LentID    uuid.UUID          `json:"lent_id"`
+	Amount    pgtype.Numeric     `json:"amount"`
+	RepaidOn  pgtype.Date        `json:"repaid_on"`
+	Note      string             `json:"note"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type MonthState struct {
 	UserID uuid.UUID `json:"user_id"`
 	Month  string    `json:"month"`
