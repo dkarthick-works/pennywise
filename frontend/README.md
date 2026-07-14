@@ -22,7 +22,9 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | Path | Page | Notes |
 |------|------|-------|
 | `/record` | Record & Expense | **Default landing page** after login (`/` redirects here) |
-| `/dashboard` | Dashboard | Month/year charts and summaries |
+| `/dashboard` | Dashboard | Month/year charts, hero cards, category-group spend |
+| `/dashboard/credits` | Credit transactions | Drill-down from the Credit Card Usage hero card |
+| `/dashboard/groups/:groupId` | Category group | Drill-down from a category-group spend card |
 | `/insights` | Insights | Emergency fund targets (from `GET /api/insights`) |
 | `/categories` | Map Categories | Assign transaction labels to high-level groups |
 | `/settings` | Settings | Budgets, templates, preferences |
@@ -30,6 +32,54 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/login` | Auth | Sign up / log in (password field has show/hide toggle) |
 
 Unknown authenticated paths fall back to `/record`.
+
+## Dashboard page
+
+Monthly and yearly views of spend. The global month selector in the shell drives
+both the main dashboard and the drill-down routes below.
+
+### Monthly hero cards
+
+Three summary cards at the top. **Monthly Cost** and **Cash Flow** use
+`GET /api/dashboard/monthly`; **Credit Card Usage** is computed client-side from
+the month's transactions.
+
+| Card | What it measures | Basis |
+|------|------------------|-------|
+| Monthly Cost | Incurred spend (`cash` + `credit`) | Transaction date |
+| Cash Flow | Cash that moved (`cash` + `settlement`) | Payment date |
+| Credit Card Usage | Expense-section `credit` rows | Transaction date |
+
+The **Credit Card Usage** card shows total charged and transaction count for
+`essential`, `flexible`, and `daily` rows where `kind = credit`. Settled credits
+are included — this is incurred spend, not open liability. Click the card (or
+press Enter/Space when focused) to open `/dashboard/credits`.
+
+### Category group spend
+
+When the user has category groups, a **Category groups** section lists monthly
+spend per group from `GET /api/dashboard/group-spend`. Groups can overlap when
+the same label is mapped to more than one group. A filter dropdown selects which
+groups to show; each card links to `/dashboard/groups/:groupId`. The section has
+`id="category-groups"` so `/dashboard#category-groups` scrolls here.
+
+### Drill-down pages
+
+Both drill-down routes reuse `TransactionListTable` (`src/components/dashboard/TransactionListTable.tsx`).
+
+| Route | Data source | Notes |
+|-------|-------------|-------|
+| `/dashboard/credits` | `GET /api/transactions?month=` filtered by `creditExpenseTransactions()` | Kind column hidden |
+| `/dashboard/groups/:groupId` | `GET /api/category-groups/{id}/transactions?month=` | Shows date, category, section, kind, amount |
+
+`creditExpenseTransactions()` in `src/lib/txns.ts` keeps rows where
+`kind === "credit"` and the section is an expense section (`essential`, `flexible`,
+`daily`).
+
+### Yearly view
+
+Client-side rollups from `GET /api/transactions?year=`: total income/spend,
+per-month bars, top categories, and section split donut.
 
 ## Record page
 
@@ -62,7 +112,7 @@ the formatted date and entry count. The quick-add row stays pinned at the top.
 ## Categories page
 
 Nav item: **Map Categories** (`/categories`). Maps free-text transaction labels to
-user-defined **groups** for future dashboard rollups. Transaction rows are not modified.
+user-defined **groups** for dashboard spend rollups. Transaction rows are not modified.
 
 ### Tabs
 

@@ -66,9 +66,11 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
 
 - **Record page** — default landing route; per-section status filter; daily rows grouped by date
   ([frontend/README.md § Record page](frontend/README.md))
-- **Category mapping** — map transaction labels to high-level groups for future dashboards
+- **Category mapping** — map transaction labels to high-level groups for dashboard rollups
   ([frontend/README.md § Categories page](frontend/README.md),
   [backend/README.md § Category groups](backend/README.md))
+- **Credit card usage** — monthly credit spend hero card with transaction drill-down
+  ([frontend/README.md § Dashboard page](frontend/README.md))
 - **Insights** — emergency fund targets from essential spend lookback
   ([backend/README.md § Insights](backend/README.md))
 - **PWA** — installable, offline-capable app shell ([frontend/README.md § PWA](frontend/README.md))
