@@ -22,3 +22,5 @@ Ledger PRD (standalone).html
 .cursor/plans/*
 
 frontend/app-story/*
+backend/graphify-out/
+frontend/FIGMA_DESIGN_SYSTEM.md
