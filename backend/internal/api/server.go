@@ -205,8 +205,20 @@ func spaHandler(fsys fs.FS) http.Handler {
 			name = "index.html"
 		}
 		if _, err := fsys.Open(name); err != nil {
+			name = "index.html"
 			r.URL.Path = "/"
 		}
+
+		// HTML and service-worker entry points must be revalidated so a new
+		// deployment can be discovered immediately. Vite's content-hashed build
+		// assets are immutable and safe to cache for a year.
+		switch {
+		case name == "index.html", name == "sw.js", name == "registerSW.js":
+			w.Header().Set("Cache-Control", "no-cache")
+		case strings.HasPrefix(name, "assets/"):
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+
 		fserver.ServeHTTP(w, r)
 	})
 }
