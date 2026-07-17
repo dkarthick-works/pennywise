@@ -20,6 +20,8 @@ import type {
   CategoryMapping,
   ImportRowPayload,
   ImportResult,
+  TransactionNameSuggestionSection,
+  TransactionNameSuggestionsResponse,
 } from "../types";
 
 // ─── Profile ─────────────────────────────────────────────────────────────
@@ -117,11 +119,24 @@ export const getOpenCredits = (section: string, excludeId?: string) =>
 
 // ─── Autocomplete suggestions ─────────────────────────────────────────────
 
-export const getDailySuggestions = () =>
-  client.get<string[]>("/api/daily-suggestions").then((r) => r.data);
-
-export const getIncomeSuggestions = () =>
-  client.get<string[]>("/api/income-suggestions").then((r) => r.data);
+export const getTransactionNameSuggestions = (
+  params: {
+    section: TransactionNameSuggestionSection;
+    q: string;
+    limit?: number;
+  },
+  signal?: AbortSignal
+) =>
+  client
+    .get<TransactionNameSuggestionsResponse>("/api/transaction-names/suggestions", {
+      params: {
+        section: params.section,
+        q: params.q.trim(),
+        limit: params.limit ?? 10,
+      },
+      signal,
+    })
+    .then((r) => r.data);
 
 // ─── Insights ─────────────────────────────────────────────────────────────
 

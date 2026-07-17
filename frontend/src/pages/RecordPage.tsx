@@ -2,13 +2,17 @@ import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   openMonth, setMonthClosed, getSettings, updateBudgets,
-  createTxn, updateTxn, deleteTxn, getDailySuggestions, getIncomeSuggestions,
+  createTxn, updateTxn, deleteTxn,
 } from "../api/ledger";
 import { inr } from "../lib/money";
 import { budgetColor } from "../lib/money";
 import { monthCode, shiftMonth, MONTH_NAMES, monthLabel, defaultDraftDate } from "../lib/dates";
 import { settledCreditIds } from "../lib/txns";
-import { invalidateMonthCaches } from "../lib/monthCaches";
+import {
+  invalidateMonthCaches,
+  invalidateTransactionNameSuggestionSections,
+  invalidateTransactionNameSuggestions,
+} from "../lib/monthCaches";
 import { StatusCell } from "../components/record/StatusCell";
 import {
   StatusFilterHeader,
@@ -266,12 +270,31 @@ function TileBudgetHead({ meta, spent, budget, onBudget, onBack }: {
 
 // ─── Shared table row mutations ───────────────────────────────────────────
 
-function useRowMutations(month: string) {
+function useRowMutations(month: string, section: Section) {
   const qc = useQueryClient();
-  const inv = () => invalidateMonthCaches(qc, month);
-  const upd = useMutation({ mutationFn: ({ id, patch }: { id: string; patch: Partial<Transaction> }) => updateTxn(id, patch), onSuccess: inv });
-  const del = useMutation({ mutationFn: (id: string) => deleteTxn(id), onSuccess: inv });
-  const add = useMutation({ mutationFn: (t: Omit<Transaction, "id" | "settled">) => createTxn(t), onSuccess: inv });
+  const upd = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<Transaction> }) => updateTxn(id, patch),
+    onSuccess: (updated, { patch }) => {
+      invalidateMonthCaches(qc, month);
+      const teachesName =
+        Object.prototype.hasOwnProperty.call(patch, "category") ||
+        Object.prototype.hasOwnProperty.call(patch, "section");
+      if (teachesName) {
+        invalidateTransactionNameSuggestionSections(qc, [section, updated.section]);
+      }
+    },
+  });
+  const del = useMutation({
+    mutationFn: (id: string) => deleteTxn(id),
+    onSuccess: () => invalidateMonthCaches(qc, month),
+  });
+  const add = useMutation({
+    mutationFn: (t: Omit<Transaction, "id" | "settled">) => createTxn(t),
+    onSuccess: (created) => {
+      invalidateMonthCaches(qc, month);
+      invalidateTransactionNameSuggestions(qc, created.section);
+    },
+  });
   return { upd, del, add };
 }
 
@@ -281,7 +304,7 @@ function EssentialTile({ rows, section, month, settledSet, templates }: {
   rows: Transaction[]; section: Section; month: string; settledSet: Set<string>; templates: string[];
 }) {
   const qc = useQueryClient();
-  const { upd, del, add } = useRowMutations(month);
+  const { upd, del, add } = useRowMutations(month, section);
   const [statusFilter, setStatusFilter] = useState<Set<StatusDisplay>>(new Set());
   const statusOptions = useMemo(() => availableStatuses(rows, settledSet), [rows, settledSet]);
   const visible = useMemo(
@@ -374,7 +397,7 @@ function FlexibleTile({ rows, section, month, settledSet, templates }: {
   rows: Transaction[]; section: Section; month: string; settledSet: Set<string>; templates: string[];
 }) {
   const qc = useQueryClient();
-  const { upd, del, add } = useRowMutations(month);
+  const { upd, del, add } = useRowMutations(month, section);
   const [statusFilter, setStatusFilter] = useState<Set<StatusDisplay>>(new Set());
   const statusOptions = useMemo(() => availableStatuses(rows, settledSet), [rows, settledSet]);
   const visible = useMemo(
@@ -470,12 +493,11 @@ function dailyGroupLabel(d: string): string {
   return `${parseInt(dd, 10)} ${MONTH_NAMES[parseInt(m, 10) - 1]} ${y}`;
 }
 
-function DailyRow({ r, section, month, settledSet, suggestions, upd, del }: {
+function DailyRow({ r, section, month, settledSet, upd, del }: {
   r: Transaction;
   section: Section;
   month: string;
   settledSet: Set<string>;
-  suggestions: string[];
   upd: ReturnType<typeof useRowMutations>["upd"];
   del: ReturnType<typeof useRowMutations>["del"];
 }) {
@@ -493,7 +515,7 @@ function DailyRow({ r, section, month, settledSet, suggestions, upd, del }: {
             </span>
           : <CategoryInput
               value={cat}
-              suggestions={suggestions}
+              section="daily"
               onChange={setCat}
               onCommit={(v) => { if (v !== r.category) upd.mutate({ id: r.id, patch: { category: v } }); }}
             />
@@ -511,16 +533,11 @@ function DailyRow({ r, section, month, settledSet, suggestions, upd, del }: {
 function DailyTile({ rows, section, month, settledSet }: {
   rows: Transaction[]; section: Section; month: string; settledSet: Set<string>;
 }) {
-  const { upd, del, add } = useRowMutations(month);
+  const { upd, del, add } = useRowMutations(month, section);
   const [statusFilter, setStatusFilter] = useState<Set<StatusDisplay>>(new Set());
   const statusOptions = useMemo(() => availableStatuses(rows, settledSet), [rows, settledSet]);
   const blank = { date: defaultDraftDate(month, rows.map((r) => r.date)), category: "", amount: 0 };
   const [draft, setDraft] = useState(blank);
-
-  const { data: suggestions = [] } = useQuery({
-    queryKey: ["daily-suggestions"],
-    queryFn: getDailySuggestions,
-  });
 
   const sorted = useMemo(
     () => [...rows].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)),
@@ -566,7 +583,7 @@ function DailyTile({ rows, section, month, settledSet }: {
               <td>
                 <CategoryInput
                   value={draft.category}
-                  suggestions={suggestions}
+                  section="daily"
                   placeholder="Type to add — e.g. Groceries"
                   onChange={(v) => setDraft({ ...draft, category: v })}
                   onSubmit={commit}
@@ -611,7 +628,6 @@ function DailyTile({ rows, section, month, settledSet }: {
                     section={section}
                     month={month}
                     settledSet={settledSet}
-                    suggestions={suggestions}
                     upd={upd}
                     del={del}
                   />
@@ -632,7 +648,7 @@ function DailyTile({ rows, section, month, settledSet }: {
         </table>
       </div>
       <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border-2)", fontSize: 12, color: "var(--ink-3)" }}>
-        Tip — type a category and press <span className="kbd">Tab</span> to autocomplete. New entries default to cash; tap the Status chip to flag Credit or a Settlement.
+        Tip — type at least 2 characters for suggestions, then use <span className="kbd">↑</span> <span className="kbd">↓</span> and <span className="kbd">Enter</span> to choose. New entries default to cash; tap the Status chip to flag Credit or a Settlement.
       </div>
     </div>
   );
@@ -643,14 +659,9 @@ function DailyTile({ rows, section, month, settledSet }: {
 // Functions like Daily: quick-add row at top, entries listed newest-first.
 
 function IncomeTile({ rows, month }: { rows: Transaction[]; month: string }) {
-  const { upd, del, add } = useRowMutations(month);
+  const { upd, del, add } = useRowMutations(month, "income");
   const blank = { date: defaultDraftDate(month, rows.map((r) => r.date)), category: "", amount: 0 };
   const [draft, setDraft] = useState(blank);
-
-  const { data: suggestions = [] } = useQuery({
-    queryKey: ["income-suggestions"],
-    queryFn: getIncomeSuggestions,
-  });
 
   const sorted = [...rows].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
 
@@ -679,7 +690,7 @@ function IncomeTile({ rows, month }: { rows: Transaction[]; month: string }) {
               <td>
                 <CategoryInput
                   value={draft.category}
-                  suggestions={suggestions}
+                  section="income"
                   placeholder="e.g. Salary, Freelance, Dividend"
                   onChange={(v) => setDraft({ ...draft, category: v })}
                   onSubmit={commit}
@@ -726,7 +737,7 @@ function IncomeTile({ rows, month }: { rows: Transaction[]; month: string }) {
         </table>
       </div>
       <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border-2)", fontSize: 12, color: "var(--ink-3)" }}>
-        Tip — type a source and press <span className="kbd">Tab</span> to autocomplete from past entries.
+        Tip — type at least 2 characters for suggestions, then use <span className="kbd">↑</span> <span className="kbd">↓</span> and <span className="kbd">Enter</span> to choose from past entries.
       </div>
     </div>
   );

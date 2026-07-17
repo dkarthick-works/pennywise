@@ -150,6 +150,18 @@ export interface CategoryMapping {
   group_name?: string;
 }
 
+// ─── Transaction name suggestions ─────────────────────────────────────────
+
+export type TransactionNameSuggestionSection = "daily" | "income";
+
+export interface TransactionNameSuggestion {
+  name: string;
+}
+
+export interface TransactionNameSuggestionsResponse {
+  items: TransactionNameSuggestion[];
+}
+
 // ─── Lent tracking ─────────────────────────────────────────────────────────
 
 export type LentStatus = "open" | "settled";

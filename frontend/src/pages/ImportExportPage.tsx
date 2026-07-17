@@ -138,9 +138,7 @@ export function ImportExportPage() {
   const importMut = useMutation({
     mutationFn: async () => {
       const payload = toImportPayload(importRows);
-      const sections = new Set(importRows.map((r) => r.row.section));
-      const res = await importTransactions(payload);
-      return { ...res, sections };
+      return importTransactions(payload);
     },
     onMutate: () => {
       setImportError("");
@@ -150,7 +148,7 @@ export function ImportExportPage() {
       setImported(res.imported);
       setImportRows([]);
       if (fileRef.current) fileRef.current.value = "";
-      invalidateImportCaches(qc, res.months, res.sections);
+      invalidateImportCaches(qc, res.months);
     },
     onError: (e) => {
       setImportError(e instanceof Error ? e.message : "Import failed");
