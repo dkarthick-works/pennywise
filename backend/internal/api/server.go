@@ -85,6 +85,7 @@ func (s *Server) Router() http.Handler {
 		pr.Post("/api/transactions", s.handleCreateTransaction)
 		pr.Patch("/api/transactions/{id}", s.handleUpdateTransaction)
 		pr.Delete("/api/transactions/{id}", s.handleDeleteTransaction)
+		pr.Get("/api/transaction-names/suggestions", s.handleTransactionNameSuggestions)
 
 		pr.Get("/api/sections/{section}/open-credits", s.handleOpenCredits)
 		pr.Get("/api/daily-suggestions", s.handleDailySuggestions)

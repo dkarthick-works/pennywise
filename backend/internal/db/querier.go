@@ -47,6 +47,7 @@ type Querier interface {
 	ListLents(ctx context.Context, arg ListLentsParams) ([]ListLentsRow, error)
 	ListLinksForSettlement(ctx context.Context, settlementID uuid.UUID) ([]uuid.UUID, error)
 	ListMonthStates(ctx context.Context, userID uuid.UUID) ([]MonthState, error)
+	ListPopularTransactionNameSuggestions(ctx context.Context, arg ListPopularTransactionNameSuggestionsParams) ([]string, error)
 	ListRepaymentsForLent(ctx context.Context, arg ListRepaymentsForLentParams) ([]ListRepaymentsForLentRow, error)
 	// ---- settlement links --------------------------------------------------
 	// All (settlement_id, credit_id) pairs where the SETTLEMENT falls in the month.
@@ -66,6 +67,8 @@ type Querier interface {
 	// picker. Excludes any credit already linked to a settlement other than the one
 	// currently being edited (exclude_settlement).
 	OpenCreditsForSection(ctx context.Context, arg OpenCreditsForSectionParams) ([]Transaction, error)
+	SearchShortTransactionNameSuggestions(ctx context.Context, arg SearchShortTransactionNameSuggestionsParams) ([]string, error)
+	SearchTransactionNameSuggestions(ctx context.Context, arg SearchTransactionNameSuggestionsParams) ([]string, error)
 	// Credit ids (in this month) that some settlement references — for "Settled" chips.
 	SettledCreditIdsByMonth(ctx context.Context, arg SettledCreditIdsByMonthParams) ([]uuid.UUID, error)
 	SumDashboardMonthly(ctx context.Context, arg SumDashboardMonthlyParams) (SumDashboardMonthlyRow, error)

@@ -118,6 +118,7 @@ only ever talks to this origin.
 | POST   | `/api/transactions` | create (settlement may include `settles[]`) |
 | PATCH  | `/api/transactions/{id}` | partial update; reconciles settlement links |
 | DELETE | `/api/transactions/{id}` | delete |
+| GET    | `/api/transaction-names/suggestions?section=&q=&limit=` | ranked, typo-tolerant transaction-name autocomplete |
 | GET    | `/api/sections/{section}/open-credits?exclude={id}` | settlement picker candidates |
 | GET    | `/api/daily-suggestions` | ghost-autocomplete categories |
 | GET    | `/api/dashboard/monthly?month=YYYY-MM` | dashboard hero-card totals |
@@ -150,6 +151,36 @@ Mirrors the prototype shape so the frontend port is a pass-through:
 `settles` appears on settlement rows (omitted when empty). `settled` is always
 present: `true` when a credit row is linked from a settlement, otherwise `false`
 (including non-credit rows).
+
+### Transaction-name autocomplete
+
+`GET /api/transaction-names/suggestions` searches the authenticated user's
+learned transaction-name history. `section` is required and accepts
+`essential`, `flexible`, `daily`, or `income`; `q` is optional; and `limit`
+defaults to 10 with a maximum of 20.
+
+```http
+GET /api/transaction-names/suggestions?section=daily&q=cof&limit=10
+```
+
+```json
+{
+  "items": [
+    { "name": "Coffee" },
+    { "name": "Coffee — Starbucks" }
+  ]
+}
+```
+
+An empty query returns the most-used, most-recent names. One- and two-character
+queries use prefix matching; longer queries add substring and PostgreSQL trigram
+similarity matching, so minor misspellings can still return useful results.
+
+The history is maintained atomically by database triggers whenever a normal
+transaction is inserted or its category/section changes. Blank, over-200-character,
+and settlement labels are ignored. Learned names remain available after the
+source transaction is renamed or deleted. Results are always scoped by both
+the authenticated user and requested section.
 
 ### Dashboard (`GET /api/dashboard/monthly?month=YYYY-MM`)
 

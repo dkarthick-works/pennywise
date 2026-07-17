@@ -171,6 +171,15 @@ type Transaction struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+type TransactionNameSuggestion struct {
+	UserID         uuid.UUID          `json:"user_id"`
+	Section        Section            `json:"section"`
+	NormalizedName string             `json:"normalized_name"`
+	DisplayName    string             `json:"display_name"`
+	UseCount       int64              `json:"use_count"`
+	LastUsedAt     pgtype.Timestamptz `json:"last_used_at"`
+}
+
 type User struct {
 	ID          uuid.UUID          `json:"id"`
 	Email       string             `json:"email"`

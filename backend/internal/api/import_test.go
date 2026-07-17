@@ -153,17 +153,19 @@ func TestImportTransactionsIntegration(t *testing.T) {
 
 	userID := uuid.New()
 	if _, err := pool.Exec(ctx, `
-		INSERT INTO users (id, email, display_name) VALUES ($1, 'import@test', 'Import Test');
-		INSERT INTO user_settings (user_id) VALUES ($1);
+		INSERT INTO users (id, email, display_name) VALUES ($1, 'import@test', 'Import Test')
 	`, userID); err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
+	if _, err := pool.Exec(ctx, `INSERT INTO user_settings (user_id) VALUES ($1)`, userID); err != nil {
+		t.Fatalf("seed user settings: %v", err)
+	}
 
 	cfg := config.Config{
-		JWTSecret:      categoryAPITestSecret,
-		JWTUserClaim:   "user_id",
-		JWTEmailClaim:  "email",
-		CORSOrigins:    []string{"*"},
+		JWTSecret:     categoryAPITestSecret,
+		JWTUserClaim:  "user_id",
+		JWTEmailClaim: "email",
+		CORSOrigins:   []string{"*"},
 	}
 	srv, err := NewServer(cfg, pool)
 	if err != nil {
