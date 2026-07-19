@@ -62,7 +62,7 @@ internal/
   database/          pgx pool + migration runner
   db/                sqlc-GENERATED code (do not edit)
   seed/              default templates + demo dataset (ported from data.jsx)
-  api/               HTTP handlers, DTOs, pgx<->JSON conversion
+  api/               HTTP handlers, DTOs, pgx<->JSON conversion (incl. lents, import/export)
   category/          label normalization for category groups
   insights/          emergency fund calculation (pure logic, no I/O)
 cmd/
@@ -119,6 +119,8 @@ only ever talks to this origin.
 | POST   | `/api/transactions` | create (settlement may include `settles[]`) |
 | PATCH  | `/api/transactions/{id}` | partial update; reconciles settlement links |
 | DELETE | `/api/transactions/{id}` | delete |
+| GET    | `/api/transactions/export?from=YYYY-MM-DD&to=YYYY-MM-DD` | download CSV (max 6-month range; settlements omitted) |
+| POST   | `/api/transactions/import` | bulk-create from validated rows (max 2000; settlements rejected) |
 | GET    | `/api/transaction-names/suggestions?section=&q=&limit=` | ranked, typo-tolerant transaction-name autocomplete |
 | GET    | `/api/sections/{section}/open-credits?exclude={id}` | settlement picker candidates |
 | GET    | `/api/daily-suggestions` | ghost-autocomplete categories |
@@ -140,6 +142,15 @@ only ever talks to this origin.
 | GET    | `/api/months/{month}` | `{closed, seeded}` |
 | PUT    | `/api/months/{month}/closed` | toggle the cosmetic closed flag |
 | POST   | `/api/months/{month}/open` | clone templates into a fresh month, return its rows |
+| GET    | `/api/lents?status=open\|settled\|all` | list money lent to others (default `all`) |
+| POST   | `/api/lents` | create a lent |
+| GET    | `/api/lents/{id}` | lent detail with nested `repayments` |
+| PATCH  | `/api/lents/{id}` | update lent fields |
+| DELETE | `/api/lents/{id}` | delete lent and all repayments |
+| GET    | `/api/lents/{id}/repayments` | list repayments for one lent |
+| POST   | `/api/lents/{id}/repayments` | record a repayment instalment |
+| PATCH  | `/api/lents/{id}/repayments/{rid}` | update a repayment |
+| DELETE | `/api/lents/{id}/repayments/{rid}` | delete a repayment |
 
 ### Transaction JSON
 
@@ -380,6 +391,87 @@ Response shape:
 
 Logic lives in `internal/insights/emergency_fund.go`; the handler aggregates
 via `SumEssentialSpendByMonths` in `db/queries/transactions.sql`.
+
+### CSV export (`GET /api/transactions/export?from=&to=`)
+
+Downloads a Pennywise-compatible CSV for the inclusive date range. Both
+`from` and `to` must be `YYYY-MM-DD`; `from` must be on or before `to`, and
+the span must not exceed **6 calendar months** (same rule as the SPA export
+form). Settlement rows are omitted from the file. Returns `404` when the range
+contains no exportable rows (including settlement-only ranges).
+
+Columns: `id`, `date`, `section`, `category`, `amount`, `currency`, `kind`.
+The `Content-Disposition` header carries the filename
+(`pennywise-transactions-{from}_{to}.csv`).
+
+### CSV import (`POST /api/transactions/import`)
+
+Bulk-creates normal transaction rows in one database transaction. Request
+body:
+
+```json
+{
+  "rows": [
+    { "date": "2026-06-01", "section": "daily", "category": "Coffee", "amount": 120, "kind": "cash" }
+  ]
+}
+```
+
+**Validation rules:**
+
+- At least one row, at most **2000** rows.
+- `kind` must be `cash` or `credit` — **settlement rows are rejected**.
+- `income` rows must be `cash`.
+- `amount` must be `>= 0`; `category` is required after trim.
+- Per-row field errors return `400` with `{ "error": "validation failed", "rows": [ { "index": 0, "fields": { … } } ] }`.
+
+On success returns `201` with `{ "imported": N, "months": ["YYYY-MM", …] }`.
+Each touched month is marked seeded (same as opening a month manually).
+Settlement links are not created by import — record settlements in the Record
+page after import.
+
+Handlers: `internal/api/import.go`; export logic in `internal/api/transactions.go`.
+
+### Lents (`/api/lents`)
+
+Tracks money lent to other people in a **standalone ledger** — deliberately
+isolated from `transactions`. Lent rows never appear on the Dashboard, Record
+page, CSV export, category suggestions, or insights calculations.
+
+| table | purpose |
+|-------|---------|
+| `lents` | one loan: counterparty, principal `amount`, `lent_on`, optional `due_on`, note |
+| `lent_repayments` | partial or full repayments against a lent |
+
+`open` vs `settled` is **derived** from `outstanding = amount - SUM(repayments)`
+and is never stored, so status cannot drift from repayment rows.
+
+**Create / update body:**
+
+```json
+{ "counterparty": "Ravi", "amount": 5000, "lent_on": "2026-06-01", "due_on": "2026-07-01", "note": "" }
+```
+
+`counterparty` is required; `amount` must be `> 0`; dates are `YYYY-MM-DD`;
+`due_on` cannot be before `lent_on`.
+
+**List** — `GET /api/lents?status=open|settled|all` (default `all`). Summary
+rows omit nested repayments.
+
+**Detail** — `GET /api/lents/{id}` includes `repayments` sorted by date.
+Returns `404` when the id does not belong to the user.
+
+**Repayments** — `POST /api/lents/{id}/repayments` with
+`{ "amount": 2000, "repaid_on": "2026-06-15", "note": "" }`. A repayment
+cannot exceed the current outstanding balance (`400` when it would
+over-repay). Updates use the same shape; when editing, the outstanding cap
+excludes the row being edited so a no-op edit does not false-trigger
+over-repayment.
+
+**Delete** — removing a lent cascades to its repayments.
+
+Handlers: `internal/api/lents.go`; queries in `db/queries/lents.sql`;
+migration `0006_lents`.
 
 ## Configuration
 

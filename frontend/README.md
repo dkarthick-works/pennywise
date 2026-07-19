@@ -25,8 +25,11 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/dashboard` | Dashboard | Month/year charts, hero cards, category-group spend |
 | `/dashboard/credits?month=&view=calendar\|billing` | Credit transactions | Drill-down from the Credit Card Usage hero card; month + view carried in the URL |
 | `/dashboard/groups/:groupId` | Category group | Drill-down from a category-group spend card |
+| `/lents` | Lent | Track money lent to others (open/settled filter, create form) |
+| `/lents/:id` | Lent detail | Edit/delete lent, record and manage repayments |
 | `/insights` | Insights | Emergency fund targets (from `GET /api/insights`) |
 | `/categories` | Map Categories | Assign transaction labels to high-level groups |
+| `/export` | Import / Export | CSV export (date range) and import with review table |
 | `/settings` | Settings | Budgets, templates, preferences |
 | `/profile` | Profile | Display name and email |
 | `/login` | Auth | Sign up / log in (password field has show/hide toggle) |
@@ -123,6 +126,56 @@ The **Daily** tile sorts rows by date descending (then by id), then inserts
 date header rows (`date-group-hdr`) whenever the date changes. Each header shows
 the formatted date and entry count. The quick-add row stays pinned at the top.
 
+### Quick-add defaults
+
+On **Daily** and **Income** tiles, the quick-add date defaults to the **latest
+date already in that table** (`defaultDraftDate` in `src/lib/dates.ts`), not
+today's calendar day. When the table is empty it falls back to today within the
+selected month. After each add the draft date is preserved so back-filling a run
+of same-day entries does not reset to today.
+
+### Transaction-name autocomplete
+
+**Daily** and **Income** quick-add rows (and Daily row edits) use
+`CategoryInput` with ranked suggestions from
+`GET /api/transaction-names/suggestions`. Type at least **2 characters** to
+fetch; use ↑/↓ and Enter to pick. Queries are debounced (250 ms) and scoped
+per section. Suggestions learn from past category labels via database triggers
+and survive renames/deletes of the source transaction.
+
+React Query keys live in `src/lib/transactionNameSuggestions.ts`; mutations
+invalidate the affected section via `invalidateTransactionNameSuggestions` in
+`src/lib/monthCaches.ts`.
+
+## Lent page
+
+Nav item: **Lent** (`/lents`). A separate ledger for money lent to other people
+— it does **not** feed Dashboard, Record, CSV export, or category suggestions.
+
+| Route | Purpose |
+|-------|---------|
+| `/lents` | List with open/settled/all filter, outstanding summary, inline create form |
+| `/lents/:id` | Edit lent fields, delete lent, list/add/edit/delete repayments |
+
+List defaults to **open** loans. The detail page hides the repayment form when
+the lent is settled. API wrappers are in `src/api/lents.ts`; React Query keys
+are prefixed with `["lents", …]`.
+
+## Import / Export page
+
+Nav item: **Import / Export** (`/export`).
+
+**Export** — pick an inclusive `from`/`to` date range (defaults to the current
+shell month; max **6 months**). Downloads via `GET /api/transactions/export`.
+Settlement rows are omitted from the CSV.
+
+**Import** — upload a Pennywise export CSV. The client parses and validates
+rows (`src/lib/import.ts`, max **2000** rows), shows an editable review table,
+then posts to `POST /api/transactions/import`. Settlement rows are rejected;
+income must be `cash`. Category mappings are **not** applied automatically —
+map new labels on the Categories page after import. Successful import
+invalidates transaction and suggestion caches for the returned months.
+
 ## Categories page
 
 Nav item: **Map Categories** (`/categories`). Maps free-text transaction labels to
@@ -163,3 +216,9 @@ React Query keys are prefixed with `["categories", …]`; mutations invalidate t
 
 `vite-plugin-pwa` precaches the app shell. Client-side routes fall back to
 `index.html`; `/api/*` is excluded from the service worker navigate fallback.
+
+In production the Go server serves the embedded SPA with explicit cache headers:
+`index.html`, `sw.js`, and `registerSW.js` are sent with `Cache-Control: no-cache`
+so new deployments are picked up immediately; content-hashed files under
+`assets/` are cached as immutable for one year (`spaHandler` in
+`backend/internal/api/server.go`).

@@ -64,13 +64,21 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
 
 ## Recent features (see sub-READMEs for detail)
 
-- **Record page** — default landing route; per-section status filter; daily rows grouped by date
+- **Record page** — default landing route; per-section status filter; daily rows grouped by date;
+  transaction-name autocomplete on Daily/Income quick-add
   ([frontend/README.md § Record page](frontend/README.md))
+- **Lent tracker** — standalone ledger for money lent to others with repayment history
+  ([frontend/README.md § Lent page](frontend/README.md),
+  [backend/README.md § Lents](backend/README.md))
+- **CSV import/export** — download transactions and bulk-import with review
+  ([frontend/README.md § Import / Export page](frontend/README.md),
+  [backend/README.md § CSV export](backend/README.md))
 - **Category mapping** — map transaction labels to high-level groups for dashboard rollups
   ([frontend/README.md § Categories page](frontend/README.md),
   [backend/README.md § Category groups](backend/README.md))
-- **Credit card usage** — monthly credit spend hero card with transaction drill-down
+- **Credit card usage** — monthly credit spend hero card with calendar-month and statement-cycle views
   ([frontend/README.md § Dashboard page](frontend/README.md))
 - **Insights** — emergency fund targets from essential spend lookback
   ([backend/README.md § Insights](backend/README.md))
-- **PWA** — installable, offline-capable app shell ([frontend/README.md § PWA](frontend/README.md))
+- **PWA** — installable, offline-capable app shell with safe cache headers on deploy
+  ([frontend/README.md § PWA](frontend/README.md))
