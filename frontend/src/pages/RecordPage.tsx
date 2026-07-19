@@ -21,6 +21,7 @@ import {
   type StatusDisplay,
 } from "../components/record/StatusFilter";
 import { AmountInput, DateCell, RowCategoryInput, CategoryInput } from "../components/record/TableCells";
+import { CopyLastMonthButton } from "../components/record/CopyLastMonthButton";
 import {
   IconChevL, IconChevR, IconChevD, IconPlus, IconX, IconCheck, IconLock, IconArrowR, IconDownload,
 } from "../components/ui/Icons";
@@ -33,7 +34,7 @@ import type { Transaction, Section, Budgets } from "../types";
 const MONTH_WINDOW_BACK = 24;
 const MONTH_WINDOW_FWD  = 12;
 
-function MonthDropdown({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
+function MonthDropdown({ month, setMonth, disabled = false }: { month: string; setMonth: (m: string) => void; disabled?: boolean }) {
   // Stable list — only recomputed when the selected month changes.
   const months = useMemo(
     () => Array.from({ length: MONTH_WINDOW_BACK + MONTH_WINDOW_FWD + 1 }, (_, i) => shiftMonth(month, i - MONTH_WINDOW_BACK)),
@@ -106,6 +107,7 @@ function MonthDropdown({ month, setMonth }: { month: string; setMonth: (m: strin
         style={{ padding: "7px 10px" }}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onKey}
+        disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -300,8 +302,9 @@ function useRowMutations(month: string, section: Section) {
 
 // ─── Essential tile ───────────────────────────────────────────────────────
 
-function EssentialTile({ rows, section, month, settledSet, templates }: {
+function EssentialTile({ rows, section, month, settledSet, templates, onCopyPendingChange }: {
   rows: Transaction[]; section: Section; month: string; settledSet: Set<string>; templates: string[];
+  onCopyPendingChange: (pending: boolean) => void;
 }) {
   const qc = useQueryClient();
   const { upd, del, add } = useRowMutations(month, section);
@@ -366,7 +369,7 @@ function EssentialTile({ rows, section, month, settledSet, templates }: {
           </tbody>
         </table>
       </div>
-      <div style={{ display: "flex", gap: 8, padding: "10px 12px", borderTop: "1px solid var(--border-2)" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 12px", borderTop: "1px solid var(--border-2)" }}>
         <button className="btn btn-soft" onClick={() => add.mutate({ section, category: "", amount: 0, date: `${month}-01`, kind: "cash" })}>
           <IconPlus size={15} /> Add row
         </button>
@@ -385,6 +388,13 @@ function EssentialTile({ rows, section, month, settledSet, templates }: {
                 : `Load from templates (${missing.length})`}
           </button>
         )}
+        <CopyLastMonthButton
+          section={section}
+          month={month}
+          currentTxns={rows}
+          onPendingChange={onCopyPendingChange}
+          onCopied={() => setStatusFilter(new Set())}
+        />
       </div>
       <StatusLegend />
     </div>
@@ -393,8 +403,9 @@ function EssentialTile({ rows, section, month, settledSet, templates }: {
 
 // ─── Flexible tile ────────────────────────────────────────────────────────
 
-function FlexibleTile({ rows, section, month, settledSet, templates }: {
+function FlexibleTile({ rows, section, month, settledSet, templates, onCopyPendingChange }: {
   rows: Transaction[]; section: Section; month: string; settledSet: Set<string>; templates: string[];
+  onCopyPendingChange: (pending: boolean) => void;
 }) {
   const qc = useQueryClient();
   const { upd, del, add } = useRowMutations(month, section);
@@ -458,7 +469,7 @@ function FlexibleTile({ rows, section, month, settledSet, templates }: {
           </tbody>
         </table>
       </div>
-      <div style={{ display: "flex", gap: 8, padding: "10px 12px", borderTop: "1px solid var(--border-2)" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 12px", borderTop: "1px solid var(--border-2)" }}>
         <button className="btn btn-soft" onClick={() => add.mutate({ section, category: "", amount: 0, date: `${month}-01`, kind: "cash" })}>
           <IconPlus size={15} /> Add subscription
         </button>
@@ -477,6 +488,13 @@ function FlexibleTile({ rows, section, month, settledSet, templates }: {
                 : `Load from templates (${missing.length})`}
           </button>
         )}
+        <CopyLastMonthButton
+          section={section}
+          month={month}
+          currentTxns={rows}
+          onPendingChange={onCopyPendingChange}
+          onCopied={() => setStatusFilter(new Set())}
+        />
       </div>
       <StatusLegend />
     </div>
@@ -658,7 +676,9 @@ function DailyTile({ rows, section, month, settledSet }: {
 // Income is always cash received — no status picker, no credit/settlement.
 // Functions like Daily: quick-add row at top, entries listed newest-first.
 
-function IncomeTile({ rows, month }: { rows: Transaction[]; month: string }) {
+function IncomeTile({ rows, month, onCopyPendingChange }: {
+  rows: Transaction[]; month: string; onCopyPendingChange: (pending: boolean) => void;
+}) {
   const { upd, del, add } = useRowMutations(month, "income");
   const blank = { date: defaultDraftDate(month, rows.map((r) => r.date)), category: "", amount: 0 };
   const [draft, setDraft] = useState(blank);
@@ -736,6 +756,14 @@ function IncomeTile({ rows, month }: { rows: Transaction[]; month: string }) {
           </tbody>
         </table>
       </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 12px", borderTop: "1px solid var(--border-2)" }}>
+        <CopyLastMonthButton
+          section="income"
+          month={month}
+          currentTxns={rows}
+          onPendingChange={onCopyPendingChange}
+        />
+      </div>
       <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border-2)", fontSize: 12, color: "var(--ink-3)" }}>
         Tip — type at least 2 characters for suggestions, then use <span className="kbd">↑</span> <span className="kbd">↓</span> and <span className="kbd">Enter</span> to choose from past entries.
       </div>
@@ -788,6 +816,11 @@ const META: Record<Section, TileMeta> = {
 
 export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
   const [tile, setTile] = useState<Section | null>(null);
+  // Lifted from the tiles: while a "Copy last month" op is loading, confirming
+  // or writing, month navigation is locked to avoid racing the open-month query.
+  const [copyPending, setCopyPending] = useState(false);
+  // Changing tiles unmounts the copy button, so drop any lock it still held.
+  const selectTile = (t: Section | null) => { setCopyPending(false); setTile(t); };
   const qc = useQueryClient();
 
   // Open-month call seeds templates if needed and returns this month's txns.
@@ -856,7 +889,8 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
           <button
             className="btn btn-soft"
             style={{ padding: "7px 10px" }}
-            onClick={() => { setMonth(shiftMonth(month, -1)); setTile(null); }}
+            onClick={() => { setMonth(shiftMonth(month, -1)); selectTile(null); }}
+            disabled={copyPending}
             aria-label="Previous month"
           >
             <IconChevL size={15} />
@@ -867,12 +901,13 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
           <button
             className="btn btn-soft"
             style={{ padding: "7px 10px" }}
-            onClick={() => { setMonth(shiftMonth(month, 1)); setTile(null); }}
+            onClick={() => { setMonth(shiftMonth(month, 1)); selectTile(null); }}
+            disabled={copyPending}
             aria-label="Next month"
           >
             <IconChevR size={15} />
           </button>
-          <MonthDropdown month={month} setMonth={(m) => { setMonth(m); setTile(null); }} />
+          <MonthDropdown month={month} setMonth={(m) => { setMonth(m); selectTile(null); }} disabled={copyPending} />
         </div>
         <div style={{ flex: 1 }} />
         <button
@@ -902,14 +937,14 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
               meta={META[sec]}
               rows={rowsOf(sec)}
               budget={effectiveBudgets[sec]}
-              onOpen={() => setTile(sec)}
+              onOpen={() => selectTile(sec)}
             />
           ))}
           {/* Income tile — no budget, shows total received */}
           <IncomeTileCard
             meta={META.income}
             rows={rowsOf("income")}
-            onOpen={() => setTile("income")}
+            onOpen={() => selectTile("income")}
           />
         </div>
       ) : (
@@ -920,12 +955,12 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
               spent={incSpent(tile)}
               budget={effectiveBudgets[tile as "essential" | "flexible" | "daily"]}
               onBudget={(v) => saveBudget(tile as "essential" | "flexible" | "daily", v)}
-              onBack={() => setTile(null)}
+              onBack={() => selectTile(null)}
             />
           )}
           {tile === "income" && (
             <div style={{ marginBottom: 18 }}>
-              <button className="btn btn-soft" style={{ padding: "6px 12px", marginBottom: 16 }} onClick={() => setTile(null)}>
+              <button className="btn btn-soft" style={{ padding: "6px 12px", marginBottom: 16 }} onClick={() => selectTile(null)}>
                 <IconChevL size={15} /> All tiles
               </button>
               <div className="card card-pad" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
@@ -946,16 +981,16 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
             </div>
           )}
           {tile === "essential" && (
-            <EssentialTile rows={rowsOf("essential")} section="essential" month={month} settledSet={settledSet} templates={settings?.templates.essential ?? []} />
+            <EssentialTile rows={rowsOf("essential")} section="essential" month={month} settledSet={settledSet} templates={settings?.templates.essential ?? []} onCopyPendingChange={setCopyPending} />
           )}
           {tile === "flexible" && (
-            <FlexibleTile rows={rowsOf("flexible")} section="flexible" month={month} settledSet={settledSet} templates={settings?.templates.flexible ?? []} />
+            <FlexibleTile rows={rowsOf("flexible")} section="flexible" month={month} settledSet={settledSet} templates={settings?.templates.flexible ?? []} onCopyPendingChange={setCopyPending} />
           )}
           {tile === "daily" && (
             <DailyTile rows={rowsOf("daily")} section="daily" month={month} settledSet={settledSet} />
           )}
           {tile === "income" && (
-            <IncomeTile rows={rowsOf("income")} month={month} />
+            <IncomeTile rows={rowsOf("income")} month={month} onCopyPendingChange={setCopyPending} />
           )}
         </div>
       )}

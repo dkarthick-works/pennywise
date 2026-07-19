@@ -24,6 +24,20 @@ export function shiftMonth(key: string, delta: number): string {
   return `${y}-${String(m).padStart(2, "0")}`;
 }
 
+/**
+ * Move a date into a target month, keeping the day-of-month but clamping it to
+ * the last valid day of that month. Timezone-safe (UTC). Handles 30-day months
+ * and leap/non-leap February: '2026-01-31' → Feb 2026 → '2026-02-28',
+ * '2024-01-31' → '2024-02-29', '2026-03-31' → '2026-04-30'.
+ */
+export function shiftDateToMonth(date: string, targetMonth: string): string {
+  const day = parseInt(date.slice(8, 10), 10);
+  const [y, m] = targetMonth.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const clamped = Math.min(day, lastDay);
+  return `${targetMonth}-${String(clamped).padStart(2, "0")}`;
+}
+
 // '2026-06-03' → '3 Jun'
 export function prettyDate(d: string): string {
   if (!d) return "";
