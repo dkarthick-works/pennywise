@@ -75,6 +75,7 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/settings", s.handleGetSettings)
 		pr.Put("/api/settings/budgets", s.handleUpdateBudgets)
 		pr.Put("/api/settings/preferences", s.handleUpdatePreferences)
+		pr.Put("/api/settings/credit-billing-cycle", s.handleUpdateCreditStatementDay)
 
 		pr.Get("/api/templates", s.handleGetTemplates)
 		pr.Put("/api/templates/{section}", s.handlePutTemplates)
@@ -93,6 +94,8 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/insights", s.handleGetInsights)
 		pr.Get("/api/dashboard/monthly", s.handleGetDashboardMonthly)
 		pr.Get("/api/dashboard/group-spend", s.handleGetGroupSpend)
+		pr.Get("/api/dashboard/credit-usage", s.handleGetCreditUsage)
+		pr.Get("/api/dashboard/credit-transactions", s.handleGetCreditTransactions)
 
 		pr.Get("/api/categories/unmapped", s.handleListUnmappedCategories)
 		pr.Get("/api/categories/texts", s.handleListTransactionCategoryTexts)

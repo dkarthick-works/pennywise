@@ -41,23 +41,33 @@ type TemplatesDTO struct {
 
 // SettingsDTO is the full settings payload consumed by the SPA.
 // Income is no longer a static setting — it is derived from income-section transactions.
+//
+// CreditStatementDay is a pointer without omitempty so an unconfigured cycle
+// serializes as an explicit JSON null rather than being dropped.
 type SettingsDTO struct {
-	Budgets   BudgetsDTO   `json:"budgets"`
-	Currency  string       `json:"currency"`
-	Theme     string       `json:"theme"`
-	Templates TemplatesDTO `json:"templates"`
+	Budgets            BudgetsDTO   `json:"budgets"`
+	Currency           string       `json:"currency"`
+	Theme              string       `json:"theme"`
+	Templates          TemplatesDTO `json:"templates"`
+	CreditStatementDay *int         `json:"credit_statement_day"`
 }
 
 func settingsToDTO(s db.UserSetting, tpl TemplatesDTO) SettingsDTO {
+	var statementDay *int
+	if s.CreditStatementDay != nil {
+		d := int(*s.CreditStatementDay)
+		statementDay = &d
+	}
 	return SettingsDTO{
 		Budgets: BudgetsDTO{
 			Essential: numToFloat(s.BudgetEssential),
 			Flexible:  numToFloat(s.BudgetFlexible),
 			Daily:     numToFloat(s.BudgetDaily),
 		},
-		Currency:  s.Currency,
-		Theme:     s.Theme,
-		Templates: tpl,
+		Currency:           s.Currency,
+		Theme:              s.Theme,
+		Templates:          tpl,
+		CreditStatementDay: statementDay,
 	}
 }
 

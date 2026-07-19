@@ -23,7 +23,7 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 |------|------|-------|
 | `/record` | Record & Expense | **Default landing page** after login (`/` redirects here) |
 | `/dashboard` | Dashboard | Month/year charts, hero cards, category-group spend |
-| `/dashboard/credits` | Credit transactions | Drill-down from the Credit Card Usage hero card |
+| `/dashboard/credits?month=&view=calendar\|billing` | Credit transactions | Drill-down from the Credit Card Usage hero card; month + view carried in the URL |
 | `/dashboard/groups/:groupId` | Category group | Drill-down from a category-group spend card |
 | `/insights` | Insights | Emergency fund targets (from `GET /api/insights`) |
 | `/categories` | Map Categories | Assign transaction labels to high-level groups |
@@ -41,19 +41,30 @@ both the main dashboard and the drill-down routes below.
 ### Monthly hero cards
 
 Three summary cards at the top. **Monthly Cost** and **Cash Flow** use
-`GET /api/dashboard/monthly`; **Credit Card Usage** is computed client-side from
-the month's transactions.
+`GET /api/dashboard/monthly`; **Credit Card Usage** uses
+`GET /api/dashboard/credit-usage` (backend-authoritative — no client-side
+aggregation).
 
 | Card | What it measures | Basis |
 |------|------------------|-------|
 | Monthly Cost | Incurred spend (`cash` + `credit`) | Transaction date |
 | Cash Flow | Cash that moved (`cash` + `settlement`) | Payment date |
-| Credit Card Usage | Expense-section `credit` rows | Transaction date |
+| Credit Card Usage | Expense-section `credit` rows | Recorded transaction date |
 
-The **Credit Card Usage** card shows total charged and transaction count for
-`essential`, `flexible`, and `daily` rows where `kind = credit`. Settled credits
-are included — this is incurred spend, not open liability. Click the card (or
-press Enter/Space when focused) to open `/dashboard/credits`.
+The **Credit Card Usage** card shows two totals from the summary API: the
+**statement cycle** that closes in the selected month and the **calendar month**.
+Both count `essential`/`flexible`/`daily` rows where `kind = credit`; settled
+credits are included (incurred spend, not open liability). Each block is a real
+`<button>` opening the matching drill-down view. The card renders explicit
+loading, error/retry, and unconfigured states and never falls back to `₹0`.
+
+The statement cycle only appears once a **statement closing day** is set in
+Settings (`/settings#credit-billing-cycle`); until then the card shows a
+"Set your statement date" CTA in place of the cycle total. The closing day is
+the inclusive last day of the cycle — day `15` makes July's cycle Jun 16 – Jul 15,
+with days 29–31 clamped to a month's last day. `src/lib/billingCycle.ts` mirrors
+the backend math for the Settings live preview only; the API response remains
+authoritative for card totals.
 
 ### Category group spend
 
@@ -69,12 +80,15 @@ Both drill-down routes reuse `TransactionListTable` (`src/components/dashboard/T
 
 | Route | Data source | Notes |
 |-------|-------------|-------|
-| `/dashboard/credits` | `GET /api/transactions?month=` filtered by `creditExpenseTransactions()` | Kind column hidden |
+| `/dashboard/credits?month=&view=` | `GET /api/dashboard/credit-transactions?month=&view=` | Kind column hidden; month + view read from the URL |
 | `/dashboard/groups/:groupId` | `GET /api/category-groups/{id}/transactions?month=` | Shows date, category, section, kind, amount |
 
-`creditExpenseTransactions()` in `src/lib/txns.ts` keeps rows where
-`kind === "credit"` and the section is an expense section (`essential`, `flexible`,
-`daily`).
+The credit drill-down reads `month` and `view` (`calendar`/`billing`) from the
+query string, canonicalizing invalid values, so refreshes and direct links are
+stable. A segmented control switches views, Back returns to
+`/dashboard?month=YYYY-MM`, and the billing view shows a setup CTA when no
+statement day is configured. Rows come straight from the API (no local calendar
+filtering).
 
 ### Yearly view
 

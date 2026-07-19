@@ -172,6 +172,54 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 	return i, err
 }
 
+const listCreditTransactionsByDateRange = `-- name: ListCreditTransactionsByDateRange :many
+SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at FROM transactions
+WHERE user_id = $1
+  AND txn_date >= $2
+  AND txn_date <  $3
+  AND section IN ('essential','flexible','daily')
+  AND kind = 'credit'
+ORDER BY txn_date, created_at
+`
+
+type ListCreditTransactionsByDateRangeParams struct {
+	UserID   uuid.UUID   `json:"user_id"`
+	FromDate pgtype.Date `json:"from_date"`
+	ToDate   pgtype.Date `json:"to_date"`
+}
+
+// Expense credit rows in a half-open [from, to) date window, for the credit
+// drill-down. Mirrors SumCreditUsage's filter so totals reconcile.
+func (q *Queries) ListCreditTransactionsByDateRange(ctx context.Context, arg ListCreditTransactionsByDateRangeParams) ([]Transaction, error) {
+	rows, err := q.db.Query(ctx, listCreditTransactionsByDateRange, arg.UserID, arg.FromDate, arg.ToDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Transaction
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Section,
+			&i.Category,
+			&i.Amount,
+			&i.TxnDate,
+			&i.Kind,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLinksForSettlement = `-- name: ListLinksForSettlement :many
 SELECT credit_id FROM settlement_links WHERE settlement_id = $1
 `
@@ -517,6 +565,39 @@ func (q *Queries) SettledCreditIdsByMonth(ctx context.Context, arg SettledCredit
 		return nil, err
 	}
 	return items, nil
+}
+
+const sumCreditUsage = `-- name: SumCreditUsage :one
+SELECT
+  COALESCE(SUM(amount), 0)::numeric AS total,
+  COUNT(*)::bigint AS count
+FROM transactions
+WHERE user_id = $1
+  AND txn_date >= $2
+  AND txn_date <  $3
+  AND section IN ('essential','flexible','daily')
+  AND kind = 'credit'
+`
+
+type SumCreditUsageParams struct {
+	UserID   uuid.UUID   `json:"user_id"`
+	FromDate pgtype.Date `json:"from_date"`
+	ToDate   pgtype.Date `json:"to_date"`
+}
+
+type SumCreditUsageRow struct {
+	Total pgtype.Numeric `json:"total"`
+	Count int64          `json:"count"`
+}
+
+// Total + count of expense credit transactions in a half-open [from, to) date
+// window. Settlement state is irrelevant: settled and unsettled credits both
+// count as incurred credit spend.
+func (q *Queries) SumCreditUsage(ctx context.Context, arg SumCreditUsageParams) (SumCreditUsageRow, error) {
+	row := q.db.QueryRow(ctx, sumCreditUsage, arg.UserID, arg.FromDate, arg.ToDate)
+	var i SumCreditUsageRow
+	err := row.Scan(&i.Total, &i.Count)
+	return i, err
 }
 
 const sumDashboardMonthly = `-- name: SumDashboardMonthly :one

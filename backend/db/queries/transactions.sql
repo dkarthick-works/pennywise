@@ -63,6 +63,31 @@ WHERE user_id = $1
   AND txn_date >= sqlc.arg(from_date)
   AND txn_date <  sqlc.arg(to_date);
 
+-- name: SumCreditUsage :one
+-- Total + count of expense credit transactions in a half-open [from, to) date
+-- window. Settlement state is irrelevant: settled and unsettled credits both
+-- count as incurred credit spend.
+SELECT
+  COALESCE(SUM(amount), 0)::numeric AS total,
+  COUNT(*)::bigint AS count
+FROM transactions
+WHERE user_id = sqlc.arg(user_id)
+  AND txn_date >= sqlc.arg(from_date)
+  AND txn_date <  sqlc.arg(to_date)
+  AND section IN ('essential','flexible','daily')
+  AND kind = 'credit';
+
+-- name: ListCreditTransactionsByDateRange :many
+-- Expense credit rows in a half-open [from, to) date window, for the credit
+-- drill-down. Mirrors SumCreditUsage's filter so totals reconcile.
+SELECT * FROM transactions
+WHERE user_id = sqlc.arg(user_id)
+  AND txn_date >= sqlc.arg(from_date)
+  AND txn_date <  sqlc.arg(to_date)
+  AND section IN ('essential','flexible','daily')
+  AND kind = 'credit'
+ORDER BY txn_date, created_at;
+
 -- name: GetTransaction :one
 SELECT * FROM transactions
 WHERE id = $1 AND user_id = $2;

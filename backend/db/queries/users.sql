@@ -44,3 +44,12 @@ SET currency   = $2,
     updated_at = now()
 WHERE user_id = $1
 RETURNING *;
+
+-- name: UpdateCreditStatementDay :one
+-- Set or clear (NULL) the credit card statement closing day. Dedicated so a
+-- currency/theme update never touches this field and vice versa.
+UPDATE user_settings
+SET credit_statement_day = sqlc.narg(credit_statement_day),
+    updated_at           = now()
+WHERE user_id = sqlc.arg(user_id)
+RETURNING *;

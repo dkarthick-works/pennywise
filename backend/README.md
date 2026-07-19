@@ -109,9 +109,10 @@ only ever talks to this origin.
 | *      | `/api/auth/*` | proxied to Goauth (signup, login, refresh, logout, me, …) |
 | GET    | `/api/me` · `/api/profile` | current user / profile |
 | PUT    | `/api/profile` | update name + email |
-| GET    | `/api/settings` | income, budgets, currency, theme, templates |
+| GET    | `/api/settings` | income, budgets, currency, theme, templates, credit statement day |
 | PUT    | `/api/settings/budgets` | per-section budgets |
 | PUT    | `/api/settings/preferences` | income, currency, theme |
+| PUT    | `/api/settings/credit-billing-cycle` | set/clear credit statement closing day (`1..31` or `null`) |
 | GET    | `/api/templates` | template lists |
 | PUT    | `/api/templates/{section}` | replace a section's ordered template list |
 | GET    | `/api/transactions?month=YYYY-MM` \| `?year=YYYY` | rows + `settles`/`settled` |
@@ -123,6 +124,8 @@ only ever talks to this origin.
 | GET    | `/api/daily-suggestions` | ghost-autocomplete categories |
 | GET    | `/api/dashboard/monthly?month=YYYY-MM` | dashboard hero-card totals |
 | GET    | `/api/dashboard/group-spend?month=YYYY-MM` | per-group spend for dashboard category cards |
+| GET    | `/api/dashboard/credit-usage?month=YYYY-MM` | calendar-month + statement-cycle credit spend |
+| GET    | `/api/dashboard/credit-transactions?month=YYYY-MM&view=calendar\|billing` | credit rows for one window |
 | GET    | `/api/categories/unmapped` | distinct transaction category strings with no group mapping |
 | GET    | `/api/categories/texts?q=&exclude_group_id=` | searchable transaction category strings; optionally excludes labels already in one group |
 | GET    | `/api/category-groups` | groups with nested mapping briefs |
@@ -232,6 +235,66 @@ Response shape — JSON array:
 
 Handlers: `internal/api/group_spend.go`; query `SumSpendByGroupsForMonth` in
 `db/queries/category_groups.sql`.
+
+### Credit usage (`GET /api/dashboard/credit-usage?month=YYYY-MM`)
+
+Returns expense **credit** spend for the selected month in two windows:
+
+- `calendar_month`: the first through last day of `month`.
+- `billing_cycle`: the statement cycle that **closes** in `month`, or `null`
+  when no statement day is configured.
+
+Both windows are derived solely from `month` (never from today's date), so
+historical dashboard navigation is deterministic. The metric counts rows where
+`section IN ('essential','flexible','daily')` and `kind = 'credit'`; settlement
+state is irrelevant (settled and unsettled credits both count).
+
+**Statement cycle semantics.** `credit_statement_day` (`1..31`, see
+`/api/settings/credit-billing-cycle`) is the inclusive **closing** day. For a
+closing day of `15`, the July 2026 cycle is `2026-06-16` through `2026-07-15`.
+Days beyond a month's length clamp to that month's final day, applied
+independently to the selected month and the previous month (so `31` closes on
+Feb 28/29). See `statementCycleRange` in `internal/api/billing_cycle.go`.
+
+All `from`/`to` values are **inclusive display dates**; SQL always queries the
+half-open range `[from, to + 1 day)` (`SumCreditUsage`). Because grouping uses
+the recorded `txn_date` (not a bank posting date), results near the closing day
+may differ from a bank statement — the UI labels totals "by recorded
+transaction date".
+
+Response shape (configured):
+
+```json
+{
+  "month": "2026-07",
+  "calendar_month": { "from": "2026-07-01", "to": "2026-07-31", "total": 22251, "count": 10 },
+  "billing_cycle":  { "statement_day": 15, "from": "2026-06-16", "to": "2026-07-15", "total": 18400, "count": 8 }
+}
+```
+
+When unconfigured, `billing_cycle` is explicit `null` (never omitted) and
+`calendar_month` is always present. The configured statement day is surfaced via
+`billing_cycle.statement_day` and through `GET /api/settings`.
+
+### Credit transactions (`GET /api/dashboard/credit-transactions?month=YYYY-MM&view=`)
+
+Authoritative drill-down rows for one window. `view` is `calendar` (default) or
+`billing`. The `billing` view returns `400` when no statement day is configured.
+Ranges are derived with the same helpers as the summary endpoint, and the
+response `total`/`count` reuse `SumCreditUsage` so detail metadata always
+reconciles with the summary bucket.
+
+```json
+{
+  "month": "2026-07", "view": "billing",
+  "from": "2026-06-16", "to": "2026-07-15",
+  "total": 18400, "count": 8, "transactions": []
+}
+```
+
+Handlers: `internal/api/credit_usage.go`; range math in
+`internal/api/billing_cycle.go`; queries `SumCreditUsage` and
+`ListCreditTransactionsByDateRange` in `db/queries/transactions.sql`.
 
 ### Category group transactions (`GET /api/category-groups/{id}/transactions?month=YYYY-MM`)
 

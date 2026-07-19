@@ -40,7 +40,7 @@ export default function App() {
               <Routes>
                 <Route path="/dashboard" element={<DashboardPage month={month} setMonth={setMonth} />} />
                 <Route path="/dashboard/groups/:groupId" element={<CategoryGroupPage month={month} />} />
-                <Route path="/dashboard/credits" element={<CreditTransactionsPage month={month} />} />
+                <Route path="/dashboard/credits" element={<CreditTransactionsPage month={month} setMonth={setMonth} />} />
                 <Route path="/record"    element={<RecordPage month={month} setMonth={setMonth} />} />
                 <Route path="/lents"     element={<LentsPage />} />
                 <Route path="/lents/:id" element={<LentDetailPage />} />

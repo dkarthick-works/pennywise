@@ -50,6 +50,9 @@ export interface Settings {
   currency: string;
   theme: string;
   templates: Templates;
+  // Statement closing day (1..31), or null when the credit billing cycle is
+  // not configured. Explicit null, never omitted.
+  credit_statement_day: number | null;
 }
 
 // ─── Month state ──────────────────────────────────────────────────────────
@@ -114,6 +117,37 @@ export interface DashboardMonthly {
   monthly_difference: number;
   outstanding_credits_count: number;
   outstanding_credits_total: number;
+}
+
+// ─── Credit usage (calendar month + statement cycle) ────────────────────────
+
+export interface CreditUsageBucket {
+  from: string; // YYYY-MM-DD inclusive
+  to: string;   // YYYY-MM-DD inclusive
+  total: number;
+  count: number;
+}
+
+export interface CreditBillingCycleBucket extends CreditUsageBucket {
+  statement_day: number;
+}
+
+export interface CreditUsageSummary {
+  month: string;
+  calendar_month: CreditUsageBucket;
+  billing_cycle: CreditBillingCycleBucket | null;
+}
+
+export type CreditTransactionView = "calendar" | "billing";
+
+export interface CreditTransactionsResponse {
+  month: string;
+  view: CreditTransactionView;
+  from: string;
+  to: string;
+  total: number;
+  count: number;
+  transactions: Transaction[];
 }
 
 export interface CategoryGroupSpend {

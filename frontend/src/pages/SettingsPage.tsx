@@ -1,9 +1,130 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getSettings, updateBudgets, updatePreferences, putTemplates } from "../api/ledger";
+import {
+  getSettings,
+  updateBudgets,
+  updatePreferences,
+  updateCreditStatementDay,
+  putTemplates,
+} from "../api/ledger";
 import { inr } from "../lib/money";
+import { invalidateCreditCaches } from "../lib/monthCaches";
+import { cyclePreviewSentence } from "../lib/billingCycle";
+import { currentMonth } from "../lib/dates";
 import { IconPlus, IconX } from "../components/ui/Icons";
 import type { Budgets } from "../types";
+
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+}
+
+// Credit card statement closing day. Hydrates from the async settings query,
+// uses an explicit Save/Clear (never autosaves), and shows a live cycle preview.
+function CreditBillingCycleCard({ savedDay }: { savedDay: number | null }) {
+  const qc = useQueryClient();
+  const [day, setDay] = useState<number | null>(savedDay);
+  const [dirty, setDirty] = useState(false);
+
+  // Hydrate when the saved value arrives/changes (e.g. async settings load or a
+  // successful save) without clobbering an in-progress edit. This render-phase
+  // reset is React's recommended alternative to a setState-in-effect.
+  const [prevSaved, setPrevSaved] = useState(savedDay);
+  if (savedDay !== prevSaved) {
+    setPrevSaved(savedDay);
+    if (!dirty) setDay(savedDay);
+  }
+
+  const mut = useMutation({
+    mutationFn: (d: number | null) => updateCreditStatementDay(d),
+    onSuccess: () => {
+      setDirty(false);
+      qc.invalidateQueries({ queryKey: ["settings"] });
+      invalidateCreditCaches(qc);
+    },
+  });
+
+  const preview = day != null ? cyclePreviewSentence(currentMonth(), day) : null;
+  const busy = mut.isPending;
+
+  return (
+    <div id="credit-billing-cycle" className="card card-pad" style={{ marginBottom: 18 }}>
+      <h3 className="card-h" style={{ marginBottom: 4 }}>Credit card billing cycle</h3>
+      <p className="muted" style={{ fontSize: 12.5, margin: "0 0 14px" }}>
+        Which day of the month is your credit card statement generated? Choose the billing or
+        statement date shown in your bank app or monthly statement — not the payment due date.
+      </p>
+
+      <Row label="Statement closing day" sub="Applies to all credit transactions, by recorded transaction date">
+        <select
+          className="input"
+          style={{ padding: "8px 12px", minWidth: 130 }}
+          value={day == null ? "" : String(day)}
+          disabled={busy}
+          onChange={(e) => {
+            const v = e.target.value;
+            setDay(v === "" ? null : Number(v));
+            setDirty(true);
+          }}
+        >
+          <option value="">Not set</option>
+          {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+            <option key={d} value={d}>{ordinal(d)}</option>
+          ))}
+        </select>
+      </Row>
+
+      {day != null && day >= 29 && (
+        <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+          Shorter months use their last day (for example, the 31st becomes 28 or 29 in February).
+        </p>
+      )}
+
+      {preview && (
+        <div
+          style={{
+            marginTop: 14,
+            padding: "12px 14px",
+            borderRadius: 12,
+            background: "var(--surface-2)",
+            border: "1px solid var(--border-2)",
+          }}
+        >
+          <div style={{ fontWeight: 600, fontSize: 13.5 }}>{preview}</div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            All recorded credit transactions within these dates will be included.
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 16 }}>
+        <button
+          className="btn btn-soft"
+          disabled={busy || !dirty || day == null}
+          onClick={() => mut.mutate(day)}
+        >
+          {busy ? "Saving…" : "Save billing cycle"}
+        </button>
+        <button
+          className="btn"
+          disabled={busy || savedDay == null}
+          onClick={() => { setDirty(false); setDay(null); mut.mutate(null); }}
+        >
+          Clear
+        </button>
+        {mut.isError && (
+          <span style={{ fontSize: 12.5, color: "var(--danger, #c0392b)" }}>
+            Couldn’t save — please try again.
+          </span>
+        )}
+        {mut.isSuccess && !dirty && !busy && (
+          <span className="muted" style={{ fontSize: 12.5 }}>Saved.</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Row({ label, sub, children }: { label: string; sub?: string; children: React.ReactNode }) {
   return (
@@ -169,6 +290,9 @@ export function SettingsPage() {
           </div>
         </Row>
       </div>
+
+      {/* credit card billing cycle */}
+      <CreditBillingCycleCard savedDay={settings?.credit_statement_day ?? null} />
 
       {/* templates */}
       <TemplateEditor

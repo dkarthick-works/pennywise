@@ -14,6 +14,9 @@ import type {
   OpenMonthResponse,
   Insights,
   DashboardMonthly,
+  CreditUsageSummary,
+  CreditTransactionsResponse,
+  CreditTransactionView,
   CategoryGroupSpend,
   CategoryGroupTransactions,
   CategoryGroup,
@@ -42,6 +45,13 @@ export const updateBudgets = (budgets: Budgets) =>
 
 export const updatePreferences = (body: { currency: string; theme: string }) =>
   client.put<Settings>("/api/settings/preferences", body).then((r) => r.data);
+
+// Set (1..31) or clear (null) the credit card statement closing day. Dedicated
+// endpoint so a currency/theme save never touches this and vice versa.
+export const updateCreditStatementDay = (day: number | null) =>
+  client
+    .put<Settings>("/api/settings/credit-billing-cycle", { credit_statement_day: day })
+    .then((r) => r.data);
 
 // ─── Templates ────────────────────────────────────────────────────────────
 
@@ -150,6 +160,30 @@ export const getDashboardMonthly = (month: string) =>
 
 export const getGroupSpend = (month: string): Promise<CategoryGroupSpend[]> =>
   client.get<CategoryGroupSpend[]>("/api/dashboard/group-spend", { params: { month } }).then((r) => r.data);
+
+// ─── Credit usage ───────────────────────────────────────────────────────────
+
+// Centralized query keys so cross-month invalidation can target the whole
+// credit-usage/detail space with a prefix match.
+export const creditUsageKeys = {
+  all: ["dashboard", "credit-usage"] as const,
+  summary: (month: string) => ["dashboard", "credit-usage", month] as const,
+  detailAll: ["dashboard", "credit-transactions"] as const,
+  detail: (month: string, view: CreditTransactionView) =>
+    ["dashboard", "credit-transactions", month, view] as const,
+};
+
+export const getCreditUsage = (month: string) =>
+  client
+    .get<CreditUsageSummary>("/api/dashboard/credit-usage", { params: { month } })
+    .then((r) => r.data);
+
+export const getCreditTransactions = (month: string, view: CreditTransactionView) =>
+  client
+    .get<CreditTransactionsResponse>("/api/dashboard/credit-transactions", {
+      params: { month, view },
+    })
+    .then((r) => r.data);
 
 export const getCategoryGroupTransactions = (groupId: string, month: string) =>
   client

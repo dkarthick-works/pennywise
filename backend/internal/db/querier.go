@@ -44,6 +44,9 @@ type Querier interface {
 	ListCategoryGroups(ctx context.Context, userID uuid.UUID) ([]CategoryGroup, error)
 	ListCategoryMappings(ctx context.Context, userID uuid.UUID) ([]ListCategoryMappingsRow, error)
 	ListCategoryMappingsByGroup(ctx context.Context, arg ListCategoryMappingsByGroupParams) ([]CategoryMapping, error)
+	// Expense credit rows in a half-open [from, to) date window, for the credit
+	// drill-down. Mirrors SumCreditUsage's filter so totals reconcile.
+	ListCreditTransactionsByDateRange(ctx context.Context, arg ListCreditTransactionsByDateRangeParams) ([]Transaction, error)
 	ListLents(ctx context.Context, arg ListLentsParams) ([]ListLentsRow, error)
 	ListLinksForSettlement(ctx context.Context, settlementID uuid.UUID) ([]uuid.UUID, error)
 	ListMonthStates(ctx context.Context, userID uuid.UUID) ([]MonthState, error)
@@ -71,6 +74,10 @@ type Querier interface {
 	SearchTransactionNameSuggestions(ctx context.Context, arg SearchTransactionNameSuggestionsParams) ([]string, error)
 	// Credit ids (in this month) that some settlement references — for "Settled" chips.
 	SettledCreditIdsByMonth(ctx context.Context, arg SettledCreditIdsByMonthParams) ([]uuid.UUID, error)
+	// Total + count of expense credit transactions in a half-open [from, to) date
+	// window. Settlement state is irrelevant: settled and unsettled credits both
+	// count as incurred credit spend.
+	SumCreditUsage(ctx context.Context, arg SumCreditUsageParams) (SumCreditUsageRow, error)
 	SumDashboardMonthly(ctx context.Context, arg SumDashboardMonthlyParams) (SumDashboardMonthlyRow, error)
 	SumEssentialSpendByMonths(ctx context.Context, arg SumEssentialSpendByMonthsParams) ([]SumEssentialSpendByMonthsRow, error)
 	SumLentOutstanding(ctx context.Context, userID uuid.UUID) (SumLentOutstandingRow, error)
@@ -81,6 +88,9 @@ type Querier interface {
 	SumTransactionsByGroupForMonth(ctx context.Context, arg SumTransactionsByGroupForMonthParams) (pgtype.Numeric, error)
 	UpdateBudgets(ctx context.Context, arg UpdateBudgetsParams) (UserSetting, error)
 	UpdateCategoryGroupName(ctx context.Context, arg UpdateCategoryGroupNameParams) (CategoryGroup, error)
+	// Set or clear (NULL) the credit card statement closing day. Dedicated so a
+	// currency/theme update never touches this field and vice versa.
+	UpdateCreditStatementDay(ctx context.Context, arg UpdateCreditStatementDayParams) (UserSetting, error)
 	UpdateLent(ctx context.Context, arg UpdateLentParams) (Lent, error)
 	UpdatePreferences(ctx context.Context, arg UpdatePreferencesParams) (UserSetting, error)
 	UpdateRepayment(ctx context.Context, arg UpdateRepaymentParams) (LentRepayment, error)

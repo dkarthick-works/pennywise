@@ -3,13 +3,24 @@ import {
   isTransactionNameSuggestionSection,
   transactionNameSuggestionKeys,
 } from "./transactionNameSuggestions";
+import { creditUsageKeys } from "../api/ledger";
 import type { TransactionNameSuggestionSection } from "../types";
+
+// Credit usage crosses month boundaries: a transaction in one calendar month
+// can belong to a statement cycle that closes in the next. Invalidating only
+// the mutated month's summary would leave adjacent cycles stale, so we always
+// invalidate the entire credit-usage and credit-transactions key space.
+export function invalidateCreditCaches(qc: QueryClient): void {
+  qc.invalidateQueries({ queryKey: creditUsageKeys.all });
+  qc.invalidateQueries({ queryKey: creditUsageKeys.detailAll });
+}
 
 export function invalidateMonthCaches(qc: QueryClient, month: string): void {
   qc.invalidateQueries({ queryKey: ["open-month", month] });
   qc.invalidateQueries({ queryKey: ["txns", "month", month] });
   qc.invalidateQueries({ queryKey: ["dashboard", "monthly", month] });
   qc.invalidateQueries({ queryKey: ["group-spend", month] });
+  invalidateCreditCaches(qc);
 }
 
 export function invalidateTransactionNameSuggestions(

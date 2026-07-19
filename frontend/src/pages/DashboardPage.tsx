@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation, useNavigate } from "react-router-dom";
-import { getDashboardMonthly, getGroupSpend, getTxnsByMonth, getTxnsByYear, getSettings } from "../api/ledger";
-import { sectionSums, creditExpenseTransactions } from "../lib/txns";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { getDashboardMonthly, getGroupSpend, getTxnsByMonth, getTxnsByYear, getSettings, getCreditUsage, creditUsageKeys } from "../api/ledger";
+import { sectionSums } from "../lib/txns";
 import { inr, inrShort, budgetColor } from "../lib/money";
-import { monthLabel, shiftMonth, MONTH_NAMES } from "../lib/dates";
+import { monthLabel, shiftMonth, prettyDate, MONTH_NAMES } from "../lib/dates";
+import type { CreditUsageSummary } from "../types";
 import { Donut, YearBars } from "../components/charts/Charts";
 import { IconChevL, IconChevR, IconWallet, IconTrend, IconCreditCard } from "../components/ui/Icons";
 
@@ -44,9 +45,147 @@ function HeroRow({ label, value, strong, color }: {
   );
 }
 
+function cycleRangeLabel(from: string, to: string): string {
+  return `${prettyDate(from)} – ${prettyDate(to)}`;
+}
+
+function CreditBlockButton({
+  onClick,
+  label,
+  sub,
+  amount,
+  count,
+}: {
+  onClick: () => void;
+  label: string;
+  sub: string;
+  amount: number;
+  count: number;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="hero-card-link"
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        margin: "0 0 10px",
+        padding: "12px 14px",
+        borderRadius: 14,
+        background: "var(--surface-2)",
+        border: "1px solid var(--border-2)",
+        cursor: "pointer",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
+        <div>
+          <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 3 }}>{label}</div>
+          <div className="muted" style={{ fontSize: 11.5 }}>{sub}</div>
+        </div>
+        <div className="num" style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--ink)" }}>
+          {inr(amount)}
+        </div>
+      </div>
+      <div className="muted" style={{ fontSize: 11.5, marginTop: 8, display: "flex", justifyContent: "space-between", gap: 8 }}>
+        <span>{count} credit {count === 1 ? "transaction" : "transactions"}</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          View <IconChevR size={13} style={{ color: "var(--ink-3)", flex: "none" }} />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+// Credit Card Usage hero card. Totals come exclusively from the credit-usage
+// summary API (no client-side aggregation) so backend and frontend never drift.
+function CreditUsageCard({
+  month,
+  summary,
+  isLoading,
+  isError,
+  refetch,
+}: {
+  month: string;
+  summary?: CreditUsageSummary;
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => void;
+}) {
+  const navigate = useNavigate();
+  const go = (view: "calendar" | "billing") =>
+    navigate(`/dashboard/credits?month=${month}&view=${view}`);
+
+  return (
+    <div className="card card-pad">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
+        <h3 className="card-h" style={{ whiteSpace: "nowrap" }}>
+          <IconCreditCard size={16} style={{ color: "var(--c-daily)" }} /> Credit Card Usage
+        </h3>
+        <span className="chip" style={{ background: "oklch(0.95 0.03 265)", color: "oklch(0.5 0.1 265)", whiteSpace: "nowrap", flex: "none" }}>
+          by recorded transaction date
+        </span>
+      </div>
+      <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>What you charged to credit, by calendar month and statement cycle.</p>
+
+      {isLoading ? (
+        <div aria-busy="true">
+          <div className="skeleton" style={{ height: 78, borderRadius: 14, marginBottom: 10, background: "var(--surface-2)", border: "1px solid var(--border-2)" }} />
+          <div className="skeleton" style={{ height: 78, borderRadius: 14, background: "var(--surface-2)", border: "1px solid var(--border-2)" }} />
+        </div>
+      ) : isError ? (
+        <div style={{ padding: "16px 14px", borderRadius: 14, background: "var(--surface-2)", border: "1px solid var(--border-2)" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Couldn’t load credit usage.</div>
+          <button type="button" className="btn btn-soft" onClick={refetch}>Retry</button>
+        </div>
+      ) : summary ? (
+        <>
+          {summary.billing_cycle ? (
+            <CreditBlockButton
+              onClick={() => go("billing")}
+              label="Statement cycle"
+              sub={cycleRangeLabel(summary.billing_cycle.from, summary.billing_cycle.to)}
+              amount={summary.billing_cycle.total}
+              count={summary.billing_cycle.count}
+            />
+          ) : (
+            <div
+              style={{
+                margin: "0 0 10px",
+                padding: "14px",
+                borderRadius: 14,
+                background: "var(--surface-2)",
+                border: "1px dashed var(--border)",
+              }}
+            >
+              <div style={{ fontWeight: 650, fontSize: 13.5, marginBottom: 4 }}>Statement cycle</div>
+              <p className="muted" style={{ fontSize: 12.5, margin: "0 0 10px" }}>
+                Set your statement date to see statement-cycle spend.
+              </p>
+              <button type="button" className="btn btn-soft" onClick={() => navigate("/settings#credit-billing-cycle")}>
+                Set statement date
+              </button>
+            </div>
+          )}
+
+          <CreditBlockButton
+            onClick={() => go("calendar")}
+            label="Calendar month"
+            sub={cycleRangeLabel(summary.calendar_month.from, summary.calendar_month.to)}
+            amount={summary.calendar_month.total}
+            count={summary.calendar_month.count}
+          />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState<"monthly" | "yearly">("monthly");
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[] | null>(null);
   const year = month.slice(0, 4);
@@ -74,6 +213,12 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
     enabled: view === "monthly",
   });
 
+  const creditUsageQuery = useQuery({
+    queryKey: creditUsageKeys.summary(month),
+    queryFn: () => getCreditUsage(month),
+    enabled: view === "monthly",
+  });
+
   const { data: yearTxns = [] } = useQuery({
     queryKey: ["txns", "year", year],
     queryFn: () => getTxnsByYear(year),
@@ -94,6 +239,26 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
     if (location.hash !== "#category-groups" || groupSpend.length === 0) return;
     document.getElementById("category-groups")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [location.hash, groupSpend.length]);
+
+  // A valid ?month= in the URL (e.g. arriving Back from a credit drill-down)
+  // seeds the in-memory month so refreshes and direct links are stable.
+  const urlMonth = searchParams.get("month");
+  useEffect(() => {
+    if (urlMonth && /^\d{4}-\d{2}$/.test(urlMonth) && urlMonth !== month) {
+      setMonth(urlMonth);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlMonth]);
+
+  // Mirror the active month back into the URL without stacking history entries.
+  useEffect(() => {
+    if (searchParams.get("month") !== month) {
+      const next = new URLSearchParams(searchParams);
+      next.set("month", month);
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month]);
 
   const budgets = settings?.budgets ?? { essential: 0, flexible: 0, daily: 0 };
 
@@ -146,9 +311,6 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
   const netSaved = dashboardMonthly?.net_saved ?? 0;
   const savingsRate = dashboardMonthly?.savings_rate ?? 0;
   const monthlyDifference = dashboardMonthly?.monthly_difference ?? 0;
-  const creditTxns = creditExpenseTransactions(monthTxns);
-  const creditCount = creditTxns.length;
-  const creditTotal = creditTxns.reduce((s, t) => s + t.amount, 0);
   const allGroupIds = groupSpend.map((g) => g.group_id);
   const effectiveSelectedGroupIds = selectedGroupIds ?? allGroupIds;
   const selectedGroupIdSet = new Set(effectiveSelectedGroupIds);
@@ -282,55 +444,13 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
               </div>
             </div>
 
-            <div
-              role="button"
-              tabIndex={0}
-              className="card card-pad hero-card-link"
-              onClick={() => navigate("/dashboard/credits")}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  navigate("/dashboard/credits");
-                }
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
-                <h3 className="card-h" style={{ whiteSpace: "nowrap" }}>
-                  <IconCreditCard size={16} style={{ color: "var(--c-daily)" }} /> Credit Card Usage
-                </h3>
-                <span className="chip" style={{ background: "oklch(0.95 0.03 265)", color: "oklch(0.5 0.1 265)", whiteSpace: "nowrap", flex: "none" }}>
-                  by transaction date
-                </span>
-              </div>
-              <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>What you charged to credit this month.</p>
-              <div
-                style={{
-                  margin: "0 0 10px",
-                  padding: "12px 14px",
-                  borderRadius: 14,
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border-2)",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
-                  <div>
-                    <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 3 }}>Credit spent</div>
-                    <div className="muted" style={{ fontSize: 11.5 }}>credit transactions</div>
-                  </div>
-                  <div className="num" style={{ fontSize: 29, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--ink)" }}>
-                    {inr(creditTotal)}
-                  </div>
-                </div>
-              </div>
-              <HeroRow label="Transactions" value={String(creditCount)} />
-              <div
-                className="muted"
-                style={{ fontSize: 12, marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
-              >
-                View all credit transactions
-                <IconChevR size={14} style={{ color: "var(--ink-3)", flex: "none" }} />
-              </div>
-            </div>
+            <CreditUsageCard
+              month={month}
+              summary={creditUsageQuery.data}
+              isLoading={creditUsageQuery.isLoading}
+              isError={creditUsageQuery.isError}
+              refetch={() => creditUsageQuery.refetch()}
+            />
           </div>
 
           {/* section cards */}
