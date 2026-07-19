@@ -189,12 +189,13 @@ type User struct {
 }
 
 type UserSetting struct {
-	UserID             uuid.UUID          `json:"user_id"`
-	BudgetEssential    pgtype.Numeric     `json:"budget_essential"`
-	BudgetFlexible     pgtype.Numeric     `json:"budget_flexible"`
-	BudgetDaily        pgtype.Numeric     `json:"budget_daily"`
-	Currency           string             `json:"currency"`
-	Theme              string             `json:"theme"`
-	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
-	CreditStatementDay *int16             `json:"credit_statement_day"`
+	UserID                  uuid.UUID          `json:"user_id"`
+	BudgetEssential         pgtype.Numeric     `json:"budget_essential"`
+	BudgetFlexible          pgtype.Numeric     `json:"budget_flexible"`
+	BudgetDaily             pgtype.Numeric     `json:"budget_daily"`
+	Currency                string             `json:"currency"`
+	Theme                   string             `json:"theme"`
+	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
+	CreditStatementDay      *int16             `json:"credit_statement_day"`
+	CreditSpendingThreshold pgtype.Numeric     `json:"credit_spending_threshold"`
 }

@@ -53,6 +53,13 @@ export const updateCreditStatementDay = (day: number | null) =>
     .put<Settings>("/api/settings/credit-billing-cycle", { credit_statement_day: day })
     .then((r) => r.data);
 
+// Set (positive amount) or clear (null) the credit spending threshold. Dedicated
+// endpoint so an unrelated settings save never touches this and vice versa.
+export const updateCreditSpendingThreshold = (value: number | null) =>
+  client
+    .put<Settings>("/api/settings/credit-spending-threshold", { credit_spending_threshold: value })
+    .then((r) => r.data);
+
 // ─── Templates ────────────────────────────────────────────────────────────
 
 export const getTemplates = () =>

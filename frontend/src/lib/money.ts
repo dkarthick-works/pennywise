@@ -14,6 +14,21 @@ export function inrShort(n: number): string {
   return "₹" + v;
 }
 
+// money2 formats an amount with the ₹ symbol preserving up to two decimals.
+// Unlike inr() (whole-rupee) it keeps paise so threshold comparisons never
+// display a false "equal" or "over" when amounts differ below the rupee.
+export function money2(n: number): string {
+  const v = n || 0;
+  const sign = v < 0 ? "−" : "";
+  const abs = Math.abs(v);
+  const hasCents = Math.round(abs * 100) % 100 !== 0;
+  const s = abs.toLocaleString("en-IN", {
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
+  return "₹" + sign + s;
+}
+
 export function budgetColor(ratio: number): string {
   if (ratio > 1)   return "var(--neg)";
   if (ratio >= 0.8) return "var(--amber)";

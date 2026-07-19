@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { getDashboardMonthly, getGroupSpend, getTxnsByMonth, getTxnsByYear, getSettings, getCreditUsage, creditUsageKeys } from "../api/ledger";
 import { sectionSums } from "../lib/txns";
-import { inr, inrShort, budgetColor } from "../lib/money";
+import { inr, inrShort, budgetColor, money2 } from "../lib/money";
 import { monthLabel, shiftMonth, prettyDate, MONTH_NAMES } from "../lib/dates";
 import type { CreditUsageSummary } from "../types";
 import { Donut, YearBars } from "../components/charts/Charts";
@@ -55,13 +55,35 @@ function CreditBlockButton({
   sub,
   amount,
   count,
+  threshold,
 }: {
   onClick: () => void;
   label: string;
   sub: string;
   amount: number;
   count: number;
+  threshold?: number | null;
 }) {
+  const hasThreshold = threshold != null && threshold > 0;
+  const countText = `${count} credit ${count === 1 ? "txn" : "txns"}`;
+
+  // Threshold-derived values (only used when a threshold is configured).
+  const ratio = hasThreshold ? amount / threshold! : 0;
+  // Clamp both ends: guards against negative totals producing invalid CSS
+  // widths or a negative aria-valuenow.
+  const progress = Math.max(0, Math.min(ratio * 100, 100));
+  const over = hasThreshold && amount > threshold!;
+  const color = budgetColor(ratio);
+  const statusText = over
+    ? `${money2(amount - threshold!)} over`
+    : hasThreshold
+      ? `${money2(threshold! - amount)} left`
+      : "";
+  const status = over ? "Over threshold" : "Within threshold";
+  const ariaLabel = hasThreshold
+    ? `Period spending threshold: ${money2(amount)} of ${money2(threshold!)} spent, ${status.toLowerCase()}`
+    : undefined;
+
   return (
     <button
       type="button"
@@ -82,18 +104,41 @@ function CreditBlockButton({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
         <div>
           <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 3 }}>{label}</div>
-          <div className="muted" style={{ fontSize: 11.5 }}>{sub}</div>
+          <div className="muted" style={{ fontSize: 11.5 }}>{sub} · {countText}</div>
         </div>
         <div className="num" style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--ink)" }}>
           {inr(amount)}
         </div>
       </div>
-      <div className="muted" style={{ fontSize: 11.5, marginTop: 8, display: "flex", justifyContent: "space-between", gap: 8 }}>
-        <span>{count} credit {count === 1 ? "transaction" : "transactions"}</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          View <IconChevR size={13} style={{ color: "var(--ink-3)", flex: "none" }} />
-        </span>
-      </div>
+
+      {hasThreshold ? (
+        <>
+          <div
+            className="bar"
+            style={{ height: 6, marginTop: 11 }}
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progress)}
+            aria-label={ariaLabel}
+          >
+            <i style={{ width: `${progress}%`, background: color }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 7, fontSize: 11.5 }}>
+            <span className="muted num">{money2(amount)} of {money2(threshold!)}</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span className="num" style={{ fontWeight: 700, color }}>{statusText}</span>
+              <IconChevR size={13} style={{ color: "var(--ink-3)", flex: "none" }} />
+            </span>
+          </div>
+        </>
+      ) : (
+        <div className="muted" style={{ fontSize: 11.5, marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            View <IconChevR size={13} style={{ color: "var(--ink-3)", flex: "none" }} />
+          </span>
+        </div>
+      )}
     </button>
   );
 }
@@ -106,12 +151,14 @@ function CreditUsageCard({
   isLoading,
   isError,
   refetch,
+  threshold,
 }: {
   month: string;
   summary?: CreditUsageSummary;
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;
+  threshold?: number | null;
 }) {
   const navigate = useNavigate();
   const go = (view: "calendar" | "billing") =>
@@ -121,10 +168,10 @@ function CreditUsageCard({
     <div className="card card-pad">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
         <h3 className="card-h" style={{ whiteSpace: "nowrap" }}>
-          <IconCreditCard size={16} style={{ color: "var(--c-daily)" }} /> Credit Card Usage
+          <IconCreditCard size={16} style={{ color: "var(--c-daily)" }} /> CC Usage
         </h3>
         <span className="chip" style={{ background: "oklch(0.95 0.03 265)", color: "oklch(0.5 0.1 265)", whiteSpace: "nowrap", flex: "none" }}>
-          by recorded transaction date
+          by recorded date
         </span>
       </div>
       <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>What you charged to credit, by calendar month and statement cycle.</p>
@@ -148,6 +195,7 @@ function CreditUsageCard({
               sub={cycleRangeLabel(summary.billing_cycle.from, summary.billing_cycle.to)}
               amount={summary.billing_cycle.total}
               count={summary.billing_cycle.count}
+              threshold={threshold}
             />
           ) : (
             <div
@@ -175,6 +223,7 @@ function CreditUsageCard({
             sub={cycleRangeLabel(summary.calendar_month.from, summary.calendar_month.to)}
             amount={summary.calendar_month.total}
             count={summary.calendar_month.count}
+            threshold={threshold}
           />
         </>
       ) : null}
@@ -450,6 +499,7 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
               isLoading={creditUsageQuery.isLoading}
               isError={creditUsageQuery.isError}
               refetch={() => creditUsageQuery.refetch()}
+              threshold={settings?.credit_spending_threshold ?? null}
             />
           </div>
 

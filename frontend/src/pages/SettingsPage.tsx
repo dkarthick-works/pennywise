@@ -5,6 +5,7 @@ import {
   updateBudgets,
   updatePreferences,
   updateCreditStatementDay,
+  updateCreditSpendingThreshold,
   putTemplates,
 } from "../api/ledger";
 import { inr } from "../lib/money";
@@ -20,9 +21,35 @@ function ordinal(n: number): string {
   return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
 }
 
+// Credit card controls groups the statement closing day and the per-period
+// spending threshold. Both hydrate from the async settings query and use an
+// explicit Save/Clear (never autosave).
+function CreditCardControlsCard({
+  savedDay,
+  savedThreshold,
+}: {
+  savedDay: number | null;
+  savedThreshold: number | null;
+}) {
+  return (
+    <div id="credit-billing-cycle" className="card card-pad" style={{ marginBottom: 18 }}>
+      <h3 className="card-h" style={{ marginBottom: 4 }}>Credit card controls</h3>
+      <p className="muted" style={{ fontSize: 12.5, margin: "0 0 6px" }}>
+        Settings for how credit card spending is tracked across statement cycles and calendar months.
+      </p>
+
+      <CreditBillingCycleControl savedDay={savedDay} />
+
+      <div style={{ height: 1, background: "var(--border-2)", margin: "18px 0" }} />
+
+      <CreditSpendingThresholdControl savedThreshold={savedThreshold} />
+    </div>
+  );
+}
+
 // Credit card statement closing day. Hydrates from the async settings query,
 // uses an explicit Save/Clear (never autosaves), and shows a live cycle preview.
-function CreditBillingCycleCard({ savedDay }: { savedDay: number | null }) {
+function CreditBillingCycleControl({ savedDay }: { savedDay: number | null }) {
   const qc = useQueryClient();
   const [day, setDay] = useState<number | null>(savedDay);
   const [dirty, setDirty] = useState(false);
@@ -49,9 +76,9 @@ function CreditBillingCycleCard({ savedDay }: { savedDay: number | null }) {
   const busy = mut.isPending;
 
   return (
-    <div id="credit-billing-cycle" className="card card-pad" style={{ marginBottom: 18 }}>
-      <h3 className="card-h" style={{ marginBottom: 4 }}>Credit card billing cycle</h3>
-      <p className="muted" style={{ fontSize: 12.5, margin: "0 0 14px" }}>
+    <div>
+      <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: "0 0 4px" }}>Statement closing day</h4>
+      <p className="muted" style={{ fontSize: 12.5, margin: "0 0 10px" }}>
         Which day of the month is your credit card statement generated? Choose the billing or
         statement date shown in your bank app or monthly statement — not the payment due date.
       </p>
@@ -110,6 +137,126 @@ function CreditBillingCycleCard({ savedDay }: { savedDay: number | null }) {
           className="btn"
           disabled={busy || savedDay == null}
           onClick={() => { setDirty(false); setDay(null); mut.mutate(null); }}
+        >
+          Clear
+        </button>
+        {mut.isError && (
+          <span style={{ fontSize: 12.5, color: "var(--danger, #c0392b)" }}>
+            Couldn’t save — please try again.
+          </span>
+        )}
+        {mut.isSuccess && !dirty && !busy && (
+          <span className="muted" style={{ fontSize: 12.5 }}>Saved.</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Two-decimal positive amount, no exponent — matches the backend contract.
+const THRESHOLD_DRAFT_RE = /^\d+(\.\d{1,2})?$/;
+
+function thresholdToDraft(v: number | null): string {
+  return v == null ? "" : String(v);
+}
+
+// Per-period credit spending threshold. Local string draft (nullable), explicit
+// Save/Clear, hydrates from the async settings query without clobbering an edit,
+// and writes the settings cache directly on success so the UI never flashes stale.
+function CreditSpendingThresholdControl({ savedThreshold }: { savedThreshold: number | null }) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<string>(thresholdToDraft(savedThreshold));
+  const [dirty, setDirty] = useState(false);
+  const [lastAction, setLastAction] = useState<"save" | "clear" | null>(null);
+
+  const [prevSaved, setPrevSaved] = useState(savedThreshold);
+  if (savedThreshold !== prevSaved) {
+    setPrevSaved(savedThreshold);
+    if (!dirty) setDraft(thresholdToDraft(savedThreshold));
+  }
+
+  const mut = useMutation({
+    mutationFn: (value: number | null) => updateCreditSpendingThreshold(value),
+    onSuccess: (data) => {
+      setDirty(false);
+      // Direct cache write — avoids an invalidate/refetch flash of stale data.
+      qc.setQueryData(["settings"], data);
+    },
+  });
+
+  const trimmed = draft.trim();
+  const validFormat = THRESHOLD_DRAFT_RE.test(trimmed);
+  const parsed = validFormat ? Number(trimmed) : NaN;
+  const validValue = validFormat && parsed > 0;
+  const busy = mut.isPending;
+
+  // Unchanged when the parsed value equals the saved value, or when both are empty/null.
+  const unchanged = validValue
+    ? parsed === savedThreshold
+    : trimmed === "" && savedThreshold == null;
+  const invalid = trimmed !== "" && !validValue;
+  const canSave = validValue && !unchanged && !busy;
+  const canClear = savedThreshold != null && !busy;
+
+  function onSave() {
+    if (!canSave) return;
+    setLastAction("save");
+    mut.mutate(parsed);
+  }
+
+  // Clear sends explicit null. The draft is intentionally NOT cleared here: if
+  // the request fails the previous visible value is retained; on success the
+  // settings cache update hydrates the field to empty.
+  function onClear() {
+    if (!canClear) return;
+    setLastAction("clear");
+    setDirty(false);
+    mut.mutate(null);
+  }
+
+  return (
+    <div id="credit-spending-threshold">
+      <h4 style={{ fontSize: 13.5, fontWeight: 700, margin: "0 0 4px" }}>Credit spending threshold</h4>
+      <p className="muted" style={{ fontSize: 12.5, margin: "0 0 10px" }}>
+        Show a warning when credit purchases in a period cross this amount. Applied independently to
+        the statement cycle and the calendar month on your dashboard.
+      </p>
+
+      <Row label="Credit spending threshold" sub="Leave empty to disable. Whole rupees or up to two decimals.">
+        <div style={{ display: "flex", alignItems: "center", gap: 2, border: `1px solid ${invalid ? "var(--danger, #c0392b)" : "var(--border)"}`, borderRadius: 9, padding: "6px 10px", background: "var(--surface-2)" }}>
+          <span className="muted num">₹</span>
+          <input
+            className="num"
+            type="text"
+            inputMode="decimal"
+            placeholder="0"
+            aria-label="Credit spending threshold amount"
+            value={draft}
+            disabled={busy}
+            onChange={(e) => { setDraft(e.target.value); setDirty(true); }}
+            style={{ width: 110, border: "none", background: "transparent", outline: "none", fontSize: 14.5, fontWeight: 600, textAlign: "right", color: "var(--ink)" }}
+          />
+        </div>
+      </Row>
+
+      {invalid && (
+        <p className="muted" style={{ fontSize: 12, marginTop: 10, color: "var(--danger, #c0392b)" }}>
+          Enter a positive amount with at most two decimal places.
+        </p>
+      )}
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 16 }}>
+        <button
+          className="btn btn-soft"
+          disabled={!canSave}
+          onClick={onSave}
+        >
+          {busy && lastAction === "save" ? "Saving…" : "Save threshold"}
+        </button>
+        <button
+          className="btn"
+          disabled={!canClear}
+          onClick={onClear}
         >
           Clear
         </button>
@@ -291,8 +438,11 @@ export function SettingsPage() {
         </Row>
       </div>
 
-      {/* credit card billing cycle */}
-      <CreditBillingCycleCard savedDay={settings?.credit_statement_day ?? null} />
+      {/* credit card controls */}
+      <CreditCardControlsCard
+        savedDay={settings?.credit_statement_day ?? null}
+        savedThreshold={settings?.credit_spending_threshold ?? null}
+      />
 
       {/* templates */}
       <TemplateEditor

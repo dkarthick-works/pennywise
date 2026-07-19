@@ -76,6 +76,7 @@ func (s *Server) Router() http.Handler {
 		pr.Put("/api/settings/budgets", s.handleUpdateBudgets)
 		pr.Put("/api/settings/preferences", s.handleUpdatePreferences)
 		pr.Put("/api/settings/credit-billing-cycle", s.handleUpdateCreditStatementDay)
+		pr.Put("/api/settings/credit-spending-threshold", s.handleUpdateCreditSpendingThreshold)
 
 		pr.Get("/api/templates", s.handleGetTemplates)
 		pr.Put("/api/templates/{section}", s.handlePutTemplates)

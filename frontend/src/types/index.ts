@@ -53,6 +53,9 @@ export interface Settings {
   // Statement closing day (1..31), or null when the credit billing cycle is
   // not configured. Explicit null, never omitted.
   credit_statement_day: number | null;
+  // Per-period credit spending threshold (rupees, up to two decimals), or null
+  // when disabled. Explicit null, never omitted.
+  credit_spending_threshold: number | null;
 }
 
 // ─── Month state ──────────────────────────────────────────────────────────

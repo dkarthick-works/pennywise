@@ -88,6 +88,9 @@ type Querier interface {
 	SumTransactionsByGroupForMonth(ctx context.Context, arg SumTransactionsByGroupForMonthParams) (pgtype.Numeric, error)
 	UpdateBudgets(ctx context.Context, arg UpdateBudgetsParams) (UserSetting, error)
 	UpdateCategoryGroupName(ctx context.Context, arg UpdateCategoryGroupNameParams) (CategoryGroup, error)
+	// Set or clear (NULL) the per-period credit spending threshold. Dedicated so
+	// an unrelated settings update never disturbs this field and vice versa.
+	UpdateCreditSpendingThreshold(ctx context.Context, arg UpdateCreditSpendingThresholdParams) (UserSetting, error)
 	// Set or clear (NULL) the credit card statement closing day. Dedicated so a
 	// currency/theme update never touches this field and vice versa.
 	UpdateCreditStatementDay(ctx context.Context, arg UpdateCreditStatementDayParams) (UserSetting, error)

@@ -53,7 +53,7 @@ const unconfigured: CreditUsageSummary = {
 // Scope assertions to the Credit Card Usage card — the dashboard renders other
 // ₹ amounts (e.g. a zeroed monthly-cost card) that must not leak into checks.
 async function creditCard(): Promise<HTMLElement> {
-  const heading = await screen.findByText("Credit Card Usage");
+  const heading = await screen.findByText("CC Usage");
   return heading.closest(".card") as HTMLElement;
 }
 
@@ -70,8 +70,18 @@ beforeEach(() => {
     budgets: { essential: 0, flexible: 0, daily: 0 },
     currency: "INR", theme: "light", templates: { essential: [], flexible: [] },
     credit_statement_day: 15,
+    credit_spending_threshold: null,
   });
 });
+
+function settingsWithThreshold(threshold: number | null) {
+  return {
+    budgets: { essential: 0, flexible: 0, daily: 0 },
+    currency: "INR", theme: "light", templates: { essential: [], flexible: [] },
+    credit_statement_day: 15,
+    credit_spending_threshold: threshold,
+  };
+}
 
 describe("Dashboard credit usage card", () => {
   it("renders both statement-cycle and calendar buckets from the API", async () => {
@@ -114,5 +124,76 @@ describe("Dashboard credit usage card", () => {
 
     resolve(configured);
     await waitFor(() => expect(card.getByText("₹410")).toBeInTheDocument());
+  });
+});
+
+describe("Dashboard credit spending threshold marker", () => {
+  it("shows no marker when the threshold is disabled (null)", async () => {
+    mocks.getCreditUsage.mockResolvedValue(configured);
+    mocks.getSettings.mockResolvedValue(settingsWithThreshold(null));
+    renderDashboard();
+
+    const card = within(await creditCard());
+    await card.findByText("Statement cycle");
+    expect(card.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(card.queryByText(/ of ₹/)).not.toBeInTheDocument();
+    expect(card.queryByText(/left|over/)).not.toBeInTheDocument();
+  });
+
+  it("marks the statement cycle within threshold and the calendar month over, for the same threshold", async () => {
+    // Statement cycle 410 vs 1000 → within; calendar 1500 vs 1000 → over.
+    mocks.getCreditUsage.mockResolvedValue(configured);
+    mocks.getSettings.mockResolvedValue(settingsWithThreshold(1000));
+    renderDashboard();
+
+    const card = within(await creditCard());
+    await card.findByText("Statement cycle");
+
+    await waitFor(() => {
+      expect(card.getByText(/₹590 left/)).toBeInTheDocument();
+    });
+    // Calendar month is over the same threshold by 500.
+    expect(card.getByText(/₹500 over/)).toBeInTheDocument();
+
+    const bars = card.getAllByRole("progressbar");
+    expect(bars).toHaveLength(2);
+    // Statement cycle: 410/1000 = 41%. Calendar: clamped to 100%.
+    expect(bars[0]).toHaveAttribute("aria-valuenow", "41");
+    expect(bars[1]).toHaveAttribute("aria-valuenow", "100");
+  });
+
+  it("treats exactly-80% spend as within threshold (amber boundary)", async () => {
+    // Calendar 1500 / 1875 = exactly 80%.
+    mocks.getCreditUsage.mockResolvedValue(configured);
+    mocks.getSettings.mockResolvedValue(settingsWithThreshold(1875));
+    renderDashboard();
+
+    const card = within(await creditCard());
+    await card.findByText("Statement cycle");
+
+    await waitFor(() => expect(card.getByText(/₹375 left/)).toBeInTheDocument());
+    expect(card.queryByText(/over/)).not.toBeInTheDocument();
+    const bars = card.getAllByRole("progressbar");
+    expect(bars[1]).toHaveAttribute("aria-valuenow", "80");
+  });
+
+  it("treats exactly-100% spend as within threshold (boundary)", async () => {
+    const atLimit: CreditUsageSummary = {
+      month: "2026-07",
+      calendar_month: { from: "2026-07-01", to: "2026-07-31", total: 1000, count: 3 },
+      billing_cycle: { statement_day: 15, from: "2026-06-16", to: "2026-07-15", total: 800, count: 2 },
+    };
+    mocks.getCreditUsage.mockResolvedValue(atLimit);
+    mocks.getSettings.mockResolvedValue(settingsWithThreshold(1000));
+    renderDashboard();
+
+    const card = within(await creditCard());
+    await card.findByText("Statement cycle");
+
+    // Calendar month is exactly at the threshold → within (₹0 left), not over.
+    await waitFor(() => expect(card.getByText(/₹0 left/)).toBeInTheDocument());
+    expect(card.queryByText(/over/)).not.toBeInTheDocument();
+    const bars = card.getAllByRole("progressbar");
+    expect(bars[1]).toHaveAttribute("aria-valuenow", "100");
   });
 });

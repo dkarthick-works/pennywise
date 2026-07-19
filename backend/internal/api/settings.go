@@ -1,12 +1,25 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"math/big"
 	"net/http"
+	"regexp"
 	"strings"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ledger/backend/internal/db"
 )
+
+// creditThresholdMax is the largest value representable by NUMERIC(14,2).
+var creditThresholdMax, _ = new(big.Rat).SetString("999999999999.99")
+
+// plainDecimalRe matches a non-negative JSON number literal without exponent
+// notation. It deliberately rejects "+1", ".5", "1.", "1e3", quoted strings,
+// and booleans so the threshold contract stays lexical and exact.
+var plainDecimalRe = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?$`)
 
 func (s *Server) loadTemplates(r *http.Request) (TemplatesDTO, error) {
 	rows, err := s.q.ListTemplates(r.Context(), userID(r))
@@ -83,23 +96,28 @@ func (s *Server) handleUpdatePreferences(w http.ResponseWriter, r *http.Request)
 //
 // The property must be present. An explicit JSON null clears the cycle; an
 // integer 1..31 sets it. Decimals, strings, and out-of-range values are 400s.
+//
+// A non-pointer json.RawMessage is used (not *json.RawMessage) so a missing
+// property (len 0) is reliably distinguishable from an explicit null ("null") —
+// a *json.RawMessage decodes both to nil.
 func (s *Server) handleUpdateCreditStatementDay(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		CreditStatementDay *json.RawMessage `json:"credit_statement_day"`
+		CreditStatementDay json.RawMessage `json:"credit_statement_day"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if body.CreditStatementDay == nil {
+	if len(body.CreditStatementDay) == 0 {
 		writeErr(w, http.StatusBadRequest, "credit_statement_day is required")
 		return
 	}
 
+	raw := bytes.TrimSpace(body.CreditStatementDay)
 	var day *int16
-	if strings.TrimSpace(string(*body.CreditStatementDay)) != "null" {
+	if !bytes.Equal(raw, []byte("null")) {
 		var n int
-		if err := json.Unmarshal(*body.CreditStatementDay, &n); err != nil {
+		if err := json.Unmarshal(raw, &n); err != nil {
 			writeErr(w, http.StatusBadRequest, "credit_statement_day must be an integer 1..31 or null")
 			return
 		}
@@ -119,4 +137,81 @@ func (s *Server) handleUpdateCreditStatementDay(w http.ResponseWriter, r *http.R
 		return
 	}
 	s.handleGetSettings(w, r)
+}
+
+// handleUpdateCreditSpendingThreshold sets or clears the per-period credit
+// spending threshold. Dedicated so an unrelated settings save never disturbs it.
+//
+// The property must be present. An explicit JSON null clears the threshold; a
+// positive decimal with at most two fractional digits sets it. Zero, negatives,
+// exponent notation, more than two decimals, non-numbers, and values above the
+// NUMERIC(14,2) maximum are all 400s — validated before touching PostgreSQL so a
+// bad value never becomes a 500.
+//
+// A non-pointer json.RawMessage is used (not *json.RawMessage) so a missing
+// property (len 0) is distinguishable from an explicit null ("null").
+func (s *Server) handleUpdateCreditSpendingThreshold(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		CreditSpendingThreshold json.RawMessage `json:"credit_spending_threshold"`
+	}
+	if err := readJSON(r, &body); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(body.CreditSpendingThreshold) == 0 {
+		writeErr(w, http.StatusBadRequest, "credit_spending_threshold is required")
+		return
+	}
+
+	raw := bytes.TrimSpace(body.CreditSpendingThreshold)
+
+	var threshold pgtype.Numeric // zero value: Valid=false → NULL (clear)
+	if !bytes.Equal(raw, []byte("null")) {
+		num, err := parseCreditThreshold(raw)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		threshold = num
+	}
+
+	if _, err := s.q.UpdateCreditSpendingThreshold(r.Context(), db.UpdateCreditSpendingThresholdParams{
+		UserID:                  userID(r),
+		CreditSpendingThreshold: threshold,
+	}); err != nil {
+		writeErr(w, http.StatusInternalServerError, "could not update credit spending threshold")
+		return
+	}
+	s.handleGetSettings(w, r)
+}
+
+// parseCreditThreshold validates a raw JSON number token as a positive rupee
+// amount with at most two decimal places and no exponent, then scans the exact
+// decimal string into a pgtype.Numeric without ever routing through float64.
+func parseCreditThreshold(raw []byte) (pgtype.Numeric, error) {
+	const msg = "credit_spending_threshold must be a positive number with at most two decimal places or null"
+	str := string(raw)
+	if !plainDecimalRe.MatchString(str) {
+		return pgtype.Numeric{}, errors.New(msg)
+	}
+	if dot := strings.IndexByte(str, '.'); dot >= 0 && len(str)-dot-1 > 2 {
+		return pgtype.Numeric{}, errors.New("credit_spending_threshold must have at most two decimal places")
+	}
+
+	val, ok := new(big.Rat).SetString(str)
+	if !ok {
+		return pgtype.Numeric{}, errors.New(msg)
+	}
+	if val.Sign() <= 0 {
+		return pgtype.Numeric{}, errors.New("credit_spending_threshold must be greater than zero")
+	}
+	if val.Cmp(creditThresholdMax) > 0 {
+		return pgtype.Numeric{}, errors.New("credit_spending_threshold must not exceed 999999999999.99")
+	}
+
+	var n pgtype.Numeric
+	if err := n.Scan(str); err != nil {
+		return pgtype.Numeric{}, errors.New(msg)
+	}
+	return n, nil
 }

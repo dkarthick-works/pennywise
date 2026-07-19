@@ -42,14 +42,16 @@ type TemplatesDTO struct {
 // SettingsDTO is the full settings payload consumed by the SPA.
 // Income is no longer a static setting — it is derived from income-section transactions.
 //
-// CreditStatementDay is a pointer without omitempty so an unconfigured cycle
-// serializes as an explicit JSON null rather than being dropped.
+// CreditStatementDay and CreditSpendingThreshold are pointers without omitempty
+// so an unconfigured value serializes as an explicit JSON null rather than being
+// dropped (clients then see a single stable response shape).
 type SettingsDTO struct {
-	Budgets            BudgetsDTO   `json:"budgets"`
-	Currency           string       `json:"currency"`
-	Theme              string       `json:"theme"`
-	Templates          TemplatesDTO `json:"templates"`
-	CreditStatementDay *int         `json:"credit_statement_day"`
+	Budgets                 BudgetsDTO   `json:"budgets"`
+	Currency                string       `json:"currency"`
+	Theme                   string       `json:"theme"`
+	Templates               TemplatesDTO `json:"templates"`
+	CreditStatementDay      *int         `json:"credit_statement_day"`
+	CreditSpendingThreshold *float64     `json:"credit_spending_threshold"`
 }
 
 func settingsToDTO(s db.UserSetting, tpl TemplatesDTO) SettingsDTO {
@@ -58,16 +60,22 @@ func settingsToDTO(s db.UserSetting, tpl TemplatesDTO) SettingsDTO {
 		d := int(*s.CreditStatementDay)
 		statementDay = &d
 	}
+	var threshold *float64
+	if s.CreditSpendingThreshold.Valid {
+		v := numToFloat(s.CreditSpendingThreshold)
+		threshold = &v
+	}
 	return SettingsDTO{
 		Budgets: BudgetsDTO{
 			Essential: numToFloat(s.BudgetEssential),
 			Flexible:  numToFloat(s.BudgetFlexible),
 			Daily:     numToFloat(s.BudgetDaily),
 		},
-		Currency:           s.Currency,
-		Theme:              s.Theme,
-		Templates:          tpl,
-		CreditStatementDay: statementDay,
+		Currency:                s.Currency,
+		Theme:                   s.Theme,
+		Templates:               tpl,
+		CreditStatementDay:      statementDay,
+		CreditSpendingThreshold: threshold,
 	}
 }
 

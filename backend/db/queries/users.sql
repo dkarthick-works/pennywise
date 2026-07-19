@@ -53,3 +53,12 @@ SET credit_statement_day = sqlc.narg(credit_statement_day),
     updated_at           = now()
 WHERE user_id = sqlc.arg(user_id)
 RETURNING *;
+
+-- name: UpdateCreditSpendingThreshold :one
+-- Set or clear (NULL) the per-period credit spending threshold. Dedicated so
+-- an unrelated settings update never disturbs this field and vice versa.
+UPDATE user_settings
+SET credit_spending_threshold = sqlc.narg(credit_spending_threshold),
+    updated_at                = now()
+WHERE user_id = sqlc.arg(user_id)
+RETURNING *;

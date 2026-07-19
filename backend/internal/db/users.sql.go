@@ -16,7 +16,7 @@ const ensureSettings = `-- name: EnsureSettings :one
 INSERT INTO user_settings (user_id)
 VALUES ($1)
 ON CONFLICT (user_id) DO NOTHING
-RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day
+RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
 `
 
 // Create the default settings row for a user if it does not exist yet.
@@ -32,12 +32,13 @@ func (q *Queries) EnsureSettings(ctx context.Context, userID uuid.UUID) (UserSet
 		&i.Theme,
 		&i.UpdatedAt,
 		&i.CreditStatementDay,
+		&i.CreditSpendingThreshold,
 	)
 	return i, err
 }
 
 const getSettings = `-- name: GetSettings :one
-SELECT user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day FROM user_settings WHERE user_id = $1
+SELECT user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day, credit_spending_threshold FROM user_settings WHERE user_id = $1
 `
 
 func (q *Queries) GetSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error) {
@@ -52,6 +53,7 @@ func (q *Queries) GetSettings(ctx context.Context, userID uuid.UUID) (UserSettin
 		&i.Theme,
 		&i.UpdatedAt,
 		&i.CreditStatementDay,
+		&i.CreditSpendingThreshold,
 	)
 	return i, err
 }
@@ -80,7 +82,7 @@ SET budget_essential = $2,
     budget_daily     = $4,
     updated_at       = now()
 WHERE user_id = $1
-RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day
+RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
 `
 
 type UpdateBudgetsParams struct {
@@ -107,6 +109,39 @@ func (q *Queries) UpdateBudgets(ctx context.Context, arg UpdateBudgetsParams) (U
 		&i.Theme,
 		&i.UpdatedAt,
 		&i.CreditStatementDay,
+		&i.CreditSpendingThreshold,
+	)
+	return i, err
+}
+
+const updateCreditSpendingThreshold = `-- name: UpdateCreditSpendingThreshold :one
+UPDATE user_settings
+SET credit_spending_threshold = $1,
+    updated_at                = now()
+WHERE user_id = $2
+RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
+`
+
+type UpdateCreditSpendingThresholdParams struct {
+	CreditSpendingThreshold pgtype.Numeric `json:"credit_spending_threshold"`
+	UserID                  uuid.UUID      `json:"user_id"`
+}
+
+// Set or clear (NULL) the per-period credit spending threshold. Dedicated so
+// an unrelated settings update never disturbs this field and vice versa.
+func (q *Queries) UpdateCreditSpendingThreshold(ctx context.Context, arg UpdateCreditSpendingThresholdParams) (UserSetting, error) {
+	row := q.db.QueryRow(ctx, updateCreditSpendingThreshold, arg.CreditSpendingThreshold, arg.UserID)
+	var i UserSetting
+	err := row.Scan(
+		&i.UserID,
+		&i.BudgetEssential,
+		&i.BudgetFlexible,
+		&i.BudgetDaily,
+		&i.Currency,
+		&i.Theme,
+		&i.UpdatedAt,
+		&i.CreditStatementDay,
+		&i.CreditSpendingThreshold,
 	)
 	return i, err
 }
@@ -116,7 +151,7 @@ UPDATE user_settings
 SET credit_statement_day = $1,
     updated_at           = now()
 WHERE user_id = $2
-RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day
+RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
 `
 
 type UpdateCreditStatementDayParams struct {
@@ -138,6 +173,7 @@ func (q *Queries) UpdateCreditStatementDay(ctx context.Context, arg UpdateCredit
 		&i.Theme,
 		&i.UpdatedAt,
 		&i.CreditStatementDay,
+		&i.CreditSpendingThreshold,
 	)
 	return i, err
 }
@@ -148,7 +184,7 @@ SET currency   = $2,
     theme      = $3,
     updated_at = now()
 WHERE user_id = $1
-RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day
+RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
 `
 
 type UpdatePreferencesParams struct {
@@ -169,6 +205,7 @@ func (q *Queries) UpdatePreferences(ctx context.Context, arg UpdatePreferencesPa
 		&i.Theme,
 		&i.UpdatedAt,
 		&i.CreditStatementDay,
+		&i.CreditSpendingThreshold,
 	)
 	return i, err
 }
