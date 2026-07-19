@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { signup } from "../api/auth";
-import { IconArrowR, IconEye, IconEyeOff } from "../components/ui/Icons";
+import { IconArrowR, IconEye, IconEyeOff, IconGithub } from "../components/ui/Icons";
 
 type Mode = "signin" | "register";
 
@@ -137,6 +137,16 @@ export function AuthPage() {
           {isReg ? "Already have an account?" : "New to Pennywise?"}
           <button onClick={switchMode}>{isReg ? "Sign in" : "Create one"}</button>
         </div>
+
+        <a
+          className="auth-github"
+          href="https://github.com/dkarthick-works/pennywise"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View source on GitHub"
+        >
+          <IconGithub size={20} />
+        </a>
       </div>
     </div>
   );
