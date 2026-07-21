@@ -155,6 +155,12 @@ export const IconLent = (p: IcProps) => (
     <path d="M5 19h14" />
   </Ic>
 );
+export const IconChit = (p: IcProps) => (
+  <Ic {...p}>
+    <circle cx="12" cy="12" r="8" />
+    <path d="M12 8v8M9 10.5h4.5a1.5 1.5 0 0 1 0 3H9" />
+  </Ic>
+);
 export const IconGithub = ({ size = 18, ...p }: IcProps) => (
   <svg
     className="nav-ic"

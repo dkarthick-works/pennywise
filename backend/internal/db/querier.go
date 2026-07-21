@@ -14,10 +14,13 @@ import (
 type Querier interface {
 	CategoryTextExistsForUser(ctx context.Context, arg CategoryTextExistsForUserParams) (bool, error)
 	CountCategoryMappingsForGroup(ctx context.Context, arg CountCategoryMappingsForGroupParams) (int64, error)
+	CountInstallmentsForChit(ctx context.Context, chitID uuid.UUID) (int64, error)
 	// Distinct non-settlement daily categories for ghost autocomplete.
 	DailyCategorySuggestions(ctx context.Context, userID uuid.UUID) ([]string, error)
 	DeleteCategoryGroup(ctx context.Context, arg DeleteCategoryGroupParams) error
 	DeleteCategoryMapping(ctx context.Context, arg DeleteCategoryMappingParams) error
+	DeleteChit(ctx context.Context, arg DeleteChitParams) (int64, error)
+	DeleteChitInstallment(ctx context.Context, arg DeleteChitInstallmentParams) (int64, error)
 	DeleteLent(ctx context.Context, arg DeleteLentParams) (int64, error)
 	DeleteRepayment(ctx context.Context, arg DeleteRepaymentParams) (int64, error)
 	DeleteSettlementLinks(ctx context.Context, settlementID uuid.UUID) error
@@ -27,6 +30,7 @@ type Querier interface {
 	EnsureSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
 	GetCategoryGroup(ctx context.Context, arg GetCategoryGroupParams) (CategoryGroup, error)
 	GetCategoryMapping(ctx context.Context, arg GetCategoryMappingParams) (CategoryMapping, error)
+	GetChit(ctx context.Context, arg GetChitParams) (GetChitRow, error)
 	GetLent(ctx context.Context, arg GetLentParams) (GetLentRow, error)
 	GetMonthState(ctx context.Context, arg GetMonthStateParams) (MonthState, error)
 	GetSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
@@ -36,6 +40,8 @@ type Querier interface {
 	IncomeCategorySuggestions(ctx context.Context, userID uuid.UUID) ([]string, error)
 	InsertCategoryGroup(ctx context.Context, arg InsertCategoryGroupParams) (CategoryGroup, error)
 	InsertCategoryMapping(ctx context.Context, arg InsertCategoryMappingParams) (CategoryMapping, error)
+	InsertChit(ctx context.Context, arg InsertChitParams) (Chit, error)
+	InsertChitInstallment(ctx context.Context, arg InsertChitInstallmentParams) (ChitInstallment, error)
 	InsertLent(ctx context.Context, arg InsertLentParams) (Lent, error)
 	InsertRepayment(ctx context.Context, arg InsertRepaymentParams) (LentRepayment, error)
 	InsertSettlementLink(ctx context.Context, arg InsertSettlementLinkParams) error
@@ -44,9 +50,11 @@ type Querier interface {
 	ListCategoryGroups(ctx context.Context, userID uuid.UUID) ([]CategoryGroup, error)
 	ListCategoryMappings(ctx context.Context, userID uuid.UUID) ([]ListCategoryMappingsRow, error)
 	ListCategoryMappingsByGroup(ctx context.Context, arg ListCategoryMappingsByGroupParams) ([]CategoryMapping, error)
+	ListChits(ctx context.Context, userID uuid.UUID) ([]ListChitsRow, error)
 	// Expense credit rows in a half-open [from, to) date window, for the credit
 	// drill-down. Mirrors SumCreditUsage's filter so totals reconcile.
 	ListCreditTransactionsByDateRange(ctx context.Context, arg ListCreditTransactionsByDateRangeParams) ([]Transaction, error)
+	ListInstallmentsForChit(ctx context.Context, arg ListInstallmentsForChitParams) ([]ChitInstallment, error)
 	ListLents(ctx context.Context, arg ListLentsParams) ([]ListLentsRow, error)
 	ListLinksForSettlement(ctx context.Context, settlementID uuid.UUID) ([]uuid.UUID, error)
 	ListMonthStates(ctx context.Context, userID uuid.UUID) ([]MonthState, error)
@@ -65,6 +73,7 @@ type Querier interface {
 	ListTransactionsByMonthSection(ctx context.Context, arg ListTransactionsByMonthSectionParams) ([]Transaction, error)
 	ListTransactionsByYear(ctx context.Context, arg ListTransactionsByYearParams) ([]Transaction, error)
 	ListUnmappedCategoryTexts(ctx context.Context, userID uuid.UUID) ([]string, error)
+	LockChitForUser(ctx context.Context, arg LockChitForUserParams) (Chit, error)
 	MarkMonthSeeded(ctx context.Context, arg MarkMonthSeededParams) (MonthState, error)
 	// Open (unsettled) credits in a section, newest first — candidates for a settlement
 	// picker. Excludes any credit already linked to a settlement other than the one
@@ -88,6 +97,8 @@ type Querier interface {
 	SumTransactionsByGroupForMonth(ctx context.Context, arg SumTransactionsByGroupForMonthParams) (pgtype.Numeric, error)
 	UpdateBudgets(ctx context.Context, arg UpdateBudgetsParams) (UserSetting, error)
 	UpdateCategoryGroupName(ctx context.Context, arg UpdateCategoryGroupNameParams) (CategoryGroup, error)
+	UpdateChit(ctx context.Context, arg UpdateChitParams) (Chit, error)
+	UpdateChitInstallment(ctx context.Context, arg UpdateChitInstallmentParams) (ChitInstallment, error)
 	// Set or clear (NULL) the per-period credit spending threshold. Dedicated so
 	// an unrelated settings update never disturbs this field and vice versa.
 	UpdateCreditSpendingThreshold(ctx context.Context, arg UpdateCreditSpendingThresholdParams) (UserSetting, error)

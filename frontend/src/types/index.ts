@@ -238,3 +238,48 @@ export interface RepaymentInput {
   repaid_on: string;
   note: string;
 }
+
+// ─── Chit funds (isolated from ledger transactions) ───────────────────────
+
+export type ChitStatus = "active" | "completed";
+
+export interface ChitSummary {
+  id: string;
+  name: string;
+  organizer: string;
+  chit_value: number;
+  expected_monthly: number;
+  total_installments: number;
+  start_month: string; // YYYY-MM-01
+  installment_count: number;
+  total_paid: number;
+  status: ChitStatus;
+}
+
+export interface ChitInstallment {
+  id: string;
+  paid_on: string;
+  amount: number;
+  note: string;
+  created_at?: string;
+}
+
+export interface ChitDetail extends ChitSummary {
+  installments: ChitInstallment[];
+}
+
+/** Complete-object body for create/update. start_month is YYYY-MM-01. */
+export interface ChitInput {
+  name: string;
+  organizer: string;
+  chit_value: number;
+  expected_monthly: number;
+  total_installments: number;
+  start_month: string;
+}
+
+export interface ChitInstallmentInput {
+  paid_on: string;
+  amount: number;
+  note: string;
+}

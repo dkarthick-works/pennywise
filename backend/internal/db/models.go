@@ -118,6 +118,28 @@ type CategoryMapping struct {
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Chit struct {
+	ID                uuid.UUID          `json:"id"`
+	UserID            uuid.UUID          `json:"user_id"`
+	Name              string             `json:"name"`
+	Organizer         string             `json:"organizer"`
+	ChitValue         pgtype.Numeric     `json:"chit_value"`
+	ExpectedMonthly   pgtype.Numeric     `json:"expected_monthly"`
+	TotalInstallments int32              `json:"total_installments"`
+	StartMonth        pgtype.Date        `json:"start_month"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ChitInstallment struct {
+	ID        uuid.UUID          `json:"id"`
+	ChitID    uuid.UUID          `json:"chit_id"`
+	Amount    pgtype.Numeric     `json:"amount"`
+	PaidOn    pgtype.Date        `json:"paid_on"`
+	Note      string             `json:"note"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type Lent struct {
 	ID           uuid.UUID          `json:"id"`
 	UserID       uuid.UUID          `json:"user_id"`

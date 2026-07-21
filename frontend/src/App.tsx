@@ -14,6 +14,11 @@ import { CategoriesPage } from "./pages/CategoriesPage";
 import { ImportExportPage } from "./pages/ImportExportPage";
 import { LentsPage } from "./pages/LentsPage";
 import { LentDetailPage } from "./pages/LentDetailPage";
+import { ChitsPage } from "./pages/ChitsPage";
+import { ChitCreatePage } from "./pages/ChitCreatePage";
+import { ChitDetailPage } from "./pages/ChitDetailPage";
+import { ChitEditPage } from "./pages/ChitEditPage";
+import { ChitInstallmentCreatePage } from "./pages/ChitInstallmentCreatePage";
 import { currentMonth }  from "./lib/dates";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -44,6 +49,11 @@ export default function App() {
                 <Route path="/record"    element={<RecordPage month={month} setMonth={setMonth} />} />
                 <Route path="/lents"     element={<LentsPage />} />
                 <Route path="/lents/:id" element={<LentDetailPage />} />
+                <Route path="/chits"     element={<ChitsPage />} />
+                <Route path="/chits/new" element={<ChitCreatePage />} />
+                <Route path="/chits/:id/edit" element={<ChitEditPage />} />
+                <Route path="/chits/:id/installments/new" element={<ChitInstallmentCreatePage />} />
+                <Route path="/chits/:id" element={<ChitDetailPage />} />
                 <Route path="/insights"  element={<InsightsPage />} />
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/export"    element={<ImportExportPage />} />

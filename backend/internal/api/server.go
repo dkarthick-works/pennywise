@@ -121,6 +121,15 @@ func (s *Server) Router() http.Handler {
 		pr.Patch("/api/lents/{id}/repayments/{rid}", s.handleUpdateRepayment)
 		pr.Delete("/api/lents/{id}/repayments/{rid}", s.handleDeleteRepayment)
 
+		pr.Get("/api/chits", s.handleListChits)
+		pr.Post("/api/chits", s.handleCreateChit)
+		pr.Get("/api/chits/{id}", s.handleGetChit)
+		pr.Patch("/api/chits/{id}", s.handleUpdateChit)
+		pr.Delete("/api/chits/{id}", s.handleDeleteChit)
+		pr.Post("/api/chits/{id}/installments", s.handleCreateChitInstallment)
+		pr.Patch("/api/chits/{id}/installments/{installmentId}", s.handleUpdateChitInstallment)
+		pr.Delete("/api/chits/{id}/installments/{installmentId}", s.handleDeleteChitInstallment)
+
 		pr.Get("/api/months/{month}", s.handleGetMonth)
 		pr.Put("/api/months/{month}/closed", s.handleSetMonthClosed)
 		pr.Post("/api/months/{month}/open", s.handleOpenMonth)
