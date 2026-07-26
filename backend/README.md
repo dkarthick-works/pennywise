@@ -109,10 +109,11 @@ only ever talks to this origin.
 | *      | `/api/auth/*` | proxied to Goauth (signup, login, refresh, logout, me, …) |
 | GET    | `/api/me` · `/api/profile` | current user / profile |
 | PUT    | `/api/profile` | update name + email |
-| GET    | `/api/settings` | income, budgets, currency, theme, templates, credit statement day |
+| GET    | `/api/settings` | income, budgets, currency, theme, templates, credit statement day, credit spending threshold |
 | PUT    | `/api/settings/budgets` | per-section budgets |
 | PUT    | `/api/settings/preferences` | income, currency, theme |
 | PUT    | `/api/settings/credit-billing-cycle` | set/clear credit statement closing day (`1..31` or `null`) |
+| PUT    | `/api/settings/credit-spending-threshold` | set/clear per-period credit spend warning (`> 0`, max 2 decimals, or `null`) |
 | GET    | `/api/templates` | template lists |
 | PUT    | `/api/templates/{section}` | replace a section's ordered template list |
 | GET    | `/api/transactions?month=YYYY-MM` \| `?year=YYYY` | rows + `settles`/`settled` |
@@ -151,6 +152,14 @@ only ever talks to this origin.
 | POST   | `/api/lents/{id}/repayments` | record a repayment instalment |
 | PATCH  | `/api/lents/{id}/repayments/{rid}` | update a repayment |
 | DELETE | `/api/lents/{id}/repayments/{rid}` | delete a repayment |
+| GET    | `/api/chits` | list chit-fund schemes with installment summaries |
+| POST   | `/api/chits` | create a chit |
+| GET    | `/api/chits/{id}` | chit detail with nested installments |
+| PATCH  | `/api/chits/{id}` | update chit fields |
+| DELETE | `/api/chits/{id}` | delete chit and all installments |
+| POST   | `/api/chits/{id}/installments` | record an installment payment |
+| PATCH  | `/api/chits/{id}/installments/{installmentId}` | update an installment |
+| DELETE | `/api/chits/{id}/installments/{installmentId}` | delete an installment |
 
 ### Transaction JSON
 
@@ -306,6 +315,29 @@ reconciles with the summary bucket.
 Handlers: `internal/api/credit_usage.go`; range math in
 `internal/api/billing_cycle.go`; queries `SumCreditUsage` and
 `ListCreditTransactionsByDateRange` in `db/queries/transactions.sql`.
+
+### Credit spending threshold (`PUT /api/settings/credit-spending-threshold`)
+
+Optional per-period warning amount stored in `user_settings.credit_spending_threshold`
+(`NUMERIC(14,2)`, nullable; migration `0009_credit_spending_threshold`). The
+Dashboard CC Usage card compares it independently to **statement-cycle** and
+**calendar-month** credit totals — it is a soft purchase warning, not a credit
+limit.
+
+Request body — property **required**; explicit JSON `null` clears:
+
+```json
+{ "credit_spending_threshold": 25000 }
+```
+
+**Validation:** positive decimal with at most two fractional places; no exponent
+notation; max `999999999999.99`. Zero, negatives, strings, and missing property
+return `400` before PostgreSQL is touched. Returns the full settings DTO on
+success (same shape as `GET /api/settings`).
+
+Also surfaced through `GET /api/settings` as `credit_spending_threshold: number | null`.
+
+Handler: `handleUpdateCreditSpendingThreshold` in `internal/api/settings.go`.
 
 ### Category group transactions (`GET /api/category-groups/{id}/transactions?month=YYYY-MM`)
 
@@ -472,6 +504,48 @@ over-repayment.
 
 Handlers: `internal/api/lents.go`; queries in `db/queries/lents.sql`;
 migration `0006_lents`.
+
+### Chits (`/api/chits`)
+
+Tracks chit-fund subscriptions in a **standalone ledger** — installments do
+not become `transactions` rows and are excluded from Dashboard, Insights, cash
+flow, CSV export, and category suggestions.
+
+| table | purpose |
+|-------|---------|
+| `chits` | scheme metadata: name, organizer, `chit_value`, `expected_monthly`, `total_installments` (1–360), `start_month` (`YYYY-MM-01`) |
+| `chit_installments` | individual payments: `paid_on`, `amount`, optional `note` (≤500 chars) |
+
+**Status** is derived: `active` while `installment_count < total_installments`,
+else `completed`. Completed chits reject new installments (`409`).
+
+**Create / update body:**
+
+```json
+{
+  "name": "Office chit",
+  "organizer": "Ravi",
+  "chit_value": 100000,
+  "expected_monthly": 5000,
+  "total_installments": 20,
+  "start_month": "2026-01-01"
+}
+```
+
+`name` and `organizer` are required (≤120 chars). Money fields must be `> 0`,
+≤ `999999999999.99`, with at most two decimal places. `total_installments` is
+1–360 and cannot be lowered below the existing installment count.
+
+After the **first installment**, `start_month`, `expected_monthly`, and
+`total_installments` are locked (`409` on change). `name`, `organizer`, and
+`chit_value` remain editable.
+
+**Installments** — `POST /api/chits/{id}/installments` with
+`{ "paid_on": "2026-06-01", "amount": 5000, "note": "" }`. `paid_on` is
+`YYYY-MM-DD`.
+
+Handlers: `internal/api/chits.go`; queries in `db/queries/chits.sql`;
+migration `0010_chits`.
 
 ## Configuration
 

@@ -27,10 +27,15 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/dashboard/groups/:groupId` | Category group | Drill-down from a category-group spend card |
 | `/lents` | Lent | Track money lent to others (open/settled filter, create form) |
 | `/lents/:id` | Lent detail | Edit/delete lent, record and manage repayments |
+| `/chits` | Chit funds | List chit schemes with active/completed status |
+| `/chits/new` | Create chit | New chit-fund scheme form |
+| `/chits/:id` | Chit detail | View installments, record payments |
+| `/chits/:id/edit` | Edit chit | Update scheme fields |
+| `/chits/:id/installments/new` | Add installment | Record a chit payment |
 | `/insights` | Insights | Emergency fund targets (from `GET /api/insights`) |
 | `/categories` | Map Categories | Assign transaction labels to high-level groups |
 | `/export` | Import / Export | CSV export (date range) and import with review table |
-| `/settings` | Settings | Budgets, templates, preferences |
+| `/settings` | Settings | Budgets, templates, credit card controls |
 | `/profile` | Profile | Display name and email |
 | `/login` | Auth | Sign up / log in (password field has show/hide toggle) |
 
@@ -68,6 +73,11 @@ the inclusive last day of the cycle — day `15` makes July's cycle Jun 16 – J
 with days 29–31 clamped to a month's last day. `src/lib/billingCycle.ts` mirrors
 the backend math for the Settings live preview only; the API response remains
 authoritative for card totals.
+
+When a **credit spending threshold** is set in Settings
+(`/settings#credit-spending-threshold`), each period block shows a compact
+progress bar with "within" / "over threshold" text. The same rupee limit applies
+independently to statement-cycle and calendar-month totals.
 
 ### Category group spend
 
@@ -147,6 +157,49 @@ React Query keys live in `src/lib/transactionNameSuggestions.ts`; mutations
 invalidate the affected section via `invalidateTransactionNameSuggestions` in
 `src/lib/monthCaches.ts`.
 
+### Copy last month
+
+**Income**, **Essential**, and **Flexible** tiles expose a **Copy last month**
+button (`CopyLastMonthButton.tsx`). It loads the previous month's transactions,
+builds a plan (`src/lib/copyLastMonth.ts`), and asks for confirmation with exact
+insert/fill counts before writing.
+
+**Eligible source rows:** same section; positive amount; non-empty category;
+`settlement` kind skipped. Income copies `cash` only; Essential/Flexible copy
+`cash` or `credit`.
+
+**Fill vs insert:** Essential/Flexible first try to fill existing **zero-value
+cash** rows in the current month (trimmed, case-sensitive category match; each
+zero row used once). Unmatched rows are bulk-inserted via
+`POST /api/transactions/import`; fills use `PATCH /api/transactions/{id}`.
+Income has no template rows, so it always inserts.
+
+Dates are shifted into the target month. Existing non-zero rows are never
+replaced. The operation is not fully atomic — if inserts succeed but some fills
+fail, the UI warns against retrying (which would duplicate inserts).
+
+## Settings page
+
+Nav item: **Settings** (`/settings`).
+
+| Section | Anchor | Notes |
+|---------|--------|-------|
+| Budgets | — | Per-section budget amounts (autosave) |
+| Templates | — | Ordered category lists per section |
+| Preferences | — | Income, currency, theme |
+| Credit card controls | `#credit-billing-cycle` | Statement closing day + spending threshold |
+
+**Credit card controls** groups two explicit Save/Clear settings (never
+autosave):
+
+- **Statement closing day** — `PUT /api/settings/credit-billing-cycle` with
+  `credit_statement_day` (`1..31`) or `null`. Live cycle preview uses
+  `src/lib/billingCycle.ts`; successful saves invalidate all credit-usage caches
+  (`invalidateCreditCaches`).
+- **Credit spending threshold** — `PUT /api/settings/credit-spending-threshold`
+  with a positive rupee amount (up to two decimals) or `null` to disable. The
+  dashboard CC Usage card reads the saved value from `GET /api/settings`.
+
 ## Lent page
 
 Nav item: **Lent** (`/lents`). A separate ledger for money lent to other people
@@ -160,6 +213,23 @@ Nav item: **Lent** (`/lents`). A separate ledger for money lent to other people
 List defaults to **open** loans. The detail page hides the repayment form when
 the lent is settled. API wrappers are in `src/api/lents.ts`; React Query keys
 are prefixed with `["lents", …]`.
+
+## Chit funds page
+
+Nav item: **Chit funds** (`/chits`). Tracks chit-fund subscriptions separately
+from the main ledger — installments do **not** feed Dashboard, Record, CSV
+export, or insights.
+
+| Route | Purpose |
+|-------|---------|
+| `/chits` | List schemes with active/completed status and total paid |
+| `/chits/new` | Create a new chit |
+| `/chits/:id` | View installments, add payments, link to edit |
+| `/chits/:id/edit` | Update name, organizer, chit value; structural fields locked after first installment |
+| `/chits/:id/installments/new` | Record an installment payment |
+
+API wrappers are in `src/api/chits.ts`; helpers in `src/lib/chits.ts`. React
+Query keys are prefixed with `["chits", …]`.
 
 ## Import / Export page
 
@@ -211,6 +281,18 @@ React Query keys are prefixed with `["categories", …]`; mutations invalidate t
   silent refresh on 401 via `/api/auth/refresh`.
 - `src/api/ledger.ts` — typed wrappers for all ledger endpoints.
 - `src/api/auth.ts` — signup, login, logout.
+
+## Testing
+
+Unit and component tests use **Vitest** with **Testing Library** (`jsdom`).
+
+```bash
+npm test              # vitest run (from frontend/)
+```
+
+Config: `vitest.config.ts`; setup: `src/test/setup.ts` (jest-dom matchers +
+RTL cleanup). Tests live beside source as `*.test.ts` / `*.test.tsx`. Playwright
+is installed for e2e but is separate from `npm test`.
 
 ## PWA
 

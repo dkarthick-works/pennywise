@@ -57,7 +57,7 @@ Health check: `GET /health` (also used by the container `HEALTHCHECK`).
 
 ```
 backend/              Go API, migrations, sqlc queries, dev Postgres compose
-frontend/             React SPA (Record, Dashboard, Insights, Categories, Settings, Profile)
+frontend/             React SPA (Record, Dashboard, Lent, Chits, Insights, Categories, Settings, Profile)
 auth-api-spec.json    Goauth OpenAPI spec (signup, login, refresh, …)
 Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine runtime
 ```
@@ -65,7 +65,7 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
 ## Recent features (see sub-READMEs for detail)
 
 - **Record page** — default landing route; per-section status filter; daily rows grouped by date;
-  transaction-name autocomplete on Daily/Income quick-add
+  transaction-name autocomplete on Daily/Income quick-add; **Copy last month** on Income/Essential/Flexible
   ([frontend/README.md § Record page](frontend/README.md))
 - **Lent tracker** — standalone ledger for money lent to others with repayment history
   ([frontend/README.md § Lent page](frontend/README.md),
@@ -76,8 +76,12 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
 - **Category mapping** — map transaction labels to high-level groups for dashboard rollups
   ([frontend/README.md § Categories page](frontend/README.md),
   [backend/README.md § Category groups](backend/README.md))
-- **Credit card usage** — monthly credit spend hero card with calendar-month and statement-cycle views
-  ([frontend/README.md § Dashboard page](frontend/README.md))
+- **Credit card usage** — calendar-month and statement-cycle spend with optional per-period threshold
+  ([frontend/README.md § Dashboard page](frontend/README.md),
+  [frontend/README.md § Settings page](frontend/README.md))
+- **Chit funds** — isolated chit-fund subscriptions with installment tracking
+  ([frontend/README.md § Chit funds page](frontend/README.md),
+  [backend/README.md § Chits](backend/README.md))
 - **Insights** — emergency fund targets from essential spend lookback
   ([backend/README.md § Insights](backend/README.md))
 - **PWA** — installable, offline-capable app shell with safe cache headers on deploy
