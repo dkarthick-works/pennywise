@@ -70,6 +70,8 @@ type Querier interface {
 	ListTransactionsByDateRange(ctx context.Context, arg ListTransactionsByDateRangeParams) ([]Transaction, error)
 	ListTransactionsByGroupForMonth(ctx context.Context, arg ListTransactionsByGroupForMonthParams) ([]Transaction, error)
 	ListTransactionsByMonth(ctx context.Context, arg ListTransactionsByMonthParams) ([]Transaction, error)
+	// Record open-month UI: newest activity first. Public month list stays chronological.
+	ListTransactionsByMonthRecent(ctx context.Context, arg ListTransactionsByMonthRecentParams) ([]Transaction, error)
 	ListTransactionsByMonthSection(ctx context.Context, arg ListTransactionsByMonthSectionParams) ([]Transaction, error)
 	ListTransactionsByYear(ctx context.Context, arg ListTransactionsByYearParams) ([]Transaction, error)
 	ListUnmappedCategoryTexts(ctx context.Context, userID uuid.UUID) ([]string, error)

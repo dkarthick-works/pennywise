@@ -253,6 +253,29 @@ func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		params.Kind = db.TxnKind(*patch.Kind)
 	}
 
+	fieldsUnchanged := params.Section == cur.Section &&
+		params.Category == cur.Category &&
+		numToFloat(params.Amount) == numToFloat(cur.Amount) &&
+		dateToString(params.TxnDate) == dateToString(cur.TxnDate) &&
+		params.Kind == cur.Kind
+
+	if fieldsUnchanged && patch.Settles == nil {
+		// No-op PATCH: preserve updated_at so Record recent-order does not jump.
+		writeJSON(w, http.StatusOK, settlementDTO(s, r.Context(), cur))
+		return
+	}
+	if fieldsUnchanged && patch.Settles != nil {
+		curLinks, err := s.q.ListLinksForSettlement(r.Context(), cur.ID)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, "could not update transaction")
+			return
+		}
+		if settleIDSetsEqual(uuidsToStrings(curLinks), *patch.Settles) {
+			writeJSON(w, http.StatusOK, settlementDTO(s, r.Context(), cur))
+			return
+		}
+	}
+
 	tx, err := s.pool.Begin(r.Context())
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not update transaction")
@@ -285,12 +308,7 @@ func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	dto := txnToDTO(updated)
-	if updated.Kind == db.TxnKindSettlement {
-		ids, _ := s.q.ListLinksForSettlement(r.Context(), updated.ID)
-		dto.Settles = uuidsToStrings(ids)
-	}
-	writeJSON(w, http.StatusOK, dto)
+	writeJSON(w, http.StatusOK, settlementDTO(s, r.Context(), updated))
 }
 
 func (s *Server) handleDeleteTransaction(w http.ResponseWriter, r *http.Request) {
@@ -357,6 +375,31 @@ func (s *Server) handleIncomeSuggestions(w http.ResponseWriter, r *http.Request)
 }
 
 // ---- helpers --------------------------------------------------------------
+
+func settlementDTO(s *Server, ctx context.Context, t db.Transaction) TransactionDTO {
+	dto := txnToDTO(t)
+	if t.Kind == db.TxnKindSettlement {
+		ids, _ := s.q.ListLinksForSettlement(ctx, t.ID)
+		dto.Settles = uuidsToStrings(ids)
+	}
+	return dto
+}
+
+func settleIDSetsEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := make(map[string]struct{}, len(a))
+	for _, id := range a {
+		seen[id] = struct{}{}
+	}
+	for _, id := range b {
+		if _, ok := seen[id]; !ok {
+			return false
+		}
+	}
+	return true
+}
 
 func replaceLinks(ctx context.Context, q *db.Queries, settlementID uuid.UUID, creditIDs []string) error {
 	if err := q.DeleteSettlementLinks(ctx, settlementID); err != nil {

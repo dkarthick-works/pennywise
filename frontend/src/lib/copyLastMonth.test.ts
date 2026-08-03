@@ -214,6 +214,34 @@ describe("buildCopyLastMonthPlan — fill vs insert", () => {
     expect(p.inserts[0].amount).toBe(12);
   });
 
+  it("duplicate categories: first source row in API order fills; later source inserts", () => {
+    const p = plan({
+      section: "essential",
+      sourceTxns: [
+        txn({ id: "src-first", section: "essential", category: "Rent", amount: 100, date: "2026-06-03" }),
+        txn({ id: "src-second", section: "essential", category: "Rent", amount: 200, date: "2026-06-10" }),
+      ],
+      currentTxns: [txn({ id: "zero", section: "essential", category: "Rent", amount: 0, kind: "cash" })],
+    });
+    expect(p.fills).toEqual([
+      { id: "zero", patch: { date: "2026-07-03", amount: 100, kind: "cash", category: "Rent" } },
+    ]);
+    expect(p.inserts).toEqual([
+      { date: "2026-07-10", section: "essential", category: "Rent", amount: 200, kind: "cash" },
+    ]);
+
+    const reversed = plan({
+      section: "essential",
+      sourceTxns: [
+        txn({ id: "src-second", section: "essential", category: "Rent", amount: 200, date: "2026-06-10" }),
+        txn({ id: "src-first", section: "essential", category: "Rent", amount: 100, date: "2026-06-03" }),
+      ],
+      currentTxns: [txn({ id: "zero", section: "essential", category: "Rent", amount: 0, kind: "cash" })],
+    });
+    expect(reversed.fills[0].patch.amount).toBe(200);
+    expect(reversed.inserts[0].amount).toBe(100);
+  });
+
   it("income never fills — always inserts", () => {
     const p = plan({
       section: "income",

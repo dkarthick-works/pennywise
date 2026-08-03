@@ -3,6 +3,12 @@ SELECT * FROM transactions
 WHERE user_id = $1 AND to_char(txn_date, 'YYYY-MM') = sqlc.arg(month)::text
 ORDER BY txn_date, created_at;
 
+-- name: ListTransactionsByMonthRecent :many
+-- Record open-month UI: newest activity first. Public month list stays chronological.
+SELECT * FROM transactions
+WHERE user_id = $1 AND to_char(txn_date, 'YYYY-MM') = sqlc.arg(month)::text
+ORDER BY updated_at DESC, txn_date DESC, id DESC;
+
 -- name: ListTransactionsByMonthSection :many
 SELECT * FROM transactions
 WHERE user_id = $1

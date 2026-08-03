@@ -397,6 +397,48 @@ func (q *Queries) ListTransactionsByMonth(ctx context.Context, arg ListTransacti
 	return items, nil
 }
 
+const listTransactionsByMonthRecent = `-- name: ListTransactionsByMonthRecent :many
+SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at FROM transactions
+WHERE user_id = $1 AND to_char(txn_date, 'YYYY-MM') = $2::text
+ORDER BY updated_at DESC, txn_date DESC, id DESC
+`
+
+type ListTransactionsByMonthRecentParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	Month  string    `json:"month"`
+}
+
+// Record open-month UI: newest activity first. Public month list stays chronological.
+func (q *Queries) ListTransactionsByMonthRecent(ctx context.Context, arg ListTransactionsByMonthRecentParams) ([]Transaction, error) {
+	rows, err := q.db.Query(ctx, listTransactionsByMonthRecent, arg.UserID, arg.Month)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Transaction
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Section,
+			&i.Category,
+			&i.Amount,
+			&i.TxnDate,
+			&i.Kind,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTransactionsByMonthSection = `-- name: ListTransactionsByMonthSection :many
 SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at FROM transactions
 WHERE user_id = $1

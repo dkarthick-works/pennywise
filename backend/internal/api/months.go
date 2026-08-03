@@ -107,7 +107,7 @@ func (s *Server) handleOpenMonth(w http.ResponseWriter, r *http.Request) {
 	if st, err := s.q.GetMonthState(ctx, db.GetMonthStateParams{UserID: uid, Month: month}); err == nil {
 		closed = st.Closed
 	}
-	txns, err := s.q.ListTransactionsByMonth(ctx, db.ListTransactionsByMonthParams{UserID: uid, Month: month})
+	txns, err := s.q.ListTransactionsByMonthRecent(ctx, db.ListTransactionsByMonthRecentParams{UserID: uid, Month: month})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not load month")
 		return

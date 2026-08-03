@@ -26,6 +26,7 @@ import {
   IconChevL, IconChevR, IconChevD, IconPlus, IconX, IconCheck, IconLock, IconArrowR, IconDownload,
 } from "../components/ui/Icons";
 import type { Transaction, Section, Budgets } from "../types";
+import { preserveApiRowOrder, sortRowsByDateDesc } from "../lib/recordRowOrder";
 
 // ─── Month dropdown ───────────────────────────────────────────────────────
 
@@ -310,9 +311,10 @@ function EssentialTile({ rows, section, month, settledSet, templates, onCopyPend
   const { upd, del, add } = useRowMutations(month, section);
   const [statusFilter, setStatusFilter] = useState<Set<StatusDisplay>>(new Set());
   const statusOptions = useMemo(() => availableStatuses(rows, settledSet), [rows, settledSet]);
+  const ordered = useMemo(() => preserveApiRowOrder(rows), [rows]);
   const visible = useMemo(
-    () => rows.filter((r) => matchesStatusFilter(r, statusFilter, settledSet)),
-    [rows, statusFilter, settledSet]
+    () => ordered.filter((r) => matchesStatusFilter(r, statusFilter, settledSet)),
+    [ordered, statusFilter, settledSet]
   );
 
   // Labels in templates that don't yet have a matching row in this section.
@@ -411,9 +413,10 @@ function FlexibleTile({ rows, section, month, settledSet, templates, onCopyPendi
   const { upd, del, add } = useRowMutations(month, section);
   const [statusFilter, setStatusFilter] = useState<Set<StatusDisplay>>(new Set());
   const statusOptions = useMemo(() => availableStatuses(rows, settledSet), [rows, settledSet]);
+  const ordered = useMemo(() => preserveApiRowOrder(rows), [rows]);
   const visible = useMemo(
-    () => rows.filter((r) => matchesStatusFilter(r, statusFilter, settledSet)),
-    [rows, statusFilter, settledSet]
+    () => ordered.filter((r) => matchesStatusFilter(r, statusFilter, settledSet)),
+    [ordered, statusFilter, settledSet]
   );
 
   const existingCats = new Set(rows.map((r) => r.category));
@@ -557,10 +560,7 @@ function DailyTile({ rows, section, month, settledSet }: {
   const blank = { date: defaultDraftDate(month, rows.map((r) => r.date)), category: "", amount: 0 };
   const [draft, setDraft] = useState(blank);
 
-  const sorted = useMemo(
-    () => [...rows].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)),
-    [rows]
-  );
+  const sorted = useMemo(() => sortRowsByDateDesc(rows), [rows]);
   const visible = useMemo(
     () => sorted.filter((r) => matchesStatusFilter(r, statusFilter, settledSet)),
     [sorted, statusFilter, settledSet]
@@ -683,7 +683,7 @@ function IncomeTile({ rows, month, onCopyPendingChange }: {
   const blank = { date: defaultDraftDate(month, rows.map((r) => r.date)), category: "", amount: 0 };
   const [draft, setDraft] = useState(blank);
 
-  const sorted = [...rows].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const sorted = sortRowsByDateDesc(rows);
 
   function commit() {
     if (!draft.category.trim() || !draft.amount) return;
