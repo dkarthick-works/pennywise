@@ -35,6 +35,7 @@
   --c-essential: oklch(0.55 0.100 265);  /* indigo  */
   --c-flexible:  oklch(0.62 0.090 210);  /* sky-blue */
   --c-daily:     oklch(0.65 0.085 240);  /* blue    */
+  --c-daily-soft: oklch(0.95 0.03 240);  /* daily soft fill */
 
   /* shape / spacing */
   --r-lg: 18px; --r-md: 13px; --r-sm: 9px;

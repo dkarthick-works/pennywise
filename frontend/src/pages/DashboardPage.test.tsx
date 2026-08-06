@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { DashboardPage } from "./DashboardPage";
@@ -195,5 +195,116 @@ describe("Dashboard credit spending threshold marker", () => {
     expect(card.queryByText(/over/)).not.toBeInTheDocument();
     const bars = card.getAllByRole("progressbar");
     expect(bars[1]).toHaveAttribute("aria-valuenow", "100");
+  });
+});
+
+describe("Dashboard daily spend by day", () => {
+  beforeEach(() => {
+    mocks.getCreditUsage.mockResolvedValue(unconfigured);
+  });
+
+  async function dailyCard(): Promise<HTMLElement> {
+    return (await screen.findByTestId("daily-spend-by-day")) as HTMLElement;
+  }
+
+  it("shows the card on monthly view with header total matching series", async () => {
+    mocks.getTxnsByMonth.mockResolvedValue([
+      { id: "1", section: "daily", category: "Food", amount: 100, date: "2026-07-03", kind: "cash" },
+      { id: "2", section: "daily", category: "Cab", amount: 50, date: "2026-07-03", kind: "credit" },
+      { id: "3", section: "daily", category: "Pay", amount: 999, date: "2026-07-04", kind: "settlement" },
+      { id: "4", section: "essential", category: "Rent", amount: 200, date: "2026-07-05", kind: "cash" },
+    ]);
+    renderDashboard();
+
+    const cardEl = await dailyCard();
+    const card = within(cardEl);
+    await waitFor(() => {
+      expect(card.getByRole("group", { name: /Daily spend by day for July 2026/ })).toBeInTheDocument();
+    });
+    expect(card.getByRole("heading", { name: /Daily spend by day/ })).toHaveTextContent("July 2026");
+    // Header total = cash+credit daily only (scoped to this card)
+    expect(card.getByText("₹150")).toBeInTheDocument();
+    expect(card.getByRole("group").querySelectorAll("g[aria-label]")).toHaveLength(31);
+  });
+
+  it("hides the card on yearly view", async () => {
+    mocks.getTxnsByMonth.mockResolvedValue([]);
+    renderDashboard();
+    expect(await screen.findByTestId("daily-spend-by-day")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Yearly/i }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("daily-spend-by-day")).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows skeleton while pending — not ₹0", async () => {
+    let resolve!: (v: unknown[]) => void;
+    mocks.getTxnsByMonth.mockReturnValue(new Promise((r) => { resolve = r; }));
+    renderDashboard();
+
+    const cardEl = await dailyCard();
+    const card = within(cardEl);
+    expect(cardEl.querySelector('[aria-busy="true"]')).toBeTruthy();
+    expect(card.queryByText("₹0")).not.toBeInTheDocument();
+    expect(card.queryByRole("group")).not.toBeInTheDocument();
+
+    resolve([]);
+    await waitFor(() => {
+      expect(card.queryByRole("group", { name: /Daily spend by day/ })).toBeInTheDocument();
+    });
+    // Empty successful month may show ₹0 in header — that's fine after success
+    expect(card.getByText("₹0")).toBeInTheDocument();
+  });
+
+  it("shows error + retry without zero series", async () => {
+    mocks.getTxnsByMonth.mockRejectedValue(new Error("network"));
+    renderDashboard();
+
+    const card = within(await dailyCard());
+    expect(await card.findByText(/Could not load daily spend/i)).toBeInTheDocument();
+    expect(card.getByRole("button", { name: /Retry/i })).toBeInTheDocument();
+    expect(card.queryByRole("group")).not.toBeInTheDocument();
+    expect(card.queryByText("₹0")).not.toBeInTheDocument();
+  });
+
+  it("highlights today only for the current month", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 6, 15)); // 15 Jul 2026 local
+
+    mocks.getTxnsByMonth.mockResolvedValue([]);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/dashboard"]}>
+          <DashboardPage month="2026-07" setMonth={() => {}} />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    let card = within(await dailyCard());
+    await waitFor(() => expect(card.getByRole("group")).toBeInTheDocument());
+    const julyToday = Array.from(card.getByRole("group").querySelectorAll("g[aria-label]")).find((g) =>
+      g.getAttribute("aria-label")?.startsWith("15 Jul")
+    );
+    expect(julyToday?.querySelector("rect[rx]")?.getAttribute("fill")).toBe("var(--c-daily)");
+
+    rerender(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/dashboard"]}>
+          <DashboardPage month="2026-06" setMonth={() => {}} />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    card = within(await dailyCard());
+    await waitFor(() => expect(card.getByText(/June 2026/)).toBeInTheDocument());
+    await waitFor(() => expect(card.getByRole("group")).toBeInTheDocument());
+    const bars = card.getByRole("group").querySelectorAll("rect[rx]");
+    for (const bar of bars) {
+      expect(bar.getAttribute("fill")).toBe("var(--c-daily-soft)");
+    }
+
+    vi.useRealTimers();
   });
 });

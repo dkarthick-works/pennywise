@@ -54,6 +54,15 @@ export function currentMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Local calendar date as YYYY-MM-DD — never use toISOString() for this. */
+export function currentDate(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 /** Latest date among entries, or today-in-month when the table is empty. */
 export function defaultDraftDate(month: string, dates: string[]): string {
   if (dates.length > 0) return dates.reduce((a, b) => (a > b ? a : b));

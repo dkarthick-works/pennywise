@@ -1,5 +1,8 @@
 // SVG charts — port of charts.jsx
+import { useState } from "react";
 import { inr, inrShort } from "../../lib/money";
+import { prettyDate } from "../../lib/dates";
+import type { DailySpendDay } from "../../lib/txns";
 
 // ─── Donut ────────────────────────────────────────────────────────────────
 
@@ -118,6 +121,136 @@ export function YearBars({ data, height = 200, accent = "var(--accent)", highlig
         );
       })}
     </svg>
+  );
+}
+
+// ─── DayBars ──────────────────────────────────────────────────────────────
+// Daily spend per calendar day. Soft/solid daily-blue fills (not accent).
+// Sparse x labels; full-column hit targets; custom tooltip (pointer/focus/touch).
+
+interface DayBarsProps {
+  data: DailySpendDay[];
+  height?: number;
+  highlight?: string; // YYYY-MM-DD
+  ariaLabel?: string;
+}
+
+function sparseDayLabels(lastDay: number): Set<number> {
+  return new Set([1, 5, 10, 15, 20, 25, lastDay]);
+}
+
+export function DayBars({ data, height = 170, highlight, ariaLabel }: DayBarsProps) {
+  const [tip, setTip] = useState<{ date: string; value: number; x: number; y: number } | null>(null);
+  const max = Math.max(...data.map((d) => Math.max(0, d.value)), 1);
+  const W = 640, padL = 8, padR = 8, padB = 26, padT = 14;
+  const innerW = W - padL - padR;
+  const n = Math.max(data.length, 1);
+  const bw = innerW / n;
+  const barW = Math.min(14, bw * 0.62);
+  const innerH = height - padB - padT;
+  const lastDay = data.length > 0 ? data[data.length - 1].day : 0;
+  const sparse = sparseDayLabels(lastDay);
+  const groupLabel = ariaLabel ?? "Daily spend by day";
+
+  function showTip(d: DailySpendDay, i: number) {
+    const x = padL + i * bw + bw / 2;
+    setTip({ date: d.date, value: d.value, x, y: padT + 8 });
+  }
+
+  function hideTip() {
+    setTip(null);
+  }
+
+  return (
+    <div style={{ position: "relative", width: "100%", minHeight: height }}>
+      <svg
+        width="100%"
+        viewBox={`0 0 ${W} ${height}`}
+        preserveAspectRatio="none"
+        role="group"
+        aria-label={groupLabel}
+        style={{ display: "block", overflow: "visible", minHeight: height }}
+        onMouseLeave={hideTip}
+      >
+        {[0.25, 0.5, 0.75, 1].map((g, i) => (
+          <line
+            key={i} x1={padL} x2={W - padR}
+            y1={padT + innerH * (1 - g)} y2={padT + innerH * (1 - g)}
+            stroke="var(--border-2)" strokeWidth="1" strokeDasharray="2 4"
+          />
+        ))}
+        {data.map((d, i) => {
+          const rawH = (Math.max(0, d.value) / max) * innerH;
+          const h = Math.max(rawH, 1);
+          const x = padL + i * bw + (bw - barW) / 2;
+          const y = padT + innerH - h;
+          const isHi = highlight === d.date;
+          const tipText = `${prettyDate(d.date)} · ${inr(d.value)}`;
+          const colX = padL + i * bw;
+          return (
+            <g
+              key={d.date}
+              tabIndex={0}
+              aria-label={tipText}
+              style={{ outline: "none" }}
+              onMouseEnter={() => showTip(d, i)}
+              onFocus={() => showTip(d, i)}
+              onBlur={hideTip}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                showTip(d, i);
+              }}
+            >
+              {/* Full-column hit target for zero / short bars */}
+              <rect
+                x={colX} y={padT} width={bw} height={innerH}
+                fill="transparent"
+              />
+              <rect
+                x={x} y={y} width={barW} height={h} rx="3"
+                fill={isHi ? "var(--c-daily)" : "var(--c-daily-soft)"}
+                stroke={isHi ? "none" : "var(--c-daily)"} strokeOpacity="0.35"
+                style={{ transition: "y .5s cubic-bezier(.4,0,.2,1), height .5s cubic-bezier(.4,0,.2,1)" }}
+                pointerEvents="none"
+              >
+                <title>{tipText}</title>
+              </rect>
+              {sparse.has(d.day) && (
+                <text
+                  x={colX + bw / 2} y={height - 8} textAnchor="middle"
+                  style={{ fontSize: 10, fontWeight: 600, fill: isHi ? "var(--ink)" : "var(--ink-3)" }}
+                  pointerEvents="none"
+                >
+                  {d.day}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      {tip && (
+        <div
+          role="tooltip"
+          style={{
+            position: "absolute",
+            left: `${(tip.x / W) * 100}%`,
+            top: 4,
+            transform: "translateX(-50%)",
+            background: "var(--ink)",
+            color: "var(--surface)",
+            fontSize: 12,
+            fontWeight: 600,
+            padding: "4px 8px",
+            borderRadius: 6,
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+            zIndex: 2,
+          }}
+        >
+          {prettyDate(tip.date)} · {inr(tip.value)}
+        </div>
+      )}
+    </div>
   );
 }
 

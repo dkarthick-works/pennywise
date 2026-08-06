@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { getDashboardMonthly, getGroupSpend, getTxnsByMonth, getTxnsByYear, getSettings, getCreditUsage, creditUsageKeys } from "../api/ledger";
-import { sectionSums } from "../lib/txns";
+import { sectionSums, dailySpendByDay } from "../lib/txns";
 import { inr, inrShort, budgetColor, money2 } from "../lib/money";
-import { monthLabel, shiftMonth, prettyDate, MONTH_NAMES } from "../lib/dates";
+import { monthLabel, shiftMonth, prettyDate, MONTH_NAMES, currentMonth, currentDate } from "../lib/dates";
 import type { CreditUsageSummary } from "../types";
-import { Donut, YearBars } from "../components/charts/Charts";
+import { Donut, YearBars, DayBars } from "../components/charts/Charts";
 import { IconChevL, IconChevR, IconWallet, IconTrend, IconCreditCard } from "../components/ui/Icons";
 
 const SECMETA = {
@@ -244,11 +244,15 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
     queryFn: getSettings,
   });
 
-  const { data: monthTxns = [] } = useQuery({
+  const monthTxnsQuery = useQuery({
     queryKey: ["txns", "month", month],
     queryFn: () => getTxnsByMonth(month),
     enabled: view === "monthly",
   });
+  const monthTxns = monthTxnsQuery.data ?? [];
+  const monthTxnsPending = monthTxnsQuery.isPending;
+  const monthTxnsShowError = monthTxnsQuery.isError && monthTxnsQuery.data === undefined;
+  const monthTxnsReady = monthTxnsQuery.data !== undefined;
 
   const { data: dashboardMonthly } = useQuery({
     queryKey: ["dashboard", "monthly", month],
@@ -314,6 +318,10 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
   // ---- monthly computations ----
   const incBy  = sectionSums(monthTxns, month, "incurred");
   const spentIncurred = incBy.essential + incBy.flexible + incBy.daily;
+  const dailyByDay = monthTxnsReady ? dailySpendByDay(monthTxns, month) : [];
+  const dailyByDayTotal = dailyByDay.reduce((s, d) => s + d.value, 0);
+  const todayKey = currentDate();
+  const dayHighlight = month === currentMonth() ? todayKey : undefined;
 
   const sectionCards = (["essential", "flexible", "daily"] as const).map((k) => {
     const spent  = incBy[k];
@@ -501,6 +509,47 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
               refetch={() => creditUsageQuery.refetch()}
               threshold={settings?.credit_spending_threshold ?? null}
             />
+          </div>
+
+          {/* Daily spend by day */}
+          <div className="card card-pad" data-testid="daily-spend-by-day">
+            {monthTxnsPending ? (
+              <div aria-busy="true">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
+                  <h3 className="card-h" style={{ margin: 0 }}>Daily spend by day · {monthLabel(month)}</h3>
+                </div>
+                <div
+                  style={{
+                    height: 170,
+                    borderRadius: 10,
+                    background: "var(--surface-2)",
+                    border: "1px solid var(--border-2)",
+                  }}
+                />
+              </div>
+            ) : monthTxnsShowError ? (
+              <div>
+                <h3 className="card-h" style={{ margin: "0 0 10px" }}>Daily spend by day · {monthLabel(month)}</h3>
+                <p className="muted" style={{ fontSize: 13, margin: "0 0 12px" }}>Could not load daily spend for this month.</p>
+                <button type="button" className="btn btn-soft" onClick={() => monthTxnsQuery.refetch()}>
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
+                  <h3 className="card-h" style={{ margin: 0 }}>Daily spend by day · {monthLabel(month)}</h3>
+                  <span className="num" style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", flex: "none", whiteSpace: "nowrap" }}>
+                    {inr(dailyByDayTotal)}
+                  </span>
+                </div>
+                <DayBars
+                  data={dailyByDay}
+                  highlight={dayHighlight}
+                  ariaLabel={`Daily spend by day for ${monthLabel(month)}, total ${inr(dailyByDayTotal)}, ${dailyByDay.length} days`}
+                />
+              </>
+            )}
           </div>
 
           {/* section cards */}
