@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import type { Transaction, TxnKind, Section } from "../types";
-import { dailySpendByDay, sectionSums } from "./txns";
+import { dailySpendByDay, dailySpendAverage, sectionSums } from "./txns";
+import { inr } from "./money";
 
 function txn(partial: {
   id?: string;
@@ -134,5 +135,109 @@ describe("dailySpendByDay", () => {
     const total = series.reduce((s, d) => s + d.value, 0);
     expect(total).toBe(sectionSums(txns, "2026-07", "incurred").daily);
     expect(total).toBe(158.5);
+  });
+});
+
+describe("dailySpendAverage", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("uses full series and calendar days for a past month", () => {
+    const series = dailySpendByDay(
+      [
+        txn({ amount: 310, date: "2026-07-01" }),
+        txn({ amount: 310, date: "2026-07-15", id: "t2" }),
+      ],
+      "2026-07"
+    );
+    const result = dailySpendAverage(series, "2026-07", "2026-08-07");
+    expect(result.soFar).toBe(false);
+    expect(result.divisor).toBe(31);
+    expect(result.numerator).toBe(620);
+    expect(result.avg).toBeCloseTo(620 / 31, 10);
+  });
+
+  it("uses full series and calendar days for a future selected month", () => {
+    const series = dailySpendByDay(
+      [txn({ amount: 900, date: "2026-09-10" })],
+      "2026-09"
+    );
+    const result = dailySpendAverage(series, "2026-09", "2026-08-07");
+    expect(result.soFar).toBe(false);
+    expect(result.divisor).toBe(30);
+    expect(result.numerator).toBe(900);
+    expect(result.avg).toBe(30);
+  });
+
+  it("uses elapsed days and soFar for current mid-month", () => {
+    const series = dailySpendByDay(
+      [txn({ amount: 700, date: "2026-08-02" })],
+      "2026-08"
+    );
+    const result = dailySpendAverage(series, "2026-08", "2026-08-07");
+    expect(result.soFar).toBe(true);
+    expect(result.divisor).toBe(7);
+    expect(result.numerator).toBe(700);
+    expect(result.avg).toBe(100);
+  });
+
+  it("uses divisor 1 on current month day 1", () => {
+    const series = dailySpendByDay(
+      [txn({ amount: 50, date: "2026-08-01" })],
+      "2026-08"
+    );
+    const result = dailySpendAverage(series, "2026-08", "2026-08-01");
+    expect(result.soFar).toBe(true);
+    expect(result.divisor).toBe(1);
+    expect(result.numerator).toBe(50);
+    expect(result.avg).toBe(50);
+  });
+
+  it("excludes future-dated spend from current-month numerator", () => {
+    const series = dailySpendByDay(
+      [
+        txn({ amount: 100, date: "2026-08-03" }),
+        txn({ amount: 3000, date: "2026-08-20", id: "t2" }),
+      ],
+      "2026-08"
+    );
+    const fullTotal = series.reduce((s, d) => s + d.value, 0);
+    expect(fullTotal).toBe(3100);
+
+    const result = dailySpendAverage(series, "2026-08", "2026-08-07");
+    expect(result.soFar).toBe(true);
+    expect(result.numerator).toBe(100);
+    expect(result.divisor).toBe(7);
+    expect(result.avg).toBeCloseTo(100 / 7, 10);
+  });
+
+  it("returns zeros for empty series", () => {
+    expect(dailySpendAverage([], "2026-08", "2026-08-07")).toEqual({
+      avg: 0,
+      numerator: 0,
+      divisor: 0,
+      soFar: false,
+    });
+  });
+
+  it("rounds display with inr for non-integer averages", () => {
+    const series = dailySpendByDay([], "2026-07");
+    // Force numerator/divisor via past-month path with crafted values
+    series[0].value = 100;
+    const result = dailySpendAverage(series, "2026-07", "2026-08-07");
+    // 100/31 ≈ 3.226 → inr rounds to ₹3
+    expect(inr(result.avg)).toBe("₹3");
+
+    // Explicit 100/3 case: build a 3-day series manually
+    const short = [
+      { date: "2026-02-01", day: 1, value: 100 },
+      { date: "2026-02-02", day: 2, value: 0 },
+      { date: "2026-02-03", day: 3, value: 0 },
+    ];
+    // Past Feb relative to Aug → full series / 3
+    const r2 = dailySpendAverage(short, "2026-02", "2026-08-07");
+    expect(r2.avg).toBeCloseTo(100 / 3, 10);
+    expect(inr(r2.avg)).toBe("₹33");
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
@@ -203,11 +203,29 @@ describe("Dashboard daily spend by day", () => {
     mocks.getCreditUsage.mockResolvedValue(unconfigured);
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   async function dailyCard(): Promise<HTMLElement> {
     return (await screen.findByTestId("daily-spend-by-day")) as HTMLElement;
   }
 
+  function renderDashboardMonth(month: string) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/dashboard"]}>
+          <DashboardPage month={month} setMonth={() => {}} />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+  }
+
   it("shows the card on monthly view with header total matching series", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 7, 7)); // 7 Aug 2026 — July is past
+
     mocks.getTxnsByMonth.mockResolvedValue([
       { id: "1", section: "daily", category: "Food", amount: 100, date: "2026-07-03", kind: "cash" },
       { id: "2", section: "daily", category: "Cab", amount: 50, date: "2026-07-03", kind: "credit" },
@@ -224,7 +242,36 @@ describe("Dashboard daily spend by day", () => {
     expect(card.getByRole("heading", { name: /Daily spend by day/ })).toHaveTextContent("July 2026");
     // Header total = cash+credit daily only (scoped to this card)
     expect(card.getByText("₹150")).toBeInTheDocument();
+    // Past month: avg = 150/31 ≈ ₹5, no "so far"
+    expect(card.getByText(/Avg · ₹5\/day/)).toBeInTheDocument();
+    expect(card.queryByText(/so far/)).not.toBeInTheDocument();
+    expect(card.getByRole("group")).toHaveAccessibleName(
+      /total ₹150, average ₹5 per day, 31 days/
+    );
     expect(card.getByRole("group").querySelectorAll("g[aria-label]")).toHaveLength(31);
+  });
+
+  it("shows so far average for the current month and excludes future spend from avg", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 7, 7)); // 7 Aug 2026
+
+    mocks.getTxnsByMonth.mockResolvedValue([
+      { id: "1", section: "daily", category: "Food", amount: 700, date: "2026-08-02", kind: "cash" },
+      { id: "2", section: "daily", category: "Trip", amount: 3000, date: "2026-08-20", kind: "cash" },
+    ]);
+    renderDashboardMonth("2026-08");
+
+    const card = within(await dailyCard());
+    await waitFor(() => {
+      expect(card.getByRole("group")).toBeInTheDocument();
+    });
+    // Full-series total includes future-dated txn
+    expect(card.getByText("₹3,700")).toBeInTheDocument();
+    // Avg numerator through today only: 700/7 = 100
+    expect(card.getByText(/Avg · ₹100\/day · so far/)).toBeInTheDocument();
+    expect(card.getByRole("group")).toHaveAccessibleName(
+      /total ₹3,700, average ₹100 per day so far, 31 days/
+    );
   });
 
   it("hides the card on yearly view", async () => {
@@ -247,6 +294,7 @@ describe("Dashboard daily spend by day", () => {
     const card = within(cardEl);
     expect(cardEl.querySelector('[aria-busy="true"]')).toBeTruthy();
     expect(card.queryByText("₹0")).not.toBeInTheDocument();
+    expect(card.queryByText(/Avg ·/)).not.toBeInTheDocument();
     expect(card.queryByRole("group")).not.toBeInTheDocument();
 
     resolve([]);
@@ -266,6 +314,7 @@ describe("Dashboard daily spend by day", () => {
     expect(card.getByRole("button", { name: /Retry/i })).toBeInTheDocument();
     expect(card.queryByRole("group")).not.toBeInTheDocument();
     expect(card.queryByText("₹0")).not.toBeInTheDocument();
+    expect(card.queryByText(/Avg ·/)).not.toBeInTheDocument();
   });
 
   it("highlights today only for the current month", async () => {
@@ -288,6 +337,7 @@ describe("Dashboard daily spend by day", () => {
       g.getAttribute("aria-label")?.startsWith("15 Jul")
     );
     expect(julyToday?.querySelector("rect[rx]")?.getAttribute("fill")).toBe("var(--c-daily)");
+    expect(card.getByText(/so far/)).toBeInTheDocument();
 
     rerender(
       <QueryClientProvider client={qc}>
@@ -304,7 +354,6 @@ describe("Dashboard daily spend by day", () => {
     for (const bar of bars) {
       expect(bar.getAttribute("fill")).toBe("var(--c-daily-soft)");
     }
-
-    vi.useRealTimers();
+    expect(card.queryByText(/so far/)).not.toBeInTheDocument();
   });
 });

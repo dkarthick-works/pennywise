@@ -66,6 +66,52 @@ export function dailySpendByDay(txns: Transaction[], month: string): DailySpendD
   return out;
 }
 
+export interface DailySpendAverage {
+  avg: number;
+  numerator: number;
+  divisor: number;
+  soFar: boolean;
+}
+
+/**
+ * Average Daily spend per day for the chart header.
+ * Current month: numerator = series through today; divisor = today's day-of-month; soFar=true.
+ * Past/future month: full series sum / series.length; soFar=false.
+ */
+export function dailySpendAverage(
+  series: DailySpendDay[],
+  selectedMonth: string,
+  today: string
+): DailySpendAverage {
+  if (series.length === 0) {
+    return { avg: 0, numerator: 0, divisor: 0, soFar: false };
+  }
+
+  const soFar = today.slice(0, 7) === selectedMonth;
+  if (soFar) {
+    const todayDay = parseInt(today.slice(8, 10), 10);
+    const numerator = series
+      .filter((d) => d.date <= today)
+      .reduce((s, d) => s + d.value, 0);
+    const divisor = Number.isFinite(todayDay) && todayDay > 0 ? todayDay : 0;
+    return {
+      avg: divisor > 0 ? numerator / divisor : 0,
+      numerator,
+      divisor,
+      soFar: true,
+    };
+  }
+
+  const numerator = series.reduce((s, d) => s + d.value, 0);
+  const divisor = series.length;
+  return {
+    avg: divisor > 0 ? numerator / divisor : 0,
+    numerator,
+    divisor,
+    soFar: false,
+  };
+}
+
 export function sectionSums(
   txns: Transaction[],
   month: string,

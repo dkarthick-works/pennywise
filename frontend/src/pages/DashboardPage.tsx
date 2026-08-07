@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { getDashboardMonthly, getGroupSpend, getTxnsByMonth, getTxnsByYear, getSettings, getCreditUsage, creditUsageKeys } from "../api/ledger";
-import { sectionSums, dailySpendByDay } from "../lib/txns";
+import { sectionSums, dailySpendByDay, dailySpendAverage } from "../lib/txns";
 import { inr, inrShort, budgetColor, money2 } from "../lib/money";
 import { monthLabel, shiftMonth, prettyDate, MONTH_NAMES, currentMonth, currentDate } from "../lib/dates";
 import type { CreditUsageSummary } from "../types";
@@ -321,6 +321,9 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
   const dailyByDay = monthTxnsReady ? dailySpendByDay(monthTxns, month) : [];
   const dailyByDayTotal = dailyByDay.reduce((s, d) => s + d.value, 0);
   const todayKey = currentDate();
+  const dailyAvg = monthTxnsReady
+    ? dailySpendAverage(dailyByDay, month, todayKey)
+    : { avg: 0, numerator: 0, divisor: 0, soFar: false };
   const dayHighlight = month === currentMonth() ? todayKey : undefined;
 
   const sectionCards = (["essential", "flexible", "daily"] as const).map((k) => {
@@ -539,14 +542,23 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
               <>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
                   <h3 className="card-h" style={{ margin: 0 }}>Daily spend by day · {monthLabel(month)}</h3>
-                  <span className="num" style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", flex: "none", whiteSpace: "nowrap" }}>
-                    {inr(dailyByDayTotal)}
-                  </span>
+                  <div style={{ flex: "none", textAlign: "right", whiteSpace: "nowrap" }}>
+                    <div className="num" style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>
+                      {inr(dailyByDayTotal)}
+                    </div>
+                    <div className="muted" style={{ fontSize: 12, fontWeight: 600, marginTop: 2 }}>
+                      Avg · {inr(dailyAvg.avg)}/day{dailyAvg.soFar ? " · so far" : ""}
+                    </div>
+                  </div>
                 </div>
                 <DayBars
                   data={dailyByDay}
                   highlight={dayHighlight}
-                  ariaLabel={`Daily spend by day for ${monthLabel(month)}, total ${inr(dailyByDayTotal)}, ${dailyByDay.length} days`}
+                  ariaLabel={
+                    dailyAvg.soFar
+                      ? `Daily spend by day for ${monthLabel(month)}, total ${inr(dailyByDayTotal)}, average ${inr(dailyAvg.avg)} per day so far, ${dailyByDay.length} days`
+                      : `Daily spend by day for ${monthLabel(month)}, total ${inr(dailyByDayTotal)}, average ${inr(dailyAvg.avg)} per day, ${dailyByDay.length} days`
+                  }
                 />
               </>
             )}
