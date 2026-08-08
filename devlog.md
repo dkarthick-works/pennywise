@@ -43,3 +43,43 @@ Shipped an optional credit spending threshold: Settings stores a positive amount
 **Decisions**
 
 Threshold is a soft per-period purchase warning, not a credit limit; null-only disable; same value applied to both windows. Exact decimal write path; Save/Clear (not budget autosave). Compact marker keeps hero row height balanced.
+
+## 2026-07-20
+
+### Session 1
+
+Shipped Copy last month on Income, Essential, and Flexible record tiles. Eligible prior-month rows (non-empty category, amount > 0; income cash-only; essential/flexible cash or credit; settlements skipped) are remapped into the open month with day clamping for short months and leap years. New rows go through the existing atomic import endpoint; matching zero-value cash rows are filled best-effort via updateTxn. Confirm dialog shows fill vs insert counts, aria-live reports success/partial/error, and month navigation locks while the copy is in flight. Daily stays excluded. Committed and pushed to main.
+
+**Decisions**
+
+Frontend-only: atomic inserts via importTransactions plus best-effort fills — overall copy is not end-to-end atomic; partial-fill warns against retry. Zero-row matches are any same-category zero cash row (no seed provenance), case-sensitive after trim.
+
+## 2026-07-21
+
+### Session 1
+
+Shipped isolated Chit funds: own Postgres tables and /api/chits CRUD with installment create/edit/delete, count-based active/completed status, metadata locks after the first installment, and FOR UPDATE cap enforcement. Frontend nav section covers list, create, detail, edit, and add-installment pages so browse surfaces stay read-first. Installments never touch ledger transactions, dashboard, or CSV export. Pushed to main; app-story updated.
+
+**Decisions**
+
+Chits stay off the transaction ledger. Progress is installment_count vs total_installments (no stored status). After the first installment, start_month, expected_monthly, and total_installments lock. Create/edit/add-installment are separate routes; list and detail stay read-first.
+
+## 2026-08-06
+
+### Session 1
+
+Shipped a Daily spend by day bar chart on the monthly Dashboard under the hero cards. Client-side buckets from the existing month-txns query fill every calendar day with Daily cash+credit totals (settlements excluded), with sparse labels, custom tooltips, today highlight, skeleton/error states, and a header total. Tightened incurred kind checks to explicit cash|credit so the chart and Daily section card stay aligned. Committed and pushed to main; app-story updated.
+
+**Decisions**
+
+Future-dated Daily txns stay in the series so the header matches the Daily card. Chart uses shared isIncurredExpenseKind rather than kind !== settlement. Skeleton only on isPending; no fake ₹0 while loading or failed.
+
+## 2026-08-07
+
+### Session 1
+
+Extended the Daily spend by day Dashboard chart with a header average. Past and future months use full-series total over calendar days; the current month averages spend through today over elapsed days and labels it “so far,” so future-dated rows stay in the month total but not the pacing numerator. Added helper tests and Dashboard coverage, then pushed to main; app-story updated.
+
+**Decisions**
+
+Option C pacing: current-month avg caps the numerator at today so “so far” stays honest. Header total remains the full chart series.
