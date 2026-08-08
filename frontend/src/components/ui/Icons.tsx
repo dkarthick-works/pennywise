@@ -161,6 +161,9 @@ export const IconChit = (p: IcProps) => (
     <path d="M12 8v8M9 10.5h4.5a1.5 1.5 0 0 1 0 3H9" />
   </Ic>
 );
+export const IconZap = (p: IcProps) => (
+  <Ic {...p}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></Ic>
+);
 export const IconGithub = ({ size = 18, ...p }: IcProps) => (
   <svg
     className="nav-ic"

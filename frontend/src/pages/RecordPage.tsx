@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, Fragment } from "react";
+import type { ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -26,6 +27,7 @@ import { CopyLastMonthButton } from "../components/record/CopyLastMonthButton";
 import { MonthDropdown } from "../components/record/MonthDropdown";
 import {
   IconChevL, IconChevR, IconPlus, IconX, IconCheck, IconLock, IconArrowR, IconDownload,
+  IconRecord, IconCreditCard, IconTrend, IconWallet, IconZap,
 } from "../components/ui/Icons";
 import type { Transaction, Section, Budgets } from "../types";
 import { preserveApiRowOrder, sortRowsByDateDesc } from "../lib/recordRowOrder";
@@ -67,39 +69,32 @@ function QuickAddTile({ onOpen }: { onOpen: () => void }) {
         minHeight: 168,
         cursor: "pointer",
         transition: ".15s",
-        border: "1.5px solid var(--accent)",
-        background: "var(--accent-soft)",
+        border: "1.5px dashed var(--accent)",
+        background: "var(--surface)",
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLElement).style.boxShadow = "var(--sh-md)";
         (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-        (e.currentTarget as HTMLElement).style.background = "var(--surface)";
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLElement).style.boxShadow = "var(--sh-sm)";
         (e.currentTarget as HTMLElement).style.transform = "none";
-        (e.currentTarget as HTMLElement).style.background = "var(--accent-soft)";
       }}
     >
       <div>
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            marginBottom: 12,
-            padding: "4px 9px",
-            borderRadius: 8,
-            background: "var(--accent)",
-            color: "#fff",
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
-          }}
-        >
-          <IconPlus size={12} style={{ color: "#fff" }} />
-          Fast path
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div
+            style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: "var(--accent)", display: "flex",
+              alignItems: "center", justifyContent: "center", flex: "none",
+            }}
+          >
+            <IconZap size={18} style={{ color: "#fff" }} />
+          </div>
+          <span style={{ fontWeight: 700, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--accent)" }}>
+            Fast path
+          </span>
         </div>
         <div style={{ fontWeight: 700, fontSize: 22, letterSpacing: "-0.03em", lineHeight: 1.15, color: "var(--accent-ink)" }}>
           Log any spend
@@ -111,17 +106,16 @@ function QuickAddTile({ onOpen }: { onOpen: () => void }) {
       <span
         className="btn btn-primary"
         style={{
-          display: "inline-flex",
+          display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 6,
-          width: "auto",
-          alignSelf: "flex-start",
+          alignSelf: "stretch",
           padding: "9px 14px",
           pointerEvents: "none",
         }}
       >
-        Open quick add
+        Quick add
         <IconChevR size={15} style={{ color: "#fff" }} />
       </span>
     </button>
@@ -131,7 +125,8 @@ function QuickAddTile({ onOpen }: { onOpen: () => void }) {
 // ─── Tile overview card ───────────────────────────────────────────────────
 
 interface TileMeta {
-  label: string; color: string; tag: string; unit: string; desc: string;
+  label: string; color: string; iconBg: string; icon: ComponentType<{ size?: number }>;
+  tag: string; unit: string; desc: string;
 }
 function TileCard({ meta, rows, budget, onOpen }: {
   meta: TileMeta; rows: Transaction[]; budget: number; onOpen: () => void;
@@ -150,25 +145,36 @@ function TileCard({ meta, rows, budget, onOpen }: {
       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "var(--sh-sm)"; (e.currentTarget as HTMLElement).style.transform = "none"; }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span className="dot" style={{ background: meta.color, width: 9, height: 9 }} />
-            <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: "-0.01em" }}>{meta.label}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              width: 40, height: 40, borderRadius: 10, flex: "none",
+              background: meta.iconBg, display: "flex",
+              alignItems: "center", justifyContent: "center",
+              color: meta.color,
+            }}
+          >
+            <meta.icon size={18} />
           </div>
-          <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>{meta.tag}</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 16, letterSpacing: "-0.01em" }}>{meta.label}</div>
+            <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>{meta.tag}</div>
+          </div>
         </div>
-        <span className="muted" style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", flex: "none" }}>
-          Open <IconChevR size={14} />
-        </span>
       </div>
       <div className="num" style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.1 }}>{inr(spent)}</div>
       <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
-        incurred of {inr(budget)} · {credits > 0 ? `${credits} on credit` : `${filled} ${meta.unit}`}
+        of {inr(budget)} · {credits > 0 ? `${credits} on credit` : `${filled} ${meta.unit}`}
       </div>
       <div className="bar"><i style={{ width: `${Math.min(ratio * 100, 100)}%`, background: budgetColor(ratio) }} /></div>
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12 }}>
         <span style={{ fontWeight: 600, color: budgetColor(ratio) }}>{Math.round(ratio * 100)}% used</span>
         <span className="muted num">{inr(Math.max(budget - spent, 0))} left</span>
+      </div>
+      <div style={{ marginTop: 14, borderTop: "1px solid var(--border-2)", paddingTop: 10,
+        display: "flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 600,
+        color: "var(--ink-2)", pointerEvents: "none" }}>
+        <span style={{ color: meta.color, display: "flex" }}><meta.icon size={13} /></span> View entries <IconChevR size={13} />
       </div>
     </button>
   );
@@ -732,23 +738,34 @@ function IncomeTileCard({ meta, rows, onOpen }: { meta: TileMeta; rows: Transact
       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "var(--sh-md)"; (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)"; }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "var(--sh-sm)"; (e.currentTarget as HTMLElement).style.transform = "none"; }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span className="dot" style={{ background: meta.color, width: 9, height: 9 }} />
-            <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: "-0.01em" }}>{meta.label}</span>
-          </div>
-          <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>{meta.tag}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <div
+          style={{
+            width: 40, height: 40, borderRadius: 10, flex: "none",
+            background: meta.iconBg, display: "flex",
+            alignItems: "center", justifyContent: "center",
+            color: meta.color,
+          }}
+        >
+          <meta.icon size={18} />
         </div>
-        <span className="muted" style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", flex: "none" }}>
-          Open <IconChevR size={14} />
-        </span>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 16, letterSpacing: "-0.01em" }}>{meta.label}</div>
+          <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>{meta.tag}</div>
+        </div>
       </div>
       <div className="num" style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.1, color: total > 0 ? "var(--pos)" : "var(--ink)" }}>
         {inr(total)}
       </div>
-      <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
+      <div className="muted" style={{ fontSize: 12.5, marginTop: 4, marginBottom: 12 }}>
         received · {rows.length} {rows.length === 1 ? "entry" : "entries"}
+      </div>
+      <div className="bar" style={{ opacity: 0 }} />
+      <div style={{ height: 16, marginTop: 8 }} />
+      <div style={{ marginTop: 14, borderTop: "1px solid var(--border-2)", paddingTop: 10,
+        display: "flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 600,
+        color: "var(--pos)", pointerEvents: "none" }}>
+        <IconTrend size={13} /> Great! Keep tracking <IconChevR size={13} />
       </div>
     </button>
   );
@@ -757,10 +774,10 @@ function IncomeTileCard({ meta, rows, onOpen }: { meta: TileMeta; rows: Transact
 // ─── RecordPage ───────────────────────────────────────────────────────────
 
 const META: Record<Section, TileMeta> = {
-  essential: { label: "Bare Minimum",   color: "var(--c-essential)", tag: "Mandatory monthly spend",   unit: "rows filled", desc: "Rent, savings, EMIs — the non-negotiables. Rows clone into every new month." },
-  flexible:  { label: "Subscriptions",  color: "var(--c-flexible)",  tag: "Recurring flexible spend",  unit: "active",      desc: "Wifi, SaaS, domains. Mark each Cash, Credit, or a Settlement that clears credits." },
-  daily:     { label: "Daily / Running",color: "var(--c-daily)",     tag: "Fast everyday entry",       unit: "entries",     desc: "Friction-free logging. Default is cash — flag Credit or Settlement only when needed." },
-  income:    { label: "Income",         color: "var(--pos)",         tag: "Money coming in",           unit: "entries",     desc: "Log salary, freelance, dividends and any other income. Always recorded as cash received." },
+  essential: { label: "Bare Minimum",   color: "var(--c-essential)", icon: IconRecord,     iconBg: "var(--c-essential-soft, #fff3e0)", tag: "Mandatory monthly spend",   unit: "rows filled", desc: "Rent, savings, EMIs — the non-negotiables. Rows clone into every new month." },
+  flexible:  { label: "Subscriptions",  color: "var(--c-flexible)",  icon: IconCreditCard, iconBg: "var(--c-flexible-soft,  #e8f5e9)", tag: "Recurring flexible spend",  unit: "active",      desc: "Wifi, SaaS, domains. Mark each Cash, Credit, or a Settlement that clears credits." },
+  daily:     { label: "Daily / Running",color: "var(--c-daily)",     icon: IconTrend,      iconBg: "var(--c-daily-soft,     #e3f2fd)", tag: "Fast everyday entry",       unit: "entries",     desc: "Friction-free logging. Default is cash — flag Credit or Settlement only when needed." },
+  income:    { label: "Income",         color: "var(--pos)",         icon: IconWallet,     iconBg: "var(--pos-soft,         #e8f5e9)", tag: "Money coming in",           unit: "entries",     desc: "Log salary, freelance, dividends and any other income. Always recorded as cash received." },
 };
 
 export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {

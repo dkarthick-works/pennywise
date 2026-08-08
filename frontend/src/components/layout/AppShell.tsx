@@ -3,19 +3,21 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { initials } from "../../lib/txns";
 import {
-  IconDashboard, IconRecord, IconLent, IconChit, IconInsights, IconCategories, IconExport, IconSettings, IconProfile, IconMenu,
+  IconDashboard, IconRecord, IconLent, IconChit, IconInsights, IconCategories, IconExport, IconSettings, IconProfile, IconMenu, IconPlus,
 } from "../ui/Icons";
 
-const NAV = [
-  { path: "/record",    label: "Record Expense",  Icon: IconRecord },
-  { path: "/dashboard", label: "Dashboard",        Icon: IconDashboard },
-  { path: "/lents",     label: "Lent",             Icon: IconLent },
-  { path: "/chits",     label: "Chit funds",       Icon: IconChit },
-  { path: "/insights",  label: "Insights",          Icon: IconInsights },
-  { path: "/categories", label: "Map Categories",   Icon: IconCategories },
-  { path: "/export",    label: "Import / Export", Icon: IconExport },
-  { path: "/settings",  label: "Settings",          Icon: IconSettings },
-  { path: "/profile",   label: "Profile",           Icon: IconProfile },
+const NAV_CTA = { path: "/record", label: "Record Expense", Icon: IconPlus };
+const NAV_MAIN = [
+  { path: "/dashboard",  label: "Dashboard",      Icon: IconDashboard },
+  { path: "/lents",      label: "Lent",            Icon: IconLent },
+  { path: "/chits",      label: "Chit funds",      Icon: IconChit },
+  { path: "/insights",   label: "Insights",         Icon: IconInsights },
+  { path: "/categories", label: "Map Categories",  Icon: IconCategories },
+];
+const NAV_TOOLS = [
+  { path: "/export",   label: "Import / Export", Icon: IconExport },
+  { path: "/settings", label: "Settings",         Icon: IconSettings },
+  { path: "/profile",  label: "Profile",          Icon: IconProfile },
 ];
 
 interface Props {
@@ -53,8 +55,25 @@ export function AppShell({ children }: Props) {
         </div>
 
         <nav className="nav">
-          <div className="nav-label">Menu</div>
-          {NAV.map(({ path, label, Icon }) => (
+          <button
+            className={"nav-cta" + (pathname.startsWith(NAV_CTA.path) ? " active" : "")}
+            onClick={() => go(NAV_CTA.path)}
+          >
+            <NAV_CTA.Icon size={17} /> {NAV_CTA.label}
+          </button>
+          <hr className="nav-divider" />
+          {NAV_MAIN.map(({ path, label, Icon }) => (
+            <button
+              key={path}
+              className={"nav-item" + (pathname.startsWith(path) ? " active" : "")}
+              onClick={() => go(path)}
+            >
+              <Icon /> {label}
+            </button>
+          ))}
+          <hr className="nav-divider" />
+          <div className="nav-label" style={{ marginTop: 10 }}>Tools</div>
+          {NAV_TOOLS.map(({ path, label, Icon }) => (
             <button
               key={path}
               className={"nav-item" + (pathname.startsWith(path) ? " active" : "")}

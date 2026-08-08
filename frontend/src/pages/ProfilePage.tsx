@@ -87,6 +87,10 @@ export function ProfilePage() {
       >
         <IconLogout size={16} /> Sign out
       </button>
+
+      <p className="muted" style={{ fontSize: 12, marginTop: 28, textAlign: "center" }}>
+        Pennywise v{__APP_VERSION__}
+      </p>
     </div>
   );
 }
