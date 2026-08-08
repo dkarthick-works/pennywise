@@ -15,5 +15,10 @@ export const transactionNameSuggestionKeys = {
 export function isTransactionNameSuggestionSection(
   section: string
 ): section is TransactionNameSuggestionSection {
-  return section === "daily" || section === "income";
+  return (
+    section === "essential" ||
+    section === "flexible" ||
+    section === "daily" ||
+    section === "income"
+  );
 }

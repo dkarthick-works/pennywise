@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
-import { invalidateCreditCaches, invalidateMonthCaches } from "./monthCaches";
+import {
+  invalidateCreditCaches,
+  invalidateMonthCaches,
+  invalidateTransactionNameSuggestions,
+} from "./monthCaches";
 
 describe("credit cache invalidation", () => {
   it("invalidateCreditCaches targets both credit prefixes across all months/views", () => {
@@ -27,5 +31,19 @@ describe("credit cache invalidation", () => {
     // Credit prefixes (no month) so adjacent statement cycles refresh too.
     expect(keys).toContain(JSON.stringify(["dashboard", "credit-usage"]));
     expect(keys).toContain(JSON.stringify(["dashboard", "credit-transactions"]));
+  });
+});
+
+describe("transaction name suggestion invalidation", () => {
+  it("invalidates essential and flexible suggestion sections", () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+
+    invalidateTransactionNameSuggestions(qc, "essential");
+    invalidateTransactionNameSuggestions(qc, "flexible");
+
+    const keys = spy.mock.calls.map((c) => c[0]?.queryKey);
+    expect(keys).toContainEqual(["transaction-name-suggestions", "essential"]);
+    expect(keys).toContainEqual(["transaction-name-suggestions", "flexible"]);
   });
 });

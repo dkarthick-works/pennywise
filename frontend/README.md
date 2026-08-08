@@ -22,6 +22,7 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | Path | Page | Notes |
 |------|------|-------|
 | `/record` | Record & Expense | **Default landing page** after login (`/` redirects here) |
+| `/record/entry` | Quick add | Cross-section draft-row entry (section/kind cycle chips, sticky date, visit session log) |
 | `/dashboard` | Dashboard | Month/year charts, hero cards, category-group spend |
 | `/dashboard/credits?month=&view=calendar\|billing` | Credit transactions | Drill-down from the Credit Card Usage hero card; month + view carried in the URL |
 | `/dashboard/groups/:groupId` | Category group | Drill-down from a category-group spend card |

@@ -24,12 +24,15 @@ export function AmountInput({
   onEnterCommit,
   placeholder = "—",
   align = "right",
+  /** When true, parse and report to parent on every keystroke (form-style entry). */
+  immediate = false,
 }: {
   value: number;
   onChange: (n: number) => void;
   onEnterCommit?: (parsed: number) => void;
   placeholder?: string;
   align?: string;
+  immediate?: boolean;
 }) {
   const fmt = (n: number) => (n ? n.toLocaleString("en-IN") : "");
   const [local, setLocal] = useState(fmt(value));
@@ -40,10 +43,14 @@ export function AmountInput({
     if (!focused) setLocal(fmt(value));
   }, [value, focused]);
 
+  function parseLocal(raw: string): number {
+    const n = parseInt(raw.replace(/[^0-9]/g, ""), 10);
+    return isNaN(n) ? 0 : n;
+  }
+
   function commit() {
     setFocused(false);
-    const n = parseInt(local.replace(/[^0-9]/g, ""), 10);
-    const parsed = isNaN(n) ? 0 : n;
+    const parsed = parseLocal(local);
     if (parsed !== value) onChange(parsed);
     setLocal(fmt(parsed)); // reformat
   }
@@ -55,13 +62,18 @@ export function AmountInput({
       style={{ textAlign: align as "left" | "right" }}
       value={local}
       placeholder={placeholder}
-      onChange={(e) => setLocal(e.target.value)}
+      onChange={(e) => {
+        const next = e.target.value;
+        setLocal(next);
+        if (immediate) onChange(parseLocal(next));
+      }}
       onFocus={() => setFocused(true)}
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
-          const n = parseInt(local.replace(/[^0-9]/g, ""), 10);
-          const parsed = isNaN(n) ? 0 : n;
+          e.preventDefault();
+          e.stopPropagation();
+          const parsed = parseLocal(local);
           if (parsed !== value) onChange(parsed);
           setLocal(fmt(parsed));
           setFocused(false);
@@ -136,7 +148,8 @@ export function CategoryInput({
   value: string;
   onChange: (v: string) => void;
   onCommit?: (v: string) => void;
-  onSubmit?: () => void;
+  /** Enter commits using the current local value (not a stale parent closure). */
+  onSubmit?: (v: string) => void;
   section: TransactionNameSuggestionSection;
   placeholder?: string;
   autoFocus?: boolean;
@@ -296,7 +309,8 @@ export function CategoryInput({
     }
     if (e.key === "Enter" && onSubmit) {
       e.preventDefault();
-      onSubmit();
+      e.stopPropagation();
+      onSubmit(value);
       return;
     }
     if (e.key === "Escape" && focused && typedSinceFocus) {

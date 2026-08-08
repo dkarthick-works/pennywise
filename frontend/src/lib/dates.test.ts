@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { shiftDateToMonth, shiftMonth } from "./dates";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { shiftDateToMonth, shiftMonth, defaultDraftDate } from "./dates";
 
 describe("shiftDateToMonth", () => {
   it("keeps a valid day unchanged", () => {
@@ -30,5 +30,27 @@ describe("shiftDateToMonth", () => {
     // Viewing January 2026, the previous month is December 2025.
     expect(shiftMonth("2026-01", -1)).toBe("2025-12");
     expect(shiftDateToMonth("2025-12-31", "2026-01")).toBe("2026-01-31");
+  });
+});
+
+describe("defaultDraftDate", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns the latest date in the month", () => {
+    expect(
+      defaultDraftDate("2026-08", ["2026-08-01", "2026-08-07", "2026-08-03"])
+    ).toBe("2026-08-07");
+  });
+
+  it("clamps today into a short month when the table is empty", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 31)); // 31 Jan local
+    expect(defaultDraftDate("2026-02", [])).toBe("2026-02-28");
+  });
+
+  it("shifts an out-of-month latest date into the target month", () => {
+    expect(defaultDraftDate("2026-02", ["2026-01-31"])).toBe("2026-02-28");
   });
 });

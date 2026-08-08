@@ -189,7 +189,8 @@ export interface CategoryMapping {
 
 // ─── Transaction name suggestions ─────────────────────────────────────────
 
-export type TransactionNameSuggestionSection = "daily" | "income";
+/** All ledger sections learn/suggest names (backend already supports all four). */
+export type TransactionNameSuggestionSection = Section;
 
 export interface TransactionNameSuggestion {
   name: string;

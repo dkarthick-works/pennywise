@@ -63,9 +63,17 @@ export function currentDate(): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Latest date among entries, or today-in-month when the table is empty. */
+/** Latest date among entries, or today-in-month when the table is empty.
+ *  Always returns a valid calendar day in `month` (clamps month-end overflow). */
 export function defaultDraftDate(month: string, dates: string[]): string {
-  if (dates.length > 0) return dates.reduce((a, b) => (a > b ? a : b));
+  if (dates.length > 0) {
+    const latest = dates.reduce((a, b) => (a > b ? a : b));
+    return monthKey(latest) === month ? latest : shiftDateToMonth(latest, month);
+  }
   const today = new Date();
-  return `${month}-${String(today.getDate()).padStart(2, "0")}`.slice(0, 10);
+  const day = today.getDate();
+  const [y, m] = month.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const clamped = Math.min(day, lastDay);
+  return `${month}-${String(clamped).padStart(2, "0")}`;
 }

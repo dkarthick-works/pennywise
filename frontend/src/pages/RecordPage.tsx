@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useMemo, Fragment } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   openMonth, setMonthClosed, getSettings, updateBudgets,
@@ -22,141 +23,12 @@ import {
 } from "../components/record/StatusFilter";
 import { AmountInput, DateCell, RowCategoryInput, CategoryInput } from "../components/record/TableCells";
 import { CopyLastMonthButton } from "../components/record/CopyLastMonthButton";
+import { MonthDropdown } from "../components/record/MonthDropdown";
 import {
-  IconChevL, IconChevR, IconChevD, IconPlus, IconX, IconCheck, IconLock, IconArrowR, IconDownload,
+  IconChevL, IconChevR, IconPlus, IconX, IconCheck, IconLock, IconArrowR, IconDownload,
 } from "../components/ui/Icons";
 import type { Transaction, Section, Budgets } from "../types";
 import { preserveApiRowOrder, sortRowsByDateDesc } from "../lib/recordRowOrder";
-
-// ─── Month dropdown ───────────────────────────────────────────────────────
-
-// MonthDropdown — 3 years back, 1 year forward (37 items).
-// The months array is anchored to the current month (always at index ANCHOR).
-const MONTH_WINDOW_BACK = 24;
-const MONTH_WINDOW_FWD  = 12;
-
-function MonthDropdown({ month, setMonth, disabled = false }: { month: string; setMonth: (m: string) => void; disabled?: boolean }) {
-  // Stable list — only recomputed when the selected month changes.
-  const months = useMemo(
-    () => Array.from({ length: MONTH_WINDOW_BACK + MONTH_WINDOW_FWD + 1 }, (_, i) => shiftMonth(month, i - MONTH_WINDOW_BACK)),
-    [month]
-  );
-  const ANCHOR = MONTH_WINDOW_BACK; // index of the current month in the array
-
-  const [open, setOpen]     = useState(false);
-  const [cursor, setCursor] = useState(ANCHOR);
-  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  // After a keyboard-triggered scroll, ignore mouseEnter briefly so the list
-  // scrolling under the pointer doesn't hijack the cursor position.
-  const suppressMouse  = useRef(false);
-  const suppressTimer  = useRef<number | undefined>(undefined);
-
-  function scrollToIdx(idx: number, behavior: ScrollBehavior = "auto") {
-    itemRefs.current[idx]?.scrollIntoView({ block: "nearest", behavior });
-    suppressMouse.current = true;
-    clearTimeout(suppressTimer.current);
-    suppressTimer.current = window.setTimeout(() => {
-      suppressMouse.current = false;
-    }, 200);
-  }
-
-  // On open: reset cursor and scroll current month into the centre of the list.
-  useEffect(() => {
-    if (!open) return;
-    setCursor(ANCHOR);
-    // rAF ensures the DOM has rendered before we scroll.
-    requestAnimationFrame(() => {
-      itemRefs.current[ANCHOR]?.scrollIntoView({ block: "center" });
-    });
-  }, [open, ANCHOR]);
-
-  function onKey(e: React.KeyboardEvent) {
-    if (!open) {
-      if (["ArrowDown", "ArrowUp", "Enter", " "].includes(e.key)) {
-        e.preventDefault();
-        setOpen(true);
-      }
-      return;
-    }
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setCursor((c) => {
-        const next = Math.min(c + 1, months.length - 1);
-        scrollToIdx(next);
-        return next;
-      });
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setCursor((c) => {
-        const prev = Math.max(c - 1, 0);
-        scrollToIdx(prev);
-        return prev;
-      });
-    } else if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      setMonth(months[cursor]);
-      setOpen(false);
-    } else if (e.key === "Escape") {
-      setOpen(false);
-    }
-  }
-
-  return (
-    <div style={{ position: "relative" }}>
-      <button
-        className="btn btn-soft"
-        style={{ padding: "7px 10px" }}
-        onClick={() => setOpen((o) => !o)}
-        onKeyDown={onKey}
-        disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <IconChevD size={15} />
-      </button>
-      {open && (
-        <>
-          <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setOpen(false)} />
-          <div
-            role="listbox"
-            className="card"
-            style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 11, width: 170, maxHeight: 280, overflowY: "auto", boxShadow: "var(--sh-lg)", padding: 5 }}
-          >
-            {months.map((m, i) => {
-              const isCursor   = i === cursor;
-              const isCurrent  = m === month;
-              return (
-                <button
-                  key={m}
-                  ref={(el) => { itemRefs.current[i] = el; }}
-                  role="option"
-                  aria-selected={isCurrent}
-                  onClick={() => { setMonth(m); setOpen(false); }}
-                  onMouseEnter={() => {
-                    if (!suppressMouse.current) setCursor(i);
-                  }}
-                  style={{
-                    display: "flex", justifyContent: "space-between", width: "100%",
-                    border: "none",
-                    background: isCursor ? "var(--accent-soft)" : isCurrent ? "var(--surface-2)" : "none",
-                    borderRadius: 8, padding: "8px 10px", fontSize: 13.5,
-                    color: isCursor || isCurrent ? "var(--accent-ink)" : "var(--ink)",
-                    fontWeight: isCurrent ? 600 : 500, textAlign: "left",
-                    outline: isCursor ? "2px solid var(--accent)" : "none",
-                    outlineOffset: -2,
-                  }}
-                >
-                  <span className="num">{monthCode(m)}</span>
-                  <span className="muted" style={{ fontSize: 11 }}>{MONTH_NAMES[+m.slice(5) - 1].slice(0, 3)}</span>
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 // ─── Status legend ────────────────────────────────────────────────────────
 
@@ -176,6 +48,83 @@ function StatusLegend() {
         <span className="chip chip-cc"><IconArrowR size={11} /> Settles</span> clears credits
       </span>
     </div>
+  );
+}
+
+// ─── Quick-add CTA (first tile) ───────────────────────────────────────────
+
+function QuickAddTile({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      className="card card-pad"
+      onClick={onOpen}
+      style={{
+        textAlign: "left",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        gap: 18,
+        minHeight: 168,
+        cursor: "pointer",
+        transition: ".15s",
+        border: "1.5px solid var(--accent)",
+        background: "var(--accent-soft)",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.boxShadow = "var(--sh-md)";
+        (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+        (e.currentTarget as HTMLElement).style.background = "var(--surface)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.boxShadow = "var(--sh-sm)";
+        (e.currentTarget as HTMLElement).style.transform = "none";
+        (e.currentTarget as HTMLElement).style.background = "var(--accent-soft)";
+      }}
+    >
+      <div>
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: 12,
+            padding: "4px 9px",
+            borderRadius: 8,
+            background: "var(--accent)",
+            color: "#fff",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+          }}
+        >
+          <IconPlus size={12} style={{ color: "#fff" }} />
+          Fast path
+        </div>
+        <div style={{ fontWeight: 700, fontSize: 22, letterSpacing: "-0.03em", lineHeight: 1.15, color: "var(--accent-ink)" }}>
+          Log any spend
+        </div>
+        <p className="muted" style={{ margin: "8px 0 0", fontSize: 13.5, lineHeight: 1.4, maxWidth: "28ch" }}>
+          One row for Bare Minimum, Subscriptions, Daily, or Income — no tile hopping.
+        </p>
+      </div>
+      <span
+        className="btn btn-primary"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          width: "auto",
+          alignSelf: "flex-start",
+          padding: "9px 14px",
+          pointerEvents: "none",
+        }}
+      >
+        Open quick add
+        <IconChevR size={15} style={{ color: "#fff" }} />
+      </span>
+    </button>
   );
 }
 
@@ -604,7 +553,7 @@ function DailyTile({ rows, section, month, settledSet }: {
                   section="daily"
                   placeholder="Type to add — e.g. Groceries"
                   onChange={(v) => setDraft({ ...draft, category: v })}
-                  onSubmit={commit}
+                  onSubmit={() => commit()}
                 />
               </td>
               <td><AmountInput value={draft.amount} onChange={(v) => setDraft({ ...draft, amount: v })} placeholder="0"
@@ -713,7 +662,7 @@ function IncomeTile({ rows, month, onCopyPendingChange }: {
                   section="income"
                   placeholder="e.g. Salary, Freelance, Dividend"
                   onChange={(v) => setDraft({ ...draft, category: v })}
-                  onSubmit={commit}
+                  onSubmit={() => commit()}
                 />
               </td>
               <td><AmountInput value={draft.amount} onChange={(v) => setDraft({ ...draft, amount: v })} placeholder="0"
@@ -815,6 +764,7 @@ const META: Record<Section, TileMeta> = {
 };
 
 export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
+  const navigate = useNavigate();
   const [tile, setTile] = useState<Section | null>(null);
   // Lifted from the tiles: while a "Copy last month" op is loading, confirming
   // or writing, month navigation is locked to avoid racing the open-month query.
@@ -930,6 +880,7 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
 
       {tile === null ? (
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+          <QuickAddTile onOpen={() => navigate("/record/entry")} />
           {/* Expense tiles with budget tracking */}
           {(["essential", "flexible", "daily"] as const).map((sec) => (
             <TileCard

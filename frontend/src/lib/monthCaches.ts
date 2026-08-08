@@ -44,5 +44,10 @@ export function invalidateTransactionNameSuggestionSections(
 
 export function invalidateImportCaches(qc: QueryClient, months: string[]): void {
   months.forEach((m) => invalidateMonthCaches(qc, m));
-  invalidateTransactionNameSuggestionSections(qc, ["daily", "income"]);
+  invalidateTransactionNameSuggestionSections(qc, [
+    "essential",
+    "flexible",
+    "daily",
+    "income",
+  ]);
 }

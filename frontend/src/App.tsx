@@ -7,6 +7,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { CategoryGroupPage } from "./pages/CategoryGroupPage";
 import { CreditTransactionsPage } from "./pages/CreditTransactionsPage";
 import { RecordPage }    from "./pages/RecordPage";
+import { RecordEntryPage } from "./pages/RecordEntryPage";
 import { SettingsPage }  from "./pages/SettingsPage";
 import { ProfilePage }   from "./pages/ProfilePage";
 import { InsightsPage }  from "./pages/InsightsPage";
@@ -47,6 +48,7 @@ export default function App() {
                 <Route path="/dashboard/groups/:groupId" element={<CategoryGroupPage month={month} />} />
                 <Route path="/dashboard/credits" element={<CreditTransactionsPage month={month} setMonth={setMonth} />} />
                 <Route path="/record"    element={<RecordPage month={month} setMonth={setMonth} />} />
+                <Route path="/record/entry" element={<RecordEntryPage month={month} setMonth={setMonth} />} />
                 <Route path="/lents"     element={<LentsPage />} />
                 <Route path="/lents/:id" element={<LentDetailPage />} />
                 <Route path="/chits"     element={<ChitsPage />} />
