@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { initials } from "../../lib/txns";
 import {
-  IconDashboard, IconRecord, IconLent, IconChit, IconInsights, IconCategories, IconExport, IconSettings, IconProfile, IconMenu, IconPlus,
+  IconDashboard, IconLent, IconChit, IconInsights, IconCategories, IconExport, IconSettings, IconProfile, IconMenu, IconPlus,
 } from "../ui/Icons";
 
 const NAV_CTA = { path: "/record", label: "Record Expense", Icon: IconPlus };
