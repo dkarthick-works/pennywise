@@ -484,7 +484,7 @@ describe("RecordEntryPage", () => {
   it("failed update keeps old values and shows rowErr", async () => {
     renderEntry();
     await screen.findByRole("heading", { name: /Quick add/i });
-    const txn = await addTxn("Bus", "50");
+    await addTxn("Bus", "50");
 
     mocks.updateTxn.mockRejectedValue(new Error("network error"));
 
