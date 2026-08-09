@@ -45,6 +45,31 @@ function HeroRow({ label, value, strong, color }: {
   );
 }
 
+function SavingsRing({ pct }: { pct: number }) {
+  const r = 34;
+  const circ = 2 * Math.PI * r;
+  const clamped = Math.min(Math.max(pct, 0), 100);
+  const dash = (clamped / 100) * circ;
+  return (
+    <svg width={88} height={88} viewBox="0 0 88 88" style={{ flexShrink: 0 }}>
+      <circle cx={44} cy={44} r={r} fill="none" stroke="var(--border)" strokeWidth={7} />
+      <circle
+        cx={44} cy={44} r={r} fill="none"
+        stroke="var(--accent)"
+        strokeWidth={7}
+        strokeLinecap="round"
+        strokeDasharray={`${dash} ${circ}`}
+        transform="rotate(-90 44 44)"
+        style={{ transition: "stroke-dasharray .6s cubic-bezier(.4,0,.2,1)" }}
+      />
+      <text x={44} y={44} textAnchor="middle" dominantBaseline="central"
+        style={{ fontSize: 15, fontWeight: 700, fill: "var(--ink)", fontFamily: "inherit" }}>
+        {Math.round(clamped)}%
+      </text>
+    </svg>
+  );
+}
+
 function cycleRangeLabel(from: string, to: string): string {
   return `${prettyDate(from)} – ${prettyDate(to)}`;
 }
@@ -424,54 +449,61 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
           {/* hero cards */}
           <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
             <div className="card card-pad">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
-                <h3 className="card-h" style={{ whiteSpace: "nowrap" }}>
-                  <IconTrend size={16} style={{ color: "var(--c-flexible)" }} /> Monthly Cost
-                </h3>
-                <span className="chip" style={{ background: "oklch(0.95 0.03 265)", color: "oklch(0.5 0.1 265)", whiteSpace: "nowrap", flex: "none" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: "oklch(0.95 0.03 265)",
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                  }}>
+                    <IconTrend size={22} style={{ color: "var(--c-flexible)" }} />
+                  </div>
+                  <h2 style={{ margin: 0, fontSize: 18, fontWeight: 750, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2 }}>
+                    Monthly Cost
+                  </h2>
+                </div>
+                <span className="chip" style={{ background: "oklch(0.95 0.03 265)", color: "oklch(0.5 0.1 265)", whiteSpace: "nowrap", flex: "none", marginTop: 2 }}>
                   by transaction date
                 </span>
               </div>
-              <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>What you incurred — regardless of when paid.</p>
+              <p className="muted" style={{ fontSize: 12.5, margin: "0 0 14px" }}>What you incurred, regardless of when paid.</p>
               <div
                 style={{
                   margin: "0 0 10px",
-                  padding: "12px 14px",
+                  padding: "16px 18px",
                   borderRadius: 14,
                   background: "var(--surface-2)",
                   border: "1px solid var(--border-2)",
+                  minHeight: 150,
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
-                  <div>
-                    <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 3 }}>Spent this month</div>
-                    <div className="muted" style={{ fontSize: 11.5 }}>cash + credit</div>
-                  </div>
-                  <div className="num" style={{ fontSize: 29, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--ink)" }}>
-                    {inr(monthlyCost)}
-                  </div>
+                <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 2 }}>Spent this month</div>
+                <div className="muted" style={{ fontSize: 11.5, marginBottom: 10 }}>cash + credit</div>
+                <div className="num" style={{ fontSize: 52, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--ink)" }}>
+                  {inr(monthlyCost)}
                 </div>
-              </div>
-              <HeroRow label="Income" value={inr(income)} color="var(--pos)" />
-              <div style={{ height: 1, background: "var(--border-2)", margin: "9px 0" }} />
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                <span className="stat-lbl">Difference</span>
-                <span className="stat-big num" style={{ color: monthlyDifference >= 0 ? "var(--pos)" : "var(--neg)" }}>
-                  {monthlyDifference >= 0 ? "+" : "−"}{inr(Math.abs(monthlyDifference))}
-                </span>
               </div>
             </div>
 
             <div className="card card-pad">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
-                <h3 className="card-h" style={{ whiteSpace: "nowrap" }}>
-                  <IconWallet size={16} style={{ color: "var(--accent)" }} /> Cash Flow
-                </h3>
-                <span className="chip" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)", whiteSpace: "nowrap", flex: "none" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: "var(--accent-soft)",
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                  }}>
+                    <IconWallet size={22} style={{ color: "var(--accent)" }} />
+                  </div>
+                  <h2 style={{ margin: 0, fontSize: 18, fontWeight: 750, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2 }}>
+                    Cash Flow
+                  </h2>
+                </div>
+                <span className="chip" style={{ background: "var(--accent-soft)", color: "var(--accent-ink)", whiteSpace: "nowrap", flex: "none", marginTop: 2 }}>
                   by payment date
                 </span>
               </div>
-              <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>Cash that actually moved this month.</p>
+              <p className="muted" style={{ fontSize: 12.5, margin: "0 0 14px" }}>Cash that actually moved this month.</p>
               <div
                 style={{
                   margin: "0 0 10px",
@@ -491,16 +523,19 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
                   </div>
                 </div>
               </div>
-              <HeroRow label="Income"     value={inr(income)}  color="var(--pos)" />
-              <div style={{ height: 1, background: "var(--border-2)", margin: "10px 0" }} />
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                <span className="stat-lbl">Net saved</span>
-                <span className="stat-big num" style={{ color: netSaved >= 0 ? "var(--pos)" : "var(--neg)" }}>
-                  {netSaved >= 0 ? "+" : "−"}{inr(Math.abs(netSaved))}
-                </span>
-              </div>
-              <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-                <span className="num" style={{ fontWeight: 600 }}>{Math.round(savingsRate)}%</span> savings rate
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div className="stat-lbl" style={{ color: "var(--ink-2)", marginBottom: 4 }}>Net saved</div>
+                  <div className="num" style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: netSaved >= 0 ? "var(--pos)" : "var(--neg)" }}>
+                    {netSaved >= 0 ? "+" : "−"}{inr(Math.abs(netSaved))}
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <span className="chip" style={{ background: "var(--surface-2)", color: "var(--ink-2)", fontSize: 11 }}>
+                      {Math.round(savingsRate)}% savings rate
+                    </span>
+                  </div>
+                </div>
+                <SavingsRing pct={savingsRate} />
               </div>
             </div>
 
