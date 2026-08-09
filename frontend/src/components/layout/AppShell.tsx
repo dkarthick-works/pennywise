@@ -50,8 +50,7 @@ export function AppShell({ children }: Props) {
       {/* sidebar */}
       <aside className={"sidebar" + (navOpen ? " open" : "")}>
         <div className="side-brand">
-          <div className="logo-mark"><span>P</span></div>
-          <div className="logo-word">Pennywise</div>
+          <div className="logo-word">pennywise</div>
         </div>
 
         <nav className="nav">
@@ -113,10 +112,7 @@ export function AppShell({ children }: Props) {
           >
             <IconMenu size={20} />
           </button>
-          <div className="logo-mark" style={{ width: 26, height: 26 }}>
-            <span style={{ fontSize: 14 }}>P</span>
-          </div>
-          <div className="logo-word" style={{ fontSize: 17 }}>Pennywise</div>
+          <div className="logo-word" style={{ fontSize: 17 }}>pennywise</div>
         </div>
 
         {children}

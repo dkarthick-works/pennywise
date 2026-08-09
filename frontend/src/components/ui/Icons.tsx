@@ -77,6 +77,12 @@ export const IconLock = (p: IcProps) => (
     <path d="M8 10V7a4 4 0 0 1 8 0v3" />
   </Ic>
 );
+export const IconMail = (p: IcProps) => (
+  <Ic {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3 7l9 7 9-7" />
+  </Ic>
+);
 export const IconLogout = (p: IcProps) => (
   <Ic {...p}>
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />

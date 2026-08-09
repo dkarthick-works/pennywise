@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Sora:wght@600&display=swap");
 
 /* ============================================================
    PENNYWISE DESIGN TOKENS
@@ -93,25 +93,37 @@ input, button { font-family: inherit; }
 
 /* ============ AUTH ============ */
 .auth-wrap {
-  height: 100%; display: grid; place-items: center; padding: 24px;
+  height: 100%; display: grid; place-items: center; padding: 28px 24px;
   background:
     radial-gradient(120% 90% at 50% -20%, var(--accent-soft) 0%, transparent 55%),
     var(--bg);
 }
 .auth-card {
-  width: 100%; max-width: 392px; background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--r-lg);
-  box-shadow: var(--sh-lg); padding: 36px 34px 30px;
+  width: 100%; max-width: 400px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 26px;
+  box-shadow: var(--sh-lg); padding: 40px 36px 32px;
 }
-.auth-logo { display: flex; align-items: center; gap: 10px; justify-content: center; margin-bottom: 26px; }
-.logo-mark {
-  width: 30px; height: 30px; border-radius: 9px; background: var(--accent);
-  display: grid; place-items: center; box-shadow: var(--sh-sm); flex: none;
+.auth-logo { display: flex; align-items: center; justify-content: center; margin-bottom: 28px; }
+.logo-word {
+  font-family: "Sora", var(--font);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  line-height: 1.2;
 }
-.logo-mark span { color: #fff; font-weight: 700; font-size: 17px; line-height: 1; }
-.logo-word { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; }
-.auth-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; text-align: center; margin: 0 0 4px; }
-.auth-sub   { color: var(--ink-2); text-align: center; margin: 0 0 24px; font-size: 14px; }
+.auth-card .logo-word {
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+.auth-title {
+  font-size: 28px; font-weight: 750; letter-spacing: -0.035em;
+  text-align: center; margin: 0 0 8px; color: var(--ink); line-height: 1.15;
+}
+.auth-sub {
+  color: var(--ink-3); text-align: center; margin: 0 0 28px;
+  font-size: 14.5px; font-weight: 450; line-height: 1.4;
+}
 .field { margin-bottom: 14px; }
 .field label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; letter-spacing: 0.01em; }
 .input {
@@ -123,7 +135,12 @@ input, button { font-family: inherit; }
 .input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3.5px var(--accent-soft); }
 .input.err { border-color: var(--neg); box-shadow: 0 0 0 3.5px var(--neg-soft); }
 .input-wrap { position: relative; }
-.input-wrap .input { padding-right: 42px; }
+.input-wrap:has(.input-toggle) .input { padding-right: 42px; }
+.input-wrap--lead .input { padding-left: 42px; }
+.input-lead {
+  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+  color: var(--ink-3); display: flex; align-items: center; pointer-events: none;
+}
 .input-toggle {
   position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
   background: none; border: none; color: var(--ink-3); padding: 4px;
@@ -131,15 +148,49 @@ input, button { font-family: inherit; }
 }
 .input-toggle:hover { color: var(--ink-2); }
 .err-msg { color: var(--neg); font-size: 12px; margin-top: 5px; }
-.auth-switch { text-align: center; margin-top: 18px; color: var(--ink-2); font-size: 13.5px; }
-.auth-switch button { background: none; border: none; color: var(--accent-ink); font-weight: 600; padding: 0 2px; }
-.auth-switch button:hover { text-decoration: underline; }
-.auth-hint { margin-top: 16px; padding: 10px 12px; background: var(--accent-soft); border-radius: var(--r-sm); font-size: 12px; color: var(--accent-ink); text-align: center; }
-.auth-github {
-  display: flex; align-items: center; justify-content: center;
-  margin-top: 20px; color: var(--ink-3); transition: color .15s;
+
+/* Auth-only field refinements */
+.auth-card .field { margin-bottom: 16px; }
+.auth-card .field label {
+  font-size: 13px; font-weight: 650; color: var(--ink); margin-bottom: 7px;
 }
-.auth-github:hover { color: var(--ink); }
+.auth-card .input {
+  padding: 13px 14px; border-radius: 14px;
+}
+.auth-card .input-wrap--lead .input { padding-left: 42px; }
+.auth-submit {
+  margin-top: 8px; padding: 13px 16px; font-size: 15px; font-weight: 650;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px oklch(0.4 0.05 265 / 0.12), 0 8px 20px -8px oklch(0.5 0.1 265 / 0.45);
+}
+.auth-switch {
+  text-align: center; margin-top: 22px; color: var(--ink-2); font-size: 14px;
+}
+.auth-switch button {
+  background: none; border: none; color: var(--ink); font-weight: 700;
+  padding: 0 2px; font-size: inherit;
+}
+.auth-switch button:hover { color: var(--accent-ink); text-decoration: underline; }
+.auth-hint {
+  margin-top: 16px; padding: 10px 12px; background: var(--accent-soft);
+  border-radius: var(--r-sm); font-size: 12px; color: var(--accent-ink); text-align: center;
+}
+.auth-github-row {
+  display: flex; align-items: center; gap: 14px; margin-top: 26px;
+}
+.auth-github-line {
+  flex: 1; height: 1px; background: var(--border);
+}
+.auth-github {
+  width: 40px; height: 40px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-3); background: var(--surface);
+  border: 1px solid var(--border); transition: color .15s, border-color .15s, background .15s;
+  flex: none;
+}
+.auth-github:hover {
+  color: var(--ink); border-color: var(--ink-3); background: var(--surface-2);
+}
 
 /* ============ BUTTONS ============ */
 .btn {
@@ -162,7 +213,7 @@ input, button { font-family: inherit; }
   border-right: 1px solid var(--border); display: flex; flex-direction: column;
   padding: 18px 14px 14px; transition: transform .26s cubic-bezier(.4,0,.2,1); z-index: 40;
 }
-.side-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.side-brand { display: flex; align-items: center; padding: 6px 8px 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
 .side-brand .logo-word { font-size: 19px; }
 .nav { display: flex; flex-direction: column; gap: 3px; flex: 1; }
 .nav-label {

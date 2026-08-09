@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { signup } from "../api/auth";
-import { IconArrowR, IconEye, IconEyeOff, IconGithub } from "../components/ui/Icons";
+import { IconArrowR, IconEye, IconEyeOff, IconGithub, IconLock, IconMail } from "../components/ui/Icons";
 
 type Mode = "signin" | "register";
 
@@ -61,16 +61,9 @@ export function AuthPage() {
   return (
     <div className="auth-wrap">
       <div className="auth-card fade-in">
-        {/* logo */}
         <div className="auth-logo">
-          <div className="logo-mark"><span>P</span></div>
-          <div className="logo-word">Pennywise</div>
+          <div className="logo-word">pennywise</div>
         </div>
-
-        <h1 className="auth-title">{isReg ? "Create your account" : "Welcome back"}</h1>
-        <p className="auth-sub">
-          {isReg ? "Start tracking every rupee — in and out." : "Sign in to your Pennywise."}
-        </p>
 
         <form onSubmit={submit} noValidate>
           {isReg && (
@@ -87,17 +80,25 @@ export function AuthPage() {
 
           <div className="field">
             <label>Email</label>
-            <input
-              className={"input" + (errors.email ? " err" : "")}
-              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@email.com" autoComplete="off"
-            />
+            <div className="input-wrap input-wrap--lead">
+              <span className="input-lead" aria-hidden="true">
+                <IconMail size={17} />
+              </span>
+              <input
+                className={"input" + (errors.email ? " err" : "")}
+                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@email.com" autoComplete="off"
+              />
+            </div>
             {errors.email && <div className="err-msg">{errors.email}</div>}
           </div>
 
           <div className="field">
             <label>Password</label>
-            <div className="input-wrap">
+            <div className="input-wrap input-wrap--lead">
+              <span className="input-lead" aria-hidden="true">
+                <IconLock size={17} />
+              </span>
               <input
                 className={"input" + (errors.pw ? " err" : "")}
                 type={showPw ? "text" : "password"}
@@ -127,26 +128,30 @@ export function AuthPage() {
             </div>
           )}
 
-          <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 6 }}>
+          <button className="btn btn-primary auth-submit" type="submit" disabled={loading}>
             {loading ? "Please wait…" : isReg ? "Create account" : "Sign in"}
             {!loading && <IconArrowR size={16} />}
           </button>
         </form>
 
         <div className="auth-switch">
-          {isReg ? "Already have an account?" : "New to Pennywise?"}
-          <button onClick={switchMode}>{isReg ? "Sign in" : "Create one"}</button>
+          {isReg ? "Already have an account? " : "New to Pennywise? "}
+          <button type="button" onClick={switchMode}>{isReg ? "Sign in" : "Create one"}</button>
         </div>
 
-        <a
-          className="auth-github"
-          href="https://github.com/dkarthick-works/pennywise"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="View source on GitHub"
-        >
-          <IconGithub size={20} />
-        </a>
+        <div className="auth-github-row">
+          <span className="auth-github-line" />
+          <a
+            className="auth-github"
+            href="https://github.com/dkarthick-works/pennywise"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="View source on GitHub"
+          >
+            <IconGithub size={18} />
+          </a>
+          <span className="auth-github-line" />
+        </div>
       </div>
     </div>
   );
