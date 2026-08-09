@@ -1,6 +1,12 @@
 import axios from "axios";
 import { setToken, clearToken } from "./client";
-import type { LoginRequest, SignupRequest, TokenResponse, Profile } from "../types";
+import type {
+  LoginRequest,
+  SignupRequest,
+  TokenResponse,
+  Profile,
+  ForgotPasswordRequest,
+} from "../types";
 
 // Auth calls go through the same proxy origin.
 // Login/signup use a separate axios instance (no auth header needed / wanted).
@@ -14,6 +20,13 @@ export async function login(body: LoginRequest): Promise<void> {
 
 export async function signup(body: SignupRequest): Promise<void> {
   await axios.post("/api/auth/signup", body);
+}
+
+// Always resolves on any 2xx — Goauth returns 200 unconditionally to avoid
+// leaking whether an email is registered. Rejects on network errors / 5xx so
+// the caller can distinguish "request sent" from "request failed".
+export async function forgotPassword(body: ForgotPasswordRequest): Promise<void> {
+  await axios.post("/api/auth/forgot-password", body);
 }
 
 export async function logout(): Promise<void> {

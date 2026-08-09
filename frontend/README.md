@@ -39,6 +39,7 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/settings` | Settings | Budgets, templates, credit card controls |
 | `/profile` | Profile | Display name and email |
 | `/login` | Auth | Sign up / log in (password field has show/hide toggle) |
+| `/forgot-password` | Forgot password | Request a reset link by email (always shows the same success copy — anti-enumeration). The emailed link goes straight to Goauth's own domain, not back into Pennywise — the reset form itself is served entirely by Goauth. |
 
 Unknown authenticated paths fall back to `/record`.
 
@@ -281,7 +282,7 @@ React Query keys are prefixed with `["categories", …]`; mutations invalidate t
 - `src/api/client.ts` — axios instance, Bearer token from `sessionStorage`,
   silent refresh on 401 via `/api/auth/refresh`.
 - `src/api/ledger.ts` — typed wrappers for all ledger endpoints.
-- `src/api/auth.ts` — signup, login, logout.
+- `src/api/auth.ts` — signup, login, logout, forgotPassword.
 
 ## Testing
 

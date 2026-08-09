@@ -552,3 +552,14 @@ migration `0010_chits`.
 See `.env.example`. Key vars: `DATABASE_URL`, `JWT_SECRET` (must match Goauth),
 `JWT_USER_CLAIM`/`JWT_EMAIL_CLAIM`, `GOAUTH_BASE_URL`, `CORS_ORIGINS`,
 `SEED_DEMO_DATA`.
+
+### Password reset
+
+Requesting a reset link (`/forgot-password` in the frontend, proxied through
+`/api/auth/forgot-password`) is the only part of this flow Pennywise is
+involved in. Goauth's password-reset email links directly to Goauth's own
+domain (e.g. `sign.deeka.work/auth/reset-password?token=...`) and Goauth
+serves and handles the entire reset form there — the browser never comes back
+to Pennywise for that step, so no token ever reaches this backend or its
+logs. Note: per Goauth's own integration guide, it has no rate limiting on
+forgot/reset-password; that's Goauth's operational concern, not this repo's.

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { AppShell } from "./components/layout/AppShell";
 import { AuthPage }      from "./pages/AuthPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { CategoryGroupPage } from "./pages/CategoryGroupPage";
 import { CreditTransactionsPage } from "./pages/CreditTransactionsPage";
@@ -36,6 +37,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<AuthPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/" element={<Navigate to="/record" replace />} />
 
       <Route

@@ -132,6 +132,12 @@ export function AuthPage() {
             {loading ? "Please wait…" : isReg ? "Create account" : "Sign in"}
             {!loading && <IconArrowR size={16} />}
           </button>
+
+          {!isReg && (
+            <div className="auth-switch" style={{ marginTop: 14 }}>
+              <button type="button" onClick={() => navigate("/forgot-password")}>Forgot password?</button>
+            </div>
+          )}
         </form>
 
         <div className="auth-switch">
