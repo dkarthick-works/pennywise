@@ -81,6 +81,33 @@ When a **credit spending threshold** is set in Settings
 progress bar with "within" / "over threshold" text. The same rupee limit applies
 independently to statement-cycle and calendar-month totals.
 
+### Daily spend by day chart
+
+Below the hero cards, a **Daily spend by day** bar chart (`DayBars` in
+`src/components/charts/Charts.tsx`) visualizes **Daily** section incurred spend
+per calendar day for the selected month.
+
+| Aspect | Rule |
+|--------|------|
+| Data source | Existing `GET /api/transactions?month=` query (client-side rollup) |
+| Rows counted | `section = daily`, `kind` is `cash` or `credit` (`isIncurredExpenseKind`) |
+| Excluded | Settlements, other sections, income |
+| Series | Every calendar day in the month, including ₹0 days |
+| Future dates | Included in the series and header **total** |
+
+Helpers live in `src/lib/txns.ts`: `dailySpendByDay` builds the series;
+`dailySpendAverage` drives the header average.
+
+**Header:** month total (full series sum) plus **Avg · ₹X/day**, with **· so far**
+on the **current** calendar month only. For the current month, the average uses
+spend through today divided by today's day-of-month (future-dated rows stay in
+the total but not the pacing numerator). Past and future months divide the full
+series sum by days in the month.
+
+The chart highlights today's bar when the selected month is the current month.
+Loading shows a skeleton (not ₹0); errors offer retry. The card uses
+`data-testid="daily-spend-by-day"`.
+
 ### Category group spend
 
 When the user has category groups, a **Category groups** section lists monthly
@@ -179,6 +206,47 @@ Income has no template rows, so it always inserts.
 Dates are shifted into the target month. Existing non-zero rows are never
 replaced. The operation is not fully atomic — if inserts succeed but some fills
 fail, the UI warns against retrying (which would duplicate inserts).
+
+### Row ordering
+
+| Tile | Order |
+|------|-------|
+| Essential, Flexible | API order from `POST /api/months/{month}/open` — `updated_at DESC`, then `txn_date DESC`, then `id DESC` (`preserveApiRowOrder`) |
+| Daily, Income | Client sort: newest `date` first, then `id` (`sortRowsByDateDesc`) |
+
+Recently edited Essential/Flexible rows therefore rise to the top. A no-op
+`PATCH` on the backend preserves `updated_at` so incidental saves do not jump
+row order.
+
+## Quick add page
+
+Nav entry: **Quick add** tile on the Record page, or `/record/entry`. A unified
+entry surface for all sections in one month — complementary to per-tile quick-add
+rows on Record.
+
+### Workflow
+
+1. Pick the open month (prev/next, dropdown, or shell month on first visit).
+2. Type **name** → **amount** → **Enter** (or click +).
+3. Section and kind cycle via chip buttons or **Alt+S** / **Alt+K** (never bare
+   S/K — would break typing). Income is always cash; kind chip is hidden.
+4. **Date** defaults from `defaultDraftDate` (latest date in the open month, or
+   today when empty) and stays **sticky** until you edit it or unlock via the
+   date chip.
+
+`POST /api/months/{month}/open` seeds the month when needed. Creates use
+`POST /api/transactions`; the name field uses `CategoryInput` with transaction-name
+suggestions (same rules as Record quick-add).
+
+### This session log
+
+Entries created on this visit appear in **This session** (newest first). Each
+row supports inline edit: cycle section/kind, change date, category, amount, or
+delete. Session state is visit-local — leaving the page clears the list (rows
+remain in the ledger and on Record tiles). Date edits must stay inside the
+selected month.
+
+Back (**All tiles**) returns to `/record` without losing saved transactions.
 
 ## Settings page
 

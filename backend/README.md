@@ -142,7 +142,7 @@ only ever talks to this origin.
 | GET    | `/api/insights` | emergency fund targets from essential spend |
 | GET    | `/api/months/{month}` | `{closed, seeded}` |
 | PUT    | `/api/months/{month}/closed` | toggle the cosmetic closed flag |
-| POST   | `/api/months/{month}/open` | clone templates into a fresh month, return its rows |
+| POST   | `/api/months/{month}/open` | clone templates into a fresh month, return its rows (see below) |
 | GET    | `/api/lents?status=open\|settled\|all` | list money lent to others (default `all`) |
 | POST   | `/api/lents` | create a lent |
 | GET    | `/api/lents/{id}` | lent detail with nested `repayments` |
@@ -160,6 +160,20 @@ only ever talks to this origin.
 | POST   | `/api/chits/{id}/installments` | record an installment payment |
 | PATCH  | `/api/chits/{id}/installments/{installmentId}` | update an installment |
 | DELETE | `/api/chits/{id}/installments/{installmentId}` | delete an installment |
+
+### Open month (`POST /api/months/{month}/open`)
+
+Clones Essential and Flexible template rows (blank amounts) into a fresh month
+when the month is not yet seeded, then returns all transactions for that month.
+
+**Row order** for the Record UI: `updated_at DESC`, `txn_date DESC`, `id DESC`
+(query `ListTransactionsForMonth` in `db/queries/transactions.sql`). Essential
+and Flexible tiles preserve this order client-side. Daily/Income tiles re-sort
+by transaction date in the SPA.
+
+A no-op `PATCH /api/transactions/{id}` (all fields unchanged, including
+settlement links) skips the `updated_at` bump so recently touched rows do not
+jump in the Essential/Flexible tables (`internal/api/transactions.go`).
 
 ### Transaction JSON
 

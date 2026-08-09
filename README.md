@@ -65,8 +65,13 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
 ## Recent features (see sub-READMEs for detail)
 
 - **Record page** — default landing route; per-section status filter; daily rows grouped by date;
-  transaction-name autocomplete on Daily/Income quick-add; **Copy last month** on Income/Essential/Flexible
+  transaction-name autocomplete on Daily/Income quick-add; **Copy last month** on Income/Essential/Flexible;
+  Essential/Flexible rows ordered by recent activity (`updated_at`)
   ([frontend/README.md § Record page](frontend/README.md))
+- **Quick add** — `/record/entry` unified entry with sticky date, section/kind chips, and visit session log
+  ([frontend/README.md § Quick add page](frontend/README.md))
+- **Dashboard daily chart** — Daily-section spend-by-day bar chart with month total and pacing average
+  ([frontend/README.md § Daily spend by day chart](frontend/README.md))
 - **Lent tracker** — standalone ledger for money lent to others with repayment history
   ([frontend/README.md § Lent page](frontend/README.md),
   [backend/README.md § Lents](backend/README.md))
