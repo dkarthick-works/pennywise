@@ -29,22 +29,6 @@ function MonthSelector({ month, setMonth }: { month: string; setMonth: (m: strin
   );
 }
 
-function HeroRow({ label, value, strong, color }: {
-  label: string; value: string; strong?: boolean; color?: string;
-}) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "5px 0" }}>
-      <span className="stat-lbl" style={{ color: strong ? "var(--ink)" : "var(--ink-2)", fontWeight: strong ? 650 : 500 }}>{label}</span>
-      <span
-        className="num"
-        style={{ fontWeight: strong ? 700 : 600, fontSize: strong ? 15 : 14.5, color: color ?? "var(--ink)" }}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
 function SavingsRing({ pct }: { pct: number }) {
   const r = 34;
   const circ = 2 * Math.PI * r;
@@ -390,12 +374,10 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
     { essential: 0, flexible: 0, daily: 0 }
   );
 
-  const income = dashboardMonthly?.income ?? 0;
   const cashFlow = dashboardMonthly?.cash_flow ?? 0;
   const monthlyCost = dashboardMonthly?.monthly_cost ?? 0;
   const netSaved = dashboardMonthly?.net_saved ?? 0;
   const savingsRate = dashboardMonthly?.savings_rate ?? 0;
-  const monthlyDifference = dashboardMonthly?.monthly_difference ?? 0;
   const allGroupIds = groupSpend.map((g) => g.group_id);
   const effectiveSelectedGroupIds = selectedGroupIds ?? allGroupIds;
   const selectedGroupIdSet = new Set(effectiveSelectedGroupIds);
