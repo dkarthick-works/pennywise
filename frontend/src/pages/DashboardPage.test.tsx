@@ -53,7 +53,7 @@ const unconfigured: CreditUsageSummary = {
 // Scope assertions to the Credit Card Usage card — the dashboard renders other
 // ₹ amounts (e.g. a zeroed monthly-cost card) that must not leak into checks.
 async function creditCard(): Promise<HTMLElement> {
-  const heading = await screen.findByText("CC Usage");
+  const heading = await screen.findByText("Credit Card Usage");
   return heading.closest(".card") as HTMLElement;
 }
 
@@ -239,7 +239,7 @@ describe("Dashboard daily spend by day", () => {
     await waitFor(() => {
       expect(card.getByRole("group", { name: /Daily spend by day for July 2026/ })).toBeInTheDocument();
     });
-    expect(card.getByRole("heading", { name: /Daily spend by day/ })).toHaveTextContent("July 2026");
+    expect(card.getByRole("heading", { name: /Daily Spend by Day/ })).toHaveTextContent("Daily Spend by Day");
     // Header total = cash+credit daily only (scoped to this card)
     expect(card.getByText("₹150")).toBeInTheDocument();
     // Past month: avg = 150/31 ≈ ₹5, no "so far"
@@ -348,8 +348,9 @@ describe("Dashboard daily spend by day", () => {
     );
 
     card = within(await dailyCard());
-    await waitFor(() => expect(card.getByText(/June 2026/)).toBeInTheDocument());
-    await waitFor(() => expect(card.getByRole("group")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(card.getByRole("group", { name: /Daily spend by day for June 2026/ })).toBeInTheDocument()
+    );
     const bars = card.getByRole("group").querySelectorAll("rect[rx]");
     for (const bar of bars) {
       expect(bar.getAttribute("fill")).toBe("var(--c-daily-soft)");

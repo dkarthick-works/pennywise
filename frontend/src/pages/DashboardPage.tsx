@@ -175,15 +175,11 @@ function CreditUsageCard({
 
   return (
     <div className="card card-pad">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
+      <div style={{ marginBottom: 12 }}>
         <h3 className="card-h" style={{ whiteSpace: "nowrap" }}>
-          <IconCreditCard size={16} style={{ color: "var(--c-daily)" }} /> CC Usage
+          <IconCreditCard size={16} style={{ color: "var(--c-daily)" }} /> Credit Card Usage
         </h3>
-        <span className="chip" style={{ background: "oklch(0.95 0.03 265)", color: "oklch(0.5 0.1 265)", whiteSpace: "nowrap", flex: "none" }}>
-          by recorded date
-        </span>
       </div>
-      <p className="muted" style={{ fontSize: 12.5, margin: "0 0 12px" }}>What you charged to credit, by calendar month and statement cycle.</p>
 
       {isLoading ? (
         <div aria-busy="true">
@@ -457,11 +453,24 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
                   background: "var(--surface-2)",
                   border: "1px solid var(--border-2)",
                   minHeight: 150,
+                  containerType: "inline-size",
+                  overflow: "hidden",
                 }}
               >
                 <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 2 }}>Spent this month</div>
                 <div className="muted" style={{ fontSize: 11.5, marginBottom: 10 }}>cash + credit</div>
-                <div className="num" style={{ fontSize: 52, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--ink)" }}>
+                <div
+                  className="num"
+                  style={{
+                    fontSize: "clamp(1.5rem, 14cqi, 3.25rem)",
+                    fontWeight: 800,
+                    letterSpacing: "-0.03em",
+                    lineHeight: 1,
+                    color: "var(--ink)",
+                    whiteSpace: "nowrap",
+                    maxWidth: "100%",
+                  }}
+                >
                   {inr(monthlyCost)}
                 </div>
               </div>
@@ -535,9 +544,6 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
           <div className="card card-pad" data-testid="daily-spend-by-day">
             {monthTxnsPending ? (
               <div aria-busy="true">
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
-                  <h3 className="card-h" style={{ margin: 0 }}>Daily spend by day · {monthLabel(month)}</h3>
-                </div>
                 <div
                   style={{
                     height: 170,
@@ -546,20 +552,20 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
                     border: "1px solid var(--border-2)",
                   }}
                 />
+                <h3 className="card-h" style={{ margin: "14px 0 0" }}>Daily Spend by Day</h3>
               </div>
             ) : monthTxnsShowError ? (
               <div>
-                <h3 className="card-h" style={{ margin: "0 0 10px" }}>Daily spend by day · {monthLabel(month)}</h3>
                 <p className="muted" style={{ fontSize: 13, margin: "0 0 12px" }}>Could not load daily spend for this month.</p>
                 <button type="button" className="btn btn-soft" onClick={() => monthTxnsQuery.refetch()}>
                   Retry
                 </button>
+                <h3 className="card-h" style={{ margin: "14px 0 0" }}>Daily Spend by Day</h3>
               </div>
             ) : (
               <>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
-                  <h3 className="card-h" style={{ margin: 0 }}>Daily spend by day · {monthLabel(month)}</h3>
-                  <div style={{ flex: "none", textAlign: "right", whiteSpace: "nowrap" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline", justifyContent: "flex-start", marginBottom: 14 }}>
+                  <div style={{ flex: "none", textAlign: "left", whiteSpace: "nowrap" }}>
                     <div className="num" style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>
                       {inr(dailyByDayTotal)}
                     </div>
@@ -577,6 +583,7 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
                       : `Daily spend by day for ${monthLabel(month)}, total ${inr(dailyByDayTotal)}, average ${inr(dailyAvg.avg)} per day, ${dailyByDay.length} days`
                   }
                 />
+                <h3 className="card-h" style={{ margin: "14px 0 0" }}>Daily Spend by Day</h3>
               </>
             )}
           </div>

@@ -3,7 +3,7 @@ import type { ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  openMonth, setMonthClosed, getSettings, updateBudgets,
+  openMonth, getSettings, updateBudgets,
   createTxn, updateTxn, deleteTxn,
 } from "../api/ledger";
 import { inr } from "../lib/money";
@@ -100,7 +100,7 @@ function QuickAddTile({ onOpen }: { onOpen: () => void }) {
           Log any spend
         </div>
         <p className="muted" style={{ margin: "8px 0 0", fontSize: 13.5, lineHeight: 1.4, maxWidth: "28ch" }}>
-          One row for Bare Minimum, Subscriptions, Daily, or Income — no tile hopping.
+          One row for Bare Minimum, Subscriptions, Daily, or Income. No tile hopping.
         </p>
       </div>
       <span
@@ -168,7 +168,11 @@ function TileCard({ meta, rows, budget, onOpen }: {
       </div>
       <div className="bar"><i style={{ width: `${Math.min(ratio * 100, 100)}%`, background: budgetColor(ratio) }} /></div>
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12 }}>
-        <span style={{ fontWeight: 600, color: budgetColor(ratio) }}>{Math.round(ratio * 100)}% used</span>
+        <span style={{ fontWeight: 600, color: budgetColor(ratio) }}>
+          {ratio > 1
+            ? `${Math.round(ratio)}× budget`
+            : `${Math.round(ratio * 100)}% used`}
+        </span>
         <span className="muted num">{inr(Math.max(budget - spent, 0))} left</span>
       </div>
       <div style={{ marginTop: 14, borderTop: "1px solid var(--border-2)", paddingTop: 10,
@@ -774,7 +778,7 @@ function IncomeTileCard({ meta, rows, onOpen }: { meta: TileMeta; rows: Transact
 // ─── RecordPage ───────────────────────────────────────────────────────────
 
 const META: Record<Section, TileMeta> = {
-  essential: { label: "Bare Minimum",   color: "var(--c-essential)", icon: IconRecord,     iconBg: "var(--c-essential-soft, #fff3e0)", tag: "Mandatory monthly spend",   unit: "rows filled", desc: "Rent, savings, EMIs — the non-negotiables. Rows clone into every new month." },
+  essential: { label: "Bare Minimum",   color: "var(--c-essential)", icon: IconRecord,     iconBg: "var(--c-essential-soft, #fff3e0)", tag: "Mandatory monthly spend",   unit: "entries",     desc: "Rent, savings, EMIs — the non-negotiables. Rows clone into every new month." },
   flexible:  { label: "Subscriptions",  color: "var(--c-flexible)",  icon: IconCreditCard, iconBg: "var(--c-flexible-soft,  #e8f5e9)", tag: "Recurring flexible spend",  unit: "active",      desc: "Wifi, SaaS, domains. Mark each Cash, Credit, or a Settlement that clears credits." },
   daily:     { label: "Daily / Running",color: "var(--c-daily)",     icon: IconTrend,      iconBg: "var(--c-daily-soft,     #e3f2fd)", tag: "Fast everyday entry",       unit: "entries",     desc: "Friction-free logging. Default is cash — flag Credit or Settlement only when needed." },
   income:    { label: "Income",         color: "var(--pos)",         icon: IconWallet,     iconBg: "var(--pos-soft,         #e8f5e9)", tag: "Money coming in",           unit: "entries",     desc: "Log salary, freelance, dividends and any other income. Always recorded as cash received." },
@@ -805,11 +809,6 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: getSettings });
   const [budgets, setBudgets] = useState<Budgets | null>(null);
   const effectiveBudgets = budgets ?? settings?.budgets ?? { essential: 0, flexible: 0, daily: 0 };
-
-  const closeMut = useMutation({
-    mutationFn: (c: boolean) => setMonthClosed(month, c),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["open-month", month] }),
-  });
 
   const budgetMut = useMutation({
     mutationFn: (b: Budgets) => updateBudgets(b),
@@ -850,9 +849,6 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
       {/* month row */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ink-3)" }}>
-            Open month
-          </span>
           <button
             className="btn btn-soft"
             style={{ padding: "7px 10px" }}
@@ -876,14 +872,6 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
           </button>
           <MonthDropdown month={month} setMonth={(m) => { setMonth(m); selectTile(null); }} disabled={copyPending} />
         </div>
-        <div style={{ flex: 1 }} />
-        <button
-          className="btn btn-soft"
-          onClick={() => closeMut.mutate(!closed)}
-          style={closed ? { background: "var(--surface-2)", color: "var(--ink-3)" } : {}}
-        >
-          {closed ? <><IconLock size={14} /> Month closed</> : <><IconCheck size={14} /> Close month</>}
-        </button>
       </div>
 
       {closed && (
