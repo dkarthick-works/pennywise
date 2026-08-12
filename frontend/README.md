@@ -151,7 +151,7 @@ of same-day entries does not reset to today.
 **Daily** and **Income** quick-add rows (and Daily row edits) use
 `CategoryInput` with ranked suggestions from
 `GET /api/transaction-names/suggestions`. Type at least **2 characters** to
-fetch; use ↑/↓ and Enter to pick. Queries are debounced (250 ms) and scoped
+fetch; use ↑/↓ and Enter to pick. Queries are debounced (200 ms) and scoped
 per section. Suggestions learn from past category labels via database triggers
 and survive renames/deletes of the source transaction.
 
