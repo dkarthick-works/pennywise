@@ -185,7 +185,7 @@ export function CategoryInput({
       setDebouncedQuery(trimmedQuery);
       setActiveIndex(-1);
       setActiveItemsKey("");
-    }, 250);
+    }, 200);
     return () => window.clearTimeout(timer);
   }, [dismissed, focused, queryIsValid, trimmedQuery, typedSinceFocus]);
 

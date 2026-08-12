@@ -10,6 +10,7 @@
 .claude_history
 .claude_history.json
 Ledger PRD (standalone).html
+/devlog.md
 
 /frontend/node_modules
 /backend/web/dist
