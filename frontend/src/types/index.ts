@@ -270,6 +270,35 @@ export interface LentTransferImportResult {
   imported_repayments: number;
 }
 
+// ─── Chit transfer archive ─────────────────────────────────────────────────
+
+export interface ChitTransferInstallment {
+  paid_on: string;
+  amount: number;
+  note: string;
+}
+
+export interface ChitTransferChit {
+  name: string;
+  organizer: string;
+  chit_value: number;
+  expected_monthly: number;
+  total_installments: number;
+  start_month: string;
+  installments: ChitTransferInstallment[];
+}
+
+export interface ChitTransferArchive {
+  format: "pennywise-chits";
+  version: 1;
+  chits: ChitTransferChit[];
+}
+
+export interface ChitTransferImportResult {
+  imported_chits: number;
+  imported_installments: number;
+}
+
 // ─── Chit funds (isolated from ledger transactions) ───────────────────────
 
 export type ChitStatus = "active" | "completed";

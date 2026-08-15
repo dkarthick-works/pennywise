@@ -162,6 +162,8 @@ only ever talks to this origin.
 | POST   | `/api/chits/{id}/installments` | record an installment payment |
 | PATCH  | `/api/chits/{id}/installments/{installmentId}` | update an installment |
 | DELETE | `/api/chits/{id}/installments/{installmentId}` | delete an installment |
+| GET    | `/api/chits/export[?chit_id={uuid}]` | download all chits, or one chit, as JSON |
+| POST   | `/api/chits/import` | atomically append chits and installments from JSON |
 
 ### Transaction JSON
 
@@ -591,6 +593,49 @@ After the **first installment**, `start_month`, `expected_monthly`, and
 
 Handlers: `internal/api/chits.go`; queries in `db/queries/chits.sql`;
 migration `0010_chits`.
+
+### Chit JSON transfer
+
+`GET /api/chits/export` returns a deterministic, versioned archive:
+
+```json
+{
+  "format": "pennywise-chits",
+  "version": 1,
+  "chits": [
+    {
+      "name": "Office chit",
+      "organizer": "Ravi",
+      "chit_value": 100000.00,
+      "expected_monthly": 5000.00,
+      "total_installments": 20,
+      "start_month": "2026-01-01",
+      "installments": [
+        { "paid_on": "2026-06-01", "amount": 5000.00, "note": "" }
+      ]
+    }
+  ]
+}
+```
+
+The archive omits IDs, user ownership, timestamps, status, counts, and totals.
+`POST /api/chits/import` validates the complete archive before opening a write
+transaction, creates fresh IDs, and returns
+`{ "imported_chits": N, "imported_installments": N }` with `201`. Re-importing
+the same file intentionally appends duplicates; existing records are never
+updated or deleted.
+
+The inclusive transfer limits are 5 MiB of raw UTF-8 JSON, 500 chits, 10,000
+installments, 1 MiB of stored UTF-8 names/organizers/notes, and 360
+installments per chit. Money is encoded as JSON numbers with at most two
+decimal places; exponent notation, non-finite values, over-precision, and
+out-of-range amounts are rejected. Limit violations return `413` with
+`{ "error": "import exceeds transfer limits" }` for imports. Full export
+violations return `413` and direct the user to export individual chits with
+`?chit_id={uuid}`. Empty full exports are valid; empty imports return `400`.
+
+Handlers: `internal/api/chit_transfer.go`; transfer queries are in
+`db/queries/chits.sql`.
 
 ## Configuration
 

@@ -30,7 +30,7 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/lents/:id` | Lent detail | Edit/delete lent, record and manage repayments |
 | `/chits` | Chit funds | List chit schemes with active/completed status |
 | `/chits/new` | Create chit | New chit-fund scheme form |
-| `/chits/:id` | Chit detail | View installments, record payments |
+| `/chits/:id` | Chit detail | View installments, record payments, export this chit as JSON |
 | `/chits/:id/edit` | Edit chit | Update scheme fields |
 | `/chits/:id/installments/new` | Add installment | Record a chit payment |
 | `/insights` | Insights | Emergency fund targets (from `GET /api/insights`) |
@@ -255,6 +255,19 @@ Imports are additive, generate new IDs, preserve repayment relationships, and
 are atomic; importing the same archive again creates another set of records.
 Archives are limited to 25 MiB, 10,000 lents, 50,000 repayments, and 500
 repayments per lent.
+
+**Chit transfer** — the same page exports all chit funds and nested
+installments as a versioned `pennywise-chits` JSON archive and previews a
+selected archive before import. Imports are append-only: they create fresh
+chits and installments, and importing the same file again creates duplicates.
+The archive contains setup fields and installment fields only; IDs, timestamps,
+status, counts, and totals are derived or ownership-specific and are omitted.
+Exports and imports are bounded by 5 MiB raw JSON, 500 chits, 10,000
+installments, 1 MiB of stored names/organizers/notes, 360 installments per
+chit, and the existing money maximum. Full-account export over a limit returns
+`413`; use **Export JSON** on an individual chit detail page as the fallback.
+The frontend submits the BOM-stripped raw JSON text unchanged so the backend
+can enforce exact numeric syntax.
 
 ## Categories page
 

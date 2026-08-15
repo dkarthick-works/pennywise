@@ -125,6 +125,8 @@ func (s *Server) Router() http.Handler {
 
 		pr.Get("/api/chits", s.handleListChits)
 		pr.Post("/api/chits", s.handleCreateChit)
+		pr.Get("/api/chits/export", s.handleExportChits)
+		pr.Post("/api/chits/import", s.handleImportChits)
 		pr.Get("/api/chits/{id}", s.handleGetChit)
 		pr.Patch("/api/chits/{id}", s.handleUpdateChit)
 		pr.Delete("/api/chits/{id}", s.handleDeleteChit)

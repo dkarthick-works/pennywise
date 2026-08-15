@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { exportChits, importChits } from "../api/chits";
 import { exportTransactions, importTransactions } from "../api/ledger";
 import { exportLents, importLents } from "../api/lents";
 import { AmountInput, DateCell, RowCategoryInput } from "../components/record/TableCells";
@@ -12,6 +13,11 @@ import {
   parseLentTransferJSON,
 } from "../lib/lentTransfer";
 import {
+  CHIT_ARCHIVE_MAX_BYTES,
+  chitTransferCounts,
+  parseChitTransferJSON,
+} from "../lib/chitTransfer";
+import {
   allRowsValid,
   countRowErrors,
   parseImportCSV,
@@ -20,7 +26,7 @@ import {
   type ImportParsedRow,
 } from "../lib/import";
 import { invalidateImportCaches } from "../lib/monthCaches";
-import type { LentTransferArchive, Section, TxnKind } from "../types";
+import type { ChitTransferArchive, LentTransferArchive, Section, TxnKind } from "../types";
 
 const SECTIONS: Section[] = ["essential", "flexible", "daily", "income"];
 const KINDS: TxnKind[] = ["cash", "credit"];
@@ -131,6 +137,15 @@ export function ImportExportPage() {
   const [lentImportError, setLentImportError] = useState("");
   const [lentImported, setLentImported] = useState<{ lents: number; repayments: number } | null>(null);
 
+  const chitFileRef = useRef<HTMLInputElement>(null);
+  const [chitExportError, setChitExportError] = useState("");
+  const [chitExported, setChitExported] = useState(false);
+  const [chitArchive, setChitArchive] = useState<ChitTransferArchive | null>(null);
+  const [chitRawArchiveText, setChitRawArchiveText] = useState("");
+  const [chitFileError, setChitFileError] = useState("");
+  const [chitImportError, setChitImportError] = useState("");
+  const [chitImported, setChitImported] = useState<{ chits: number; installments: number } | null>(null);
+
   const exportValidationError = isValidExportRange(from, to);
 
   const exportMut = useMutation({
@@ -211,6 +226,49 @@ export function ImportExportPage() {
     },
   });
 
+  const chitExportMut = useMutation({
+    mutationFn: () => exportChits(),
+    retry: false,
+    onMutate: () => {
+      setChitExportError("");
+      setChitExported(false);
+    },
+    onSuccess: ({ blob, filename }) => {
+      downloadBlob(blob, filename);
+      setChitExported(true);
+      setTimeout(() => setChitExported(false), 2200);
+    },
+    onError: (e) => {
+      setChitExportError(e instanceof Error ? e.message : "Export failed");
+    },
+  });
+
+  const chitImportMut = useMutation({
+    mutationFn: async () => {
+      if (!chitRawArchiveText) throw new Error("Choose a chit archive first.");
+      return importChits(chitRawArchiveText);
+    },
+    retry: false,
+    onMutate: () => {
+      setChitImportError("");
+      setChitImported(null);
+    },
+    onSuccess: (result) => {
+      setChitImported({
+        chits: result.imported_chits,
+        installments: result.imported_installments,
+      });
+      setChitArchive(null);
+      setChitRawArchiveText("");
+      if (chitFileRef.current) chitFileRef.current.value = "";
+      void qc.invalidateQueries({ queryKey: ["chits"] });
+      void qc.invalidateQueries({ queryKey: ["chit"] });
+    },
+    onError: (e) => {
+      setChitImportError(e instanceof Error ? e.message : "Import failed");
+    },
+  });
+
   function submitExport() {
     if (exportValidationError) {
       setExportError(exportValidationError);
@@ -279,6 +337,43 @@ export function ImportExportPage() {
     if (lentFileRef.current) lentFileRef.current.value = "";
   }
 
+  function onChitFileChange(file: File | undefined) {
+    setChitFileError("");
+    setChitImportError("");
+    setChitImported(null);
+    setChitArchive(null);
+    setChitRawArchiveText("");
+    if (!file) return;
+    if (file.size > CHIT_ARCHIVE_MAX_BYTES) {
+      setChitFileError("Archive exceeds the maximum size of 5 MiB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === "string" ? reader.result : "";
+      const result = parseChitTransferJSON(text);
+      if (result.fileError) {
+        setChitFileError(result.fileError);
+        return;
+      }
+      setChitArchive(result.archive);
+      setChitRawArchiveText(result.rawArchiveText);
+    };
+    reader.onerror = () => {
+      setChitFileError("Could not read the chit archive.");
+    };
+    reader.readAsText(file);
+  }
+
+  function clearChitImport() {
+    setChitArchive(null);
+    setChitRawArchiveText("");
+    setChitFileError("");
+    setChitImportError("");
+    setChitImported(null);
+    if (chitFileRef.current) chitFileRef.current.value = "";
+  }
+
   function removeRow(index: number) {
     setImportRows((prev) => revalidateRows(prev.filter((_, i) => i !== index)));
   }
@@ -292,7 +387,7 @@ export function ImportExportPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Import / Export</h1>
-          <p className="page-sub">Move transaction and lent data in and out of Pennywise.</p>
+          <p className="page-sub">Move transaction, lent, and chit data in and out of Pennywise.</p>
         </div>
       </div>
 
@@ -404,6 +499,7 @@ export function ImportExportPage() {
           </span>
         )}
       </div>
+
       <div className="card card-pad" style={{ marginTop: 20 }}>
         <h3 className="card-h" style={{ marginBottom: 4 }}>
           <IconExport size={15} /> Export lents
@@ -432,6 +528,7 @@ export function ImportExportPage() {
           )}
         </div>
       </div>
+
       <div className="card card-pad" style={{ marginTop: 20 }}>
         <h3 className="card-h" style={{ marginBottom: 4 }}>
           <IconDownload size={15} /> Import lents
@@ -486,6 +583,95 @@ export function ImportExportPage() {
         {lentImported && !lentArchive && (
           <span style={{ color: "var(--pos)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 5, marginTop: 14 }}>
             <IconCheck size={15} /> Imported {lentImported.lents} lent{lentImported.lents === 1 ? "" : "s"} and {lentImported.repayments} repayment{lentImported.repayments === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+
+      <div className="card card-pad" style={{ marginTop: 20 }}>
+        <h3 className="card-h" style={{ marginBottom: 4 }}>
+          <IconExport size={15} /> Export chits
+        </h3>
+        <p className="muted" style={{ fontSize: 13, marginTop: 10, lineHeight: 1.6 }}>
+          Download all chit funds and their installments as a versioned JSON archive. If the archive is too large,
+          export individual chits from their detail pages.
+        </p>
+        {chitExportError && (
+          <div style={{ color: "var(--neg)", fontSize: 13, fontWeight: 600, marginTop: 8 }}>
+            {chitExportError}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 18, flexWrap: "wrap" }}>
+          <button
+            className="btn btn-primary"
+            style={{ width: "auto" }}
+            onClick={() => chitExportMut.mutate()}
+            disabled={chitExportMut.isPending}
+          >
+            {chitExportMut.isPending ? "Exporting..." : "Export JSON"}
+          </button>
+          {chitExported && (
+            <span style={{ color: "var(--pos)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+              <IconCheck size={15} /> Download started
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="card card-pad" style={{ marginTop: 20 }}>
+        <h3 className="card-h" style={{ marginBottom: 4 }}>
+          <IconDownload size={15} /> Import chits
+        </h3>
+        <p className="muted" style={{ fontSize: 13, marginTop: 10, lineHeight: 1.6 }}>
+          Upload a Pennywise chit archive to add copies of its funds and installments. Repeating an import duplicates
+          records; existing chits are never changed.
+        </p>
+        <div style={{ marginTop: 18 }}>
+          <input
+            ref={chitFileRef}
+            type="file"
+            accept=".json,application/json"
+            className="input"
+            onChange={(e) => onChitFileChange(e.target.files?.[0])}
+          />
+        </div>
+
+        {(chitFileError || chitImportError) && (
+          <div style={{ color: "var(--neg)", fontSize: 13, fontWeight: 600, marginTop: 8 }}>
+            {chitFileError || chitImportError}
+          </div>
+        )}
+
+        {chitArchive && (() => {
+          const counts = chitTransferCounts(chitArchive);
+          return (
+            <>
+              <div className="import-summary" style={{ marginTop: 14 }}>
+                {counts.chits} chit{counts.chits === 1 ? "" : "s"} · {counts.installments} installment{counts.installments === 1 ? "" : "s"} · ready to import
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 18, flexWrap: "wrap" }}>
+                <button
+                  className="btn btn-primary"
+                  style={{ width: "auto" }}
+                  onClick={() => chitImportMut.mutate()}
+                  disabled={chitImportMut.isPending}
+                >
+                  {chitImportMut.isPending ? "Importing..." : "Import chit archive"}
+                </button>
+                <button
+                  className="btn btn-soft"
+                  style={{ width: "auto" }}
+                  onClick={clearChitImport}
+                >
+                  Clear
+                </button>
+              </div>
+            </>
+          );
+        })()}
+
+        {chitImported && !chitArchive && (
+          <span style={{ color: "var(--pos)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 5, marginTop: 14 }}>
+            <IconCheck size={15} /> Imported {chitImported.chits} chit{chitImported.chits === 1 ? "" : "s"} and {chitImported.installments} installment{chitImported.installments === 1 ? "" : "s"}
           </span>
         )}
       </div>
