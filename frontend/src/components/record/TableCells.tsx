@@ -59,7 +59,7 @@ export function AmountInput({
     <input
       className="cell-input num"
       inputMode="numeric"
-      style={{ textAlign: align as "left" | "right" }}
+      style={{ textAlign: align as "left" | "right", minWidth: 110 }}
       value={local}
       placeholder={placeholder}
       onChange={(e) => {

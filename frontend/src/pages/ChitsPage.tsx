@@ -53,38 +53,40 @@ export function ChitsPage() {
             No chits yet. Use Add chit to record a scheme you subscribe to.
           </p>
         ) : (
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Organizer</th>
-                <th style={{ textAlign: "right" }}>Chit value</th>
-                <th>Start</th>
-                <th>Progress</th>
-                <th style={{ textAlign: "right" }}>Total paid</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((c) => (
-                <tr
-                  key={c.id}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => navigate(`/chits/${c.id}`)}
-                >
-                  <td style={{ fontWeight: 600 }}>{c.name}</td>
-                  <td>{c.organizer}</td>
-                  <td className="num" style={{ textAlign: "right" }}>{inr(c.chit_value)}</td>
-                  <td className="muted">{startMonthToMonth(c.start_month) || c.start_month}</td>
-                  <td>
-                    {c.installment_count} / {c.total_installments}
-                  </td>
-                  <td className="num" style={{ textAlign: "right" }}>{inr(c.total_paid)}</td>
-                  <td><StatusChip status={c.status} /></td>
+          <div style={{ overflowX: "auto" }}>
+            <table className="tbl" style={{ minWidth: 860 }}>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Organizer</th>
+                  <th style={{ textAlign: "right" }}>Chit value</th>
+                  <th>Start</th>
+                  <th>Progress</th>
+                  <th style={{ textAlign: "right" }}>Total paid</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.map((c) => (
+                  <tr
+                    key={c.id}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => navigate(`/chits/${c.id}`)}
+                  >
+                    <td style={{ fontWeight: 600 }}>{c.name}</td>
+                    <td>{c.organizer}</td>
+                    <td className="num" style={{ textAlign: "right" }}>{inr(c.chit_value)}</td>
+                    <td className="muted">{startMonthToMonth(c.start_month) || c.start_month}</td>
+                    <td>
+                      {c.installment_count} / {c.total_installments}
+                    </td>
+                    <td className="num" style={{ textAlign: "right" }}>{inr(c.total_paid)}</td>
+                    <td><StatusChip status={c.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
