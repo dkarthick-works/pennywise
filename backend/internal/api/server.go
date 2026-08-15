@@ -112,6 +112,8 @@ func (s *Server) Router() http.Handler {
 
 		pr.Get("/api/lents", s.handleListLents)
 		pr.Post("/api/lents", s.handleCreateLent)
+		pr.Get("/api/lents/export", s.handleExportLents)
+		pr.Post("/api/lents/import", s.handleImportLents)
 		pr.Get("/api/lents/{id}", s.handleGetLent)
 		pr.Patch("/api/lents/{id}", s.handleUpdateLent)
 		pr.Delete("/api/lents/{id}", s.handleDeleteLent)
@@ -123,6 +125,8 @@ func (s *Server) Router() http.Handler {
 
 		pr.Get("/api/chits", s.handleListChits)
 		pr.Post("/api/chits", s.handleCreateChit)
+		pr.Get("/api/chits/export", s.handleExportChits)
+		pr.Post("/api/chits/import", s.handleImportChits)
 		pr.Get("/api/chits/{id}", s.handleGetChit)
 		pr.Patch("/api/chits/{id}", s.handleUpdateChit)
 		pr.Delete("/api/chits/{id}", s.handleDeleteChit)

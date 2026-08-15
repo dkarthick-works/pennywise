@@ -61,6 +61,47 @@ JOIN lents l ON l.id = r.lent_id
 WHERE r.lent_id = sqlc.arg(lent_id) AND l.user_id = sqlc.arg(user_id)
 ORDER BY r.repaid_on ASC, r.created_at ASC;
 
+-- name: LentTransferPreflight :one
+SELECT
+    (SELECT COUNT(*)::bigint
+     FROM lents l0
+     WHERE l0.user_id = sqlc.arg(user_id)) AS lent_count,
+    (SELECT COUNT(*)::bigint
+     FROM lent_repayments r
+     JOIN lents l ON l.id = r.lent_id
+     WHERE l.user_id = sqlc.arg(user_id)) AS repayment_count,
+    (SELECT COALESCE(MAX(rep_count), 0)::bigint
+     FROM (
+         SELECT COUNT(*)::bigint AS rep_count
+         FROM lent_repayments r
+         JOIN lents l ON l.id = r.lent_id
+         WHERE l.user_id = sqlc.arg(user_id)
+         GROUP BY r.lent_id
+     ) counts) AS max_repayments_per_lent,
+    CAST((
+        (SELECT COALESCE(SUM(octet_length(l0.counterparty) + octet_length(l0.note)), 0)::bigint
+         FROM lents l0
+         WHERE l0.user_id = sqlc.arg(user_id))
+        +
+        (SELECT COALESCE(SUM(octet_length(r.note)), 0)::bigint
+         FROM lent_repayments r
+         JOIN lents l ON l.id = r.lent_id
+         WHERE l.user_id = sqlc.arg(user_id))
+    ) AS bigint) AS text_bytes;
+
+-- name: ListLentsForTransfer :many
+SELECT l.id, l.user_id, l.counterparty, l.amount, l.lent_on, l.due_on, l.note
+FROM lents l
+WHERE l.user_id = sqlc.arg(user_id)
+ORDER BY l.lent_on ASC, l.id ASC;
+
+-- name: ListRepaymentsForTransfer :many
+SELECT r.id, r.lent_id, r.amount, r.repaid_on, r.note
+FROM lent_repayments r
+JOIN lents l ON l.id = r.lent_id
+WHERE l.user_id = sqlc.arg(user_id)
+ORDER BY r.lent_id ASC, r.repaid_on ASC, r.id ASC;
+
 -- name: InsertRepayment :one
 INSERT INTO lent_repayments (lent_id, amount, repaid_on, note)
 SELECT sqlc.arg(lent_id), sqlc.arg(amount), sqlc.arg(repaid_on), sqlc.arg(note)

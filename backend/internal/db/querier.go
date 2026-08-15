@@ -13,6 +13,8 @@ import (
 
 type Querier interface {
 	CategoryTextExistsForUser(ctx context.Context, arg CategoryTextExistsForUserParams) (bool, error)
+	ChitTransferChitPreflight(ctx context.Context, arg ChitTransferChitPreflightParams) (ChitTransferChitPreflightRow, error)
+	ChitTransferPreflight(ctx context.Context, userID uuid.UUID) (ChitTransferPreflightRow, error)
 	CountCategoryMappingsForGroup(ctx context.Context, arg CountCategoryMappingsForGroupParams) (int64, error)
 	CountInstallmentsForChit(ctx context.Context, chitID uuid.UUID) (int64, error)
 	// Distinct non-settlement daily categories for ghost autocomplete.
@@ -42,24 +44,33 @@ type Querier interface {
 	InsertCategoryMapping(ctx context.Context, arg InsertCategoryMappingParams) (CategoryMapping, error)
 	InsertChit(ctx context.Context, arg InsertChitParams) (Chit, error)
 	InsertChitInstallment(ctx context.Context, arg InsertChitInstallmentParams) (ChitInstallment, error)
+	InsertChitTransferInstallment(ctx context.Context, arg InsertChitTransferInstallmentParams) (uuid.UUID, error)
+	InsertChitTransferParent(ctx context.Context, arg InsertChitTransferParentParams) (uuid.UUID, error)
 	InsertLent(ctx context.Context, arg InsertLentParams) (Lent, error)
 	InsertRepayment(ctx context.Context, arg InsertRepaymentParams) (LentRepayment, error)
 	InsertSettlementLink(ctx context.Context, arg InsertSettlementLinkParams) error
 	InsertTemplate(ctx context.Context, arg InsertTemplateParams) (Template, error)
 	InsertTransaction(ctx context.Context, arg InsertTransactionParams) (Transaction, error)
+	LentTransferPreflight(ctx context.Context, userID uuid.UUID) (LentTransferPreflightRow, error)
 	ListCategoryGroups(ctx context.Context, userID uuid.UUID) ([]CategoryGroup, error)
 	ListCategoryMappings(ctx context.Context, userID uuid.UUID) ([]ListCategoryMappingsRow, error)
 	ListCategoryMappingsByGroup(ctx context.Context, arg ListCategoryMappingsByGroupParams) ([]CategoryMapping, error)
+	ListChitForTransfer(ctx context.Context, arg ListChitForTransferParams) ([]ListChitForTransferRow, error)
+	ListChitInstallmentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListChitInstallmentsForTransferRow, error)
+	ListChitInstallmentsForTransferByChit(ctx context.Context, arg ListChitInstallmentsForTransferByChitParams) ([]ListChitInstallmentsForTransferByChitRow, error)
 	ListChits(ctx context.Context, userID uuid.UUID) ([]ListChitsRow, error)
+	ListChitsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListChitsForTransferRow, error)
 	// Expense credit rows in a half-open [from, to) date window, for the credit
 	// drill-down. Mirrors SumCreditUsage's filter so totals reconcile.
 	ListCreditTransactionsByDateRange(ctx context.Context, arg ListCreditTransactionsByDateRangeParams) ([]Transaction, error)
 	ListInstallmentsForChit(ctx context.Context, arg ListInstallmentsForChitParams) ([]ChitInstallment, error)
 	ListLents(ctx context.Context, arg ListLentsParams) ([]ListLentsRow, error)
+	ListLentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListLentsForTransferRow, error)
 	ListLinksForSettlement(ctx context.Context, settlementID uuid.UUID) ([]uuid.UUID, error)
 	ListMonthStates(ctx context.Context, userID uuid.UUID) ([]MonthState, error)
 	ListPopularTransactionNameSuggestions(ctx context.Context, arg ListPopularTransactionNameSuggestionsParams) ([]string, error)
 	ListRepaymentsForLent(ctx context.Context, arg ListRepaymentsForLentParams) ([]ListRepaymentsForLentRow, error)
+	ListRepaymentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListRepaymentsForTransferRow, error)
 	// ---- settlement links --------------------------------------------------
 	// All (settlement_id, credit_id) pairs where the SETTLEMENT falls in the month.
 	ListSettlementLinksByMonth(ctx context.Context, arg ListSettlementLinksByMonthParams) ([]SettlementLink, error)

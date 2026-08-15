@@ -12,6 +12,79 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const chitTransferChitPreflight = `-- name: ChitTransferChitPreflight :one
+SELECT
+    (SELECT COUNT(*)::bigint
+     FROM chits c
+     WHERE c.id = $1 AND c.user_id = $2) AS chit_count,
+    (SELECT COUNT(*)::bigint
+     FROM chit_installments i
+     JOIN chits c ON c.id = i.chit_id
+     WHERE c.id = $1 AND c.user_id = $2) AS installment_count,
+    (
+        (SELECT COALESCE(SUM(octet_length(c.name) + octet_length(c.organizer)), 0)::bigint
+         FROM chits c
+         WHERE c.id = $1 AND c.user_id = $2)
+        +
+        (SELECT COALESCE(SUM(octet_length(i.note)), 0)::bigint
+         FROM chit_installments i
+         JOIN chits c ON c.id = i.chit_id
+         WHERE c.id = $1 AND c.user_id = $2)
+    )::bigint AS text_bytes
+`
+
+type ChitTransferChitPreflightParams struct {
+	ChitID uuid.UUID `json:"chit_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+type ChitTransferChitPreflightRow struct {
+	ChitCount        int64 `json:"chit_count"`
+	InstallmentCount int64 `json:"installment_count"`
+	TextBytes        int64 `json:"text_bytes"`
+}
+
+func (q *Queries) ChitTransferChitPreflight(ctx context.Context, arg ChitTransferChitPreflightParams) (ChitTransferChitPreflightRow, error) {
+	row := q.db.QueryRow(ctx, chitTransferChitPreflight, arg.ChitID, arg.UserID)
+	var i ChitTransferChitPreflightRow
+	err := row.Scan(&i.ChitCount, &i.InstallmentCount, &i.TextBytes)
+	return i, err
+}
+
+const chitTransferPreflight = `-- name: ChitTransferPreflight :one
+SELECT
+    (SELECT COUNT(*)::bigint
+     FROM chits c
+     WHERE c.user_id = $1) AS chit_count,
+    (SELECT COUNT(*)::bigint
+     FROM chit_installments i
+     JOIN chits c ON c.id = i.chit_id
+     WHERE c.user_id = $1) AS installment_count,
+    (
+        (SELECT COALESCE(SUM(octet_length(c.name) + octet_length(c.organizer)), 0)::bigint
+         FROM chits c
+         WHERE c.user_id = $1)
+        +
+        (SELECT COALESCE(SUM(octet_length(i.note)), 0)::bigint
+         FROM chit_installments i
+         JOIN chits c ON c.id = i.chit_id
+         WHERE c.user_id = $1)
+    )::bigint AS text_bytes
+`
+
+type ChitTransferPreflightRow struct {
+	ChitCount        int64 `json:"chit_count"`
+	InstallmentCount int64 `json:"installment_count"`
+	TextBytes        int64 `json:"text_bytes"`
+}
+
+func (q *Queries) ChitTransferPreflight(ctx context.Context, userID uuid.UUID) (ChitTransferPreflightRow, error) {
+	row := q.db.QueryRow(ctx, chitTransferPreflight, userID)
+	var i ChitTransferPreflightRow
+	err := row.Scan(&i.ChitCount, &i.InstallmentCount, &i.TextBytes)
+	return i, err
+}
+
 const countInstallmentsForChit = `-- name: CountInstallmentsForChit :one
 SELECT COUNT(*)::bigint AS installment_count
 FROM chit_installments
@@ -210,6 +283,212 @@ func (q *Queries) InsertChitInstallment(ctx context.Context, arg InsertChitInsta
 	return i, err
 }
 
+const insertChitTransferInstallment = `-- name: InsertChitTransferInstallment :one
+INSERT INTO chit_installments (chit_id, amount, paid_on, note)
+SELECT $1, $2, $3, $4
+FROM chits c
+WHERE c.id = $1 AND c.user_id = $5
+RETURNING id
+`
+
+type InsertChitTransferInstallmentParams struct {
+	ChitID uuid.UUID      `json:"chit_id"`
+	Amount pgtype.Numeric `json:"amount"`
+	PaidOn pgtype.Date    `json:"paid_on"`
+	Note   string         `json:"note"`
+	UserID uuid.UUID      `json:"user_id"`
+}
+
+func (q *Queries) InsertChitTransferInstallment(ctx context.Context, arg InsertChitTransferInstallmentParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, insertChitTransferInstallment,
+		arg.ChitID,
+		arg.Amount,
+		arg.PaidOn,
+		arg.Note,
+		arg.UserID,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const insertChitTransferParent = `-- name: InsertChitTransferParent :one
+INSERT INTO chits (
+    user_id, name, organizer, chit_value, expected_monthly,
+    total_installments, start_month
+)
+VALUES (
+    $1, $2, $3,
+    $4, $5,
+    $6, $7
+)
+RETURNING id
+`
+
+type InsertChitTransferParentParams struct {
+	UserID            uuid.UUID      `json:"user_id"`
+	Name              string         `json:"name"`
+	Organizer         string         `json:"organizer"`
+	ChitValue         pgtype.Numeric `json:"chit_value"`
+	ExpectedMonthly   pgtype.Numeric `json:"expected_monthly"`
+	TotalInstallments int32          `json:"total_installments"`
+	StartMonth        pgtype.Date    `json:"start_month"`
+}
+
+func (q *Queries) InsertChitTransferParent(ctx context.Context, arg InsertChitTransferParentParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, insertChitTransferParent,
+		arg.UserID,
+		arg.Name,
+		arg.Organizer,
+		arg.ChitValue,
+		arg.ExpectedMonthly,
+		arg.TotalInstallments,
+		arg.StartMonth,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const listChitForTransfer = `-- name: ListChitForTransfer :many
+SELECT c.id, c.name, c.organizer, c.chit_value, c.expected_monthly,
+       c.total_installments, c.start_month
+FROM chits c
+WHERE c.id = $1 AND c.user_id = $2
+`
+
+type ListChitForTransferParams struct {
+	ChitID uuid.UUID `json:"chit_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+type ListChitForTransferRow struct {
+	ID                uuid.UUID      `json:"id"`
+	Name              string         `json:"name"`
+	Organizer         string         `json:"organizer"`
+	ChitValue         pgtype.Numeric `json:"chit_value"`
+	ExpectedMonthly   pgtype.Numeric `json:"expected_monthly"`
+	TotalInstallments int32          `json:"total_installments"`
+	StartMonth        pgtype.Date    `json:"start_month"`
+}
+
+func (q *Queries) ListChitForTransfer(ctx context.Context, arg ListChitForTransferParams) ([]ListChitForTransferRow, error) {
+	rows, err := q.db.Query(ctx, listChitForTransfer, arg.ChitID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListChitForTransferRow
+	for rows.Next() {
+		var i ListChitForTransferRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Organizer,
+			&i.ChitValue,
+			&i.ExpectedMonthly,
+			&i.TotalInstallments,
+			&i.StartMonth,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listChitInstallmentsForTransfer = `-- name: ListChitInstallmentsForTransfer :many
+SELECT i.id, i.chit_id, i.amount, i.paid_on, i.note
+FROM chit_installments i
+JOIN chits c ON c.id = i.chit_id
+WHERE c.user_id = $1
+ORDER BY i.chit_id ASC, i.paid_on ASC, i.created_at ASC, i.id ASC
+`
+
+type ListChitInstallmentsForTransferRow struct {
+	ID     uuid.UUID      `json:"id"`
+	ChitID uuid.UUID      `json:"chit_id"`
+	Amount pgtype.Numeric `json:"amount"`
+	PaidOn pgtype.Date    `json:"paid_on"`
+	Note   string         `json:"note"`
+}
+
+func (q *Queries) ListChitInstallmentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListChitInstallmentsForTransferRow, error) {
+	rows, err := q.db.Query(ctx, listChitInstallmentsForTransfer, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListChitInstallmentsForTransferRow
+	for rows.Next() {
+		var i ListChitInstallmentsForTransferRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChitID,
+			&i.Amount,
+			&i.PaidOn,
+			&i.Note,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listChitInstallmentsForTransferByChit = `-- name: ListChitInstallmentsForTransferByChit :many
+SELECT i.id, i.chit_id, i.amount, i.paid_on, i.note
+FROM chit_installments i
+JOIN chits c ON c.id = i.chit_id
+WHERE i.chit_id = $1 AND c.user_id = $2
+ORDER BY i.paid_on ASC, i.created_at ASC, i.id ASC
+`
+
+type ListChitInstallmentsForTransferByChitParams struct {
+	ChitID uuid.UUID `json:"chit_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+type ListChitInstallmentsForTransferByChitRow struct {
+	ID     uuid.UUID      `json:"id"`
+	ChitID uuid.UUID      `json:"chit_id"`
+	Amount pgtype.Numeric `json:"amount"`
+	PaidOn pgtype.Date    `json:"paid_on"`
+	Note   string         `json:"note"`
+}
+
+func (q *Queries) ListChitInstallmentsForTransferByChit(ctx context.Context, arg ListChitInstallmentsForTransferByChitParams) ([]ListChitInstallmentsForTransferByChitRow, error) {
+	rows, err := q.db.Query(ctx, listChitInstallmentsForTransferByChit, arg.ChitID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListChitInstallmentsForTransferByChitRow
+	for rows.Next() {
+		var i ListChitInstallmentsForTransferByChitRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChitID,
+			&i.Amount,
+			&i.PaidOn,
+			&i.Note,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listChits = `-- name: ListChits :many
 SELECT
     c.id,
@@ -268,6 +547,52 @@ func (q *Queries) ListChits(ctx context.Context, userID uuid.UUID) ([]ListChitsR
 			&i.UpdatedAt,
 			&i.InstallmentCount,
 			&i.TotalPaid,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listChitsForTransfer = `-- name: ListChitsForTransfer :many
+SELECT c.id, c.name, c.organizer, c.chit_value, c.expected_monthly,
+       c.total_installments, c.start_month
+FROM chits c
+WHERE c.user_id = $1
+ORDER BY c.created_at DESC, c.id DESC
+`
+
+type ListChitsForTransferRow struct {
+	ID                uuid.UUID      `json:"id"`
+	Name              string         `json:"name"`
+	Organizer         string         `json:"organizer"`
+	ChitValue         pgtype.Numeric `json:"chit_value"`
+	ExpectedMonthly   pgtype.Numeric `json:"expected_monthly"`
+	TotalInstallments int32          `json:"total_installments"`
+	StartMonth        pgtype.Date    `json:"start_month"`
+}
+
+func (q *Queries) ListChitsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListChitsForTransferRow, error) {
+	rows, err := q.db.Query(ctx, listChitsForTransfer, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListChitsForTransferRow
+	for rows.Next() {
+		var i ListChitsForTransferRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Organizer,
+			&i.ChitValue,
+			&i.ExpectedMonthly,
+			&i.TotalInstallments,
+			&i.StartMonth,
 		); err != nil {
 			return nil, err
 		}

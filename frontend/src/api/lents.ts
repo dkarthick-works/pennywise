@@ -2,7 +2,16 @@
 
 import axios from "axios";
 import client from "./client";
-import type { Lent, LentInput, LentListStatus, LentRepayment, RepaymentInput } from "../types";
+import { parseContentDisposition } from "../lib/export";
+import type {
+  Lent,
+  LentInput,
+  LentListStatus,
+  LentRepayment,
+  LentTransferArchive,
+  LentTransferImportResult,
+  RepaymentInput,
+} from "../types";
 
 function unwrapApiError(e: unknown): never {
   if (axios.isAxiosError(e) && e.response?.data && typeof e.response.data === "object") {
@@ -46,3 +55,39 @@ export const deleteRepayment = (lentId: string, rid: string) =>
     .delete(`/api/lents/${lentId}/repayments/${rid}`)
     .then(() => undefined)
     .catch(unwrapApiError);
+
+export async function exportLents(): Promise<{ blob: Blob; filename: string }> {
+  try {
+    const response = await client.get<Blob>("/api/lents/export", { responseType: "blob" });
+    return {
+      blob: response.data,
+      filename: parseContentDisposition(response.headers["content-disposition"]) ?? "pennywise-lents-v1.json",
+    };
+  } catch (e) {
+    if (axios.isAxiosError(e) && e.response?.data instanceof Blob) {
+      const text = await e.response.data.text();
+      let message = "Export failed";
+      try {
+        const body = JSON.parse(text) as { error?: string };
+        message = body.error ?? message;
+      } catch {
+        // Keep the UI readable if the server returns a non-JSON error.
+      }
+      throw new Error(message, { cause: e });
+    }
+    throw e;
+  }
+}
+
+export async function importLents(archive: LentTransferArchive): Promise<LentTransferImportResult> {
+  try {
+    const response = await client.post<LentTransferImportResult>("/api/lents/import", archive);
+    return response.data;
+  } catch (e) {
+    if (axios.isAxiosError(e) && e.response?.data && typeof e.response.data === "object") {
+      const body = e.response.data as { error?: string };
+      throw new Error(body.error ?? "Import failed", { cause: e });
+    }
+    throw e;
+  }
+}

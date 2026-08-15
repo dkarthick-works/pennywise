@@ -82,6 +82,10 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
 - **Chit funds** — isolated chit-fund subscriptions with installment tracking
   ([frontend/README.md § Chit funds page](frontend/README.md),
   [backend/README.md § Chits](backend/README.md))
+- **Chit JSON transfer** — bounded full-account or per-chit export and
+  append-only import with nested installments
+  ([frontend/README.md § Import / Export page](frontend/README.md),
+  [backend/README.md § Chit JSON transfer](backend/README.md))
 - **Insights** — emergency fund targets from essential spend lookback
   ([backend/README.md § Insights](backend/README.md))
 - **PWA** — installable, offline-capable app shell with safe cache headers on deploy

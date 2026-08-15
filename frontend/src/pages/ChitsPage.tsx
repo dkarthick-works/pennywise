@@ -27,7 +27,7 @@ export function ChitsPage() {
         <div>
           <h1 className="page-title">Chit funds</h1>
           <p className="page-sub">
-            Schemes you subscribe to — tracked separately from expenses, dashboard totals, insights, and CSV exports.
+            Schemes you subscribe to — tracked separately from expenses, dashboard totals, insights, and transaction CSV exports.
           </p>
         </div>
         <button

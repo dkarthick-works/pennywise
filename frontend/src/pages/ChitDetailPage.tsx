@@ -3,16 +3,18 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   deleteChitInstallment,
+  exportChits,
   getChit,
   updateChitInstallment,
 } from "../api/chits";
-import { IconChevL, IconPlus } from "../components/ui/Icons";
+import { IconChevL, IconExport, IconPlus } from "../components/ui/Icons";
 import {
   paymentVariance,
   startMonthToMonth,
   validateInstallmentForm,
 } from "../lib/chits";
 import { prettyDate } from "../lib/dates";
+import { downloadBlob } from "../lib/export";
 import { inr } from "../lib/money";
 import type { ChitInstallmentInput, ChitStatus } from "../types";
 
@@ -73,6 +75,14 @@ export function ChitDetailPage() {
     },
   });
 
+  const exportChitMut = useMutation({
+    mutationFn: () => exportChits(id),
+    retry: false,
+    onSuccess: ({ blob, filename }) => {
+      downloadBlob(blob, filename);
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="content fade-in">
@@ -112,11 +122,20 @@ export function ChitDetailPage() {
         <div>
           <h1 className="page-title">{chit.name}</h1>
           <p className="page-sub">
-            Installments are tracked separately and do not affect expenses, dashboard totals, insights, or CSV exports.
+            Installments are tracked separately and do not affect expenses, dashboard totals, insights, or transaction CSV exports.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <StatusChip status={chit.status} />
+          <button
+            type="button"
+            className="btn btn-soft"
+            style={{ width: "auto", padding: "10px 14px", display: "inline-flex", alignItems: "center", gap: 6 }}
+            onClick={() => exportChitMut.mutate()}
+            disabled={exportChitMut.isPending}
+          >
+            <IconExport size={15} /> {exportChitMut.isPending ? "Exporting..." : "Export JSON"}
+          </button>
           <button
             type="button"
             className="btn btn-ghost"
@@ -138,6 +157,11 @@ export function ChitDetailPage() {
           )}
         </div>
       </div>
+      {exportChitMut.isError && (
+        <p className="err-msg" style={{ marginTop: -8, marginBottom: 14 }}>
+          {exportChitMut.error instanceof Error ? exportChitMut.error.message : "Could not export this chit."}
+        </p>
+      )}
 
       <div
         className="card card-pad"
