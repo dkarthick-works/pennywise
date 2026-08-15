@@ -112,6 +112,8 @@ func (s *Server) Router() http.Handler {
 
 		pr.Get("/api/lents", s.handleListLents)
 		pr.Post("/api/lents", s.handleCreateLent)
+		pr.Get("/api/lents/export", s.handleExportLents)
+		pr.Post("/api/lents/import", s.handleImportLents)
 		pr.Get("/api/lents/{id}", s.handleGetLent)
 		pr.Patch("/api/lents/{id}", s.handleUpdateLent)
 		pr.Delete("/api/lents/{id}", s.handleDeleteLent)

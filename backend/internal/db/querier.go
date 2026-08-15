@@ -44,6 +44,7 @@ type Querier interface {
 	InsertChitInstallment(ctx context.Context, arg InsertChitInstallmentParams) (ChitInstallment, error)
 	InsertLent(ctx context.Context, arg InsertLentParams) (Lent, error)
 	InsertRepayment(ctx context.Context, arg InsertRepaymentParams) (LentRepayment, error)
+	LentTransferPreflight(ctx context.Context, userID uuid.UUID) (LentTransferPreflightRow, error)
 	InsertSettlementLink(ctx context.Context, arg InsertSettlementLinkParams) error
 	InsertTemplate(ctx context.Context, arg InsertTemplateParams) (Template, error)
 	InsertTransaction(ctx context.Context, arg InsertTransactionParams) (Transaction, error)
@@ -56,10 +57,12 @@ type Querier interface {
 	ListCreditTransactionsByDateRange(ctx context.Context, arg ListCreditTransactionsByDateRangeParams) ([]Transaction, error)
 	ListInstallmentsForChit(ctx context.Context, arg ListInstallmentsForChitParams) ([]ChitInstallment, error)
 	ListLents(ctx context.Context, arg ListLentsParams) ([]ListLentsRow, error)
+	ListLentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListLentsForTransferRow, error)
 	ListLinksForSettlement(ctx context.Context, settlementID uuid.UUID) ([]uuid.UUID, error)
 	ListMonthStates(ctx context.Context, userID uuid.UUID) ([]MonthState, error)
 	ListPopularTransactionNameSuggestions(ctx context.Context, arg ListPopularTransactionNameSuggestionsParams) ([]string, error)
 	ListRepaymentsForLent(ctx context.Context, arg ListRepaymentsForLentParams) ([]ListRepaymentsForLentRow, error)
+	ListRepaymentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListRepaymentsForTransferRow, error)
 	// ---- settlement links --------------------------------------------------
 	// All (settlement_id, credit_id) pairs where the SETTLEMENT falls in the month.
 	ListSettlementLinksByMonth(ctx context.Context, arg ListSettlementLinksByMonthParams) ([]SettlementLink, error)

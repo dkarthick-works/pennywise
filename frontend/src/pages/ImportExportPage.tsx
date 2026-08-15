@@ -1,10 +1,16 @@
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { exportTransactions, importTransactions } from "../api/ledger";
+import { exportLents, importLents } from "../api/lents";
 import { AmountInput, DateCell, RowCategoryInput } from "../components/record/TableCells";
 import { IconCheck, IconDownload, IconExport, IconX } from "../components/ui/Icons";
 import { currentMonth } from "../lib/dates";
 import { defaultExportRange, downloadBlob, isValidExportRange } from "../lib/export";
+import {
+  LENT_ARCHIVE_MAX_BYTES,
+  lentTransferCounts,
+  parseLentTransferJSON,
+} from "../lib/lentTransfer";
 import {
   allRowsValid,
   countRowErrors,
@@ -14,7 +20,7 @@ import {
   type ImportParsedRow,
 } from "../lib/import";
 import { invalidateImportCaches } from "../lib/monthCaches";
-import type { Section, TxnKind } from "../types";
+import type { LentTransferArchive, Section, TxnKind } from "../types";
 
 const SECTIONS: Section[] = ["essential", "flexible", "daily", "income"];
 const KINDS: TxnKind[] = ["cash", "credit"];
@@ -117,6 +123,14 @@ export function ImportExportPage() {
   const [importError, setImportError] = useState("");
   const [imported, setImported] = useState<number | null>(null);
 
+  const lentFileRef = useRef<HTMLInputElement>(null);
+  const [lentExportError, setLentExportError] = useState("");
+  const [lentExported, setLentExported] = useState(false);
+  const [lentArchive, setLentArchive] = useState<LentTransferArchive | null>(null);
+  const [lentFileError, setLentFileError] = useState("");
+  const [lentImportError, setLentImportError] = useState("");
+  const [lentImported, setLentImported] = useState<{ lents: number; repayments: number } | null>(null);
+
   const exportValidationError = isValidExportRange(from, to);
 
   const exportMut = useMutation({
@@ -155,6 +169,48 @@ export function ImportExportPage() {
     },
   });
 
+  const lentExportMut = useMutation({
+    mutationFn: exportLents,
+    retry: false,
+    onMutate: () => {
+      setLentExportError("");
+      setLentExported(false);
+    },
+    onSuccess: ({ blob, filename }) => {
+      downloadBlob(blob, filename);
+      setLentExported(true);
+      setTimeout(() => setLentExported(false), 2200);
+    },
+    onError: (e) => {
+      setLentExportError(e instanceof Error ? e.message : "Export failed");
+    },
+  });
+
+  const lentImportMut = useMutation({
+    mutationFn: async () => {
+      if (!lentArchive) throw new Error("Choose a lent archive first.");
+      return importLents(lentArchive);
+    },
+    retry: false,
+    onMutate: () => {
+      setLentImportError("");
+      setLentImported(null);
+    },
+    onSuccess: (result) => {
+      setLentImported({
+        lents: result.imported_lents,
+        repayments: result.imported_repayments,
+      });
+      setLentArchive(null);
+      if (lentFileRef.current) lentFileRef.current.value = "";
+      void qc.invalidateQueries({ queryKey: ["lents"] });
+      void qc.invalidateQueries({ queryKey: ["lent"] });
+    },
+    onError: (e) => {
+      setLentImportError(e instanceof Error ? e.message : "Import failed");
+    },
+  });
+
   function submitExport() {
     if (exportValidationError) {
       setExportError(exportValidationError);
@@ -189,6 +245,40 @@ export function ImportExportPage() {
     reader.readAsText(file);
   }
 
+  function onLentFileChange(file: File | undefined) {
+    setLentFileError("");
+    setLentImportError("");
+    setLentImported(null);
+    setLentArchive(null);
+    if (!file) return;
+    if (file.size > LENT_ARCHIVE_MAX_BYTES) {
+      setLentFileError("Archive exceeds the maximum size of 25 MiB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === "string" ? reader.result : "";
+      const result = parseLentTransferJSON(text);
+      if (result.fileError) {
+        setLentFileError(result.fileError);
+        return;
+      }
+      setLentArchive(result.archive);
+    };
+    reader.onerror = () => {
+      setLentFileError("Could not read the lent archive.");
+    };
+    reader.readAsText(file);
+  }
+
+  function clearLentImport() {
+    setLentArchive(null);
+    setLentFileError("");
+    setLentImportError("");
+    setLentImported(null);
+    if (lentFileRef.current) lentFileRef.current.value = "";
+  }
+
   function removeRow(index: number) {
     setImportRows((prev) => revalidateRows(prev.filter((_, i) => i !== index)));
   }
@@ -202,7 +292,7 @@ export function ImportExportPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Import / Export</h1>
-          <p className="page-sub">Move transaction data in and out of Pennywise.</p>
+          <p className="page-sub">Move transaction and lent data in and out of Pennywise.</p>
         </div>
       </div>
 
@@ -311,6 +401,91 @@ export function ImportExportPage() {
         {imported !== null && importRows.length === 0 && (
           <span style={{ color: "var(--pos)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 5, marginTop: 14 }}>
             <IconCheck size={15} /> Imported {imported} transaction{imported === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+      <div className="card card-pad" style={{ marginTop: 20 }}>
+        <h3 className="card-h" style={{ marginBottom: 4 }}>
+          <IconExport size={15} /> Export lents
+        </h3>
+        <p className="muted" style={{ fontSize: 13, marginTop: 10, lineHeight: 1.6 }}>
+          Download all lent records, including settled lents and their repayment history, as a versioned JSON archive.
+        </p>
+        {lentExportError && (
+          <div style={{ color: "var(--neg)", fontSize: 13, fontWeight: 600, marginTop: 8 }}>
+            {lentExportError}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 18, flexWrap: "wrap" }}>
+          <button
+            className="btn btn-primary"
+            style={{ width: "auto" }}
+            onClick={() => lentExportMut.mutate()}
+            disabled={lentExportMut.isPending}
+          >
+            {lentExportMut.isPending ? "Exporting..." : "Export JSON"}
+          </button>
+          {lentExported && (
+            <span style={{ color: "var(--pos)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+              <IconCheck size={15} /> Download started
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="card card-pad" style={{ marginTop: 20 }}>
+        <h3 className="card-h" style={{ marginBottom: 4 }}>
+          <IconDownload size={15} /> Import lents
+        </h3>
+        <p className="muted" style={{ fontSize: 13, marginTop: 10, lineHeight: 1.6 }}>
+          Upload a Pennywise lent archive to add copies of its lents and repayment history. Repeating an import duplicates the records.
+        </p>
+        <div style={{ marginTop: 18 }}>
+          <input
+            ref={lentFileRef}
+            type="file"
+            accept=".json,application/json"
+            className="input"
+            onChange={(e) => onLentFileChange(e.target.files?.[0])}
+          />
+        </div>
+
+        {(lentFileError || lentImportError) && (
+          <div style={{ color: "var(--neg)", fontSize: 13, fontWeight: 600, marginTop: 8 }}>
+            {lentFileError || lentImportError}
+          </div>
+        )}
+
+        {lentArchive && (() => {
+          const counts = lentTransferCounts(lentArchive);
+          return (
+            <>
+              <div className="import-summary" style={{ marginTop: 14 }}>
+                {counts.lents} lent{counts.lents === 1 ? "" : "s"} · {counts.repayments} repayment{counts.repayments === 1 ? "" : "s"} · ready to import
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 18, flexWrap: "wrap" }}>
+                <button
+                  className="btn btn-primary"
+                  style={{ width: "auto" }}
+                  onClick={() => lentImportMut.mutate()}
+                  disabled={lentImportMut.isPending}
+                >
+                  {lentImportMut.isPending ? "Importing..." : "Import lent archive"}
+                </button>
+                <button
+                  className="btn btn-soft"
+                  style={{ width: "auto" }}
+                  onClick={clearLentImport}
+                >
+                  Clear
+                </button>
+              </div>
+            </>
+          );
+        })()}
+
+        {lentImported && !lentArchive && (
+          <span style={{ color: "var(--pos)", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 5, marginTop: 14 }}>
+            <IconCheck size={15} /> Imported {lentImported.lents} lent{lentImported.lents === 1 ? "" : "s"} and {lentImported.repayments} repayment{lentImported.repayments === 1 ? "" : "s"}
           </span>
         )}
       </div>

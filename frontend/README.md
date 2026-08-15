@@ -248,6 +248,14 @@ income must be `cash`. Category mappings are **not** applied automatically —
 map new labels on the Categories page after import. Successful import
 invalidates transaction and suggestion caches for the returned months.
 
+**Lent transfer** — the page also exports all lent records, including settled
+lents and nested repayments, as a versioned `pennywise-lents-v1.json` archive.
+Upload a JSON archive to preview its lent and repayment counts before importing.
+Imports are additive, generate new IDs, preserve repayment relationships, and
+are atomic; importing the same archive again creates another set of records.
+Archives are limited to 25 MiB, 10,000 lents, 50,000 repayments, and 500
+repayments per lent.
+
 ## Categories page
 
 Nav item: **Map Categories** (`/categories`). Maps free-text transaction labels to

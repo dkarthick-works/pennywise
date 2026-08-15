@@ -172,6 +172,54 @@ func (q *Queries) InsertRepayment(ctx context.Context, arg InsertRepaymentParams
 	return i, err
 }
 
+const lentTransferPreflight = `-- name: LentTransferPreflight :one
+SELECT
+    (SELECT COUNT(*)::bigint
+     FROM lents l0
+     WHERE l0.user_id = $1) AS lent_count,
+    (SELECT COUNT(*)::bigint
+     FROM lent_repayments r
+     JOIN lents l ON l.id = r.lent_id
+     WHERE l.user_id = $1) AS repayment_count,
+    (SELECT COALESCE(MAX(rep_count), 0)::bigint
+     FROM (
+         SELECT COUNT(*)::bigint AS rep_count
+         FROM lent_repayments r
+         JOIN lents l ON l.id = r.lent_id
+         WHERE l.user_id = $1
+         GROUP BY r.lent_id
+     ) counts) AS max_repayments_per_lent,
+    CAST((
+        (SELECT COALESCE(SUM(octet_length(l0.counterparty) + octet_length(l0.note)), 0)::bigint
+         FROM lents l0
+         WHERE l0.user_id = $1)
+        +
+        (SELECT COALESCE(SUM(octet_length(r.note)), 0)::bigint
+         FROM lent_repayments r
+         JOIN lents l ON l.id = r.lent_id
+         WHERE l.user_id = $1)
+    ) AS bigint) AS text_bytes
+`
+
+type LentTransferPreflightRow struct {
+	LentCount            int64 `json:"lent_count"`
+	RepaymentCount       int64 `json:"repayment_count"`
+	MaxRepaymentsPerLent int64 `json:"max_repayments_per_lent"`
+	TextBytes            int64 `json:"text_bytes"`
+}
+
+func (q *Queries) LentTransferPreflight(ctx context.Context, userID uuid.UUID) (LentTransferPreflightRow, error) {
+	row := q.db.QueryRow(ctx, lentTransferPreflight, userID)
+	var i LentTransferPreflightRow
+	err := row.Scan(
+		&i.LentCount,
+		&i.RepaymentCount,
+		&i.MaxRepaymentsPerLent,
+		&i.TextBytes,
+	)
+	return i, err
+}
+
 const listLents = `-- name: ListLents :many
 SELECT l.id, l.user_id, l.counterparty, l.amount, l.lent_on, l.due_on, l.note,
        COALESCE(r.total, 0)::numeric            AS repaid_total,
@@ -236,6 +284,51 @@ func (q *Queries) ListLents(ctx context.Context, arg ListLentsParams) ([]ListLen
 	return items, nil
 }
 
+const listLentsForTransfer = `-- name: ListLentsForTransfer :many
+SELECT l.id, l.user_id, l.counterparty, l.amount, l.lent_on, l.due_on, l.note
+FROM lents l
+WHERE l.user_id = $1
+ORDER BY l.lent_on ASC, l.id ASC
+`
+
+type ListLentsForTransferRow struct {
+	ID           uuid.UUID      `json:"id"`
+	UserID       uuid.UUID      `json:"user_id"`
+	Counterparty string         `json:"counterparty"`
+	Amount       pgtype.Numeric `json:"amount"`
+	LentOn       pgtype.Date    `json:"lent_on"`
+	DueOn        pgtype.Date    `json:"due_on"`
+	Note         string         `json:"note"`
+}
+
+func (q *Queries) ListLentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListLentsForTransferRow, error) {
+	rows, err := q.db.Query(ctx, listLentsForTransfer, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLentsForTransferRow
+	for rows.Next() {
+		var i ListLentsForTransferRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Counterparty,
+			&i.Amount,
+			&i.LentOn,
+			&i.DueOn,
+			&i.Note,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRepaymentsForLent = `-- name: ListRepaymentsForLent :many
 SELECT r.id, r.lent_id, r.amount, r.repaid_on, r.note
 FROM lent_repayments r
@@ -266,6 +359,48 @@ func (q *Queries) ListRepaymentsForLent(ctx context.Context, arg ListRepaymentsF
 	var items []ListRepaymentsForLentRow
 	for rows.Next() {
 		var i ListRepaymentsForLentRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LentID,
+			&i.Amount,
+			&i.RepaidOn,
+			&i.Note,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRepaymentsForTransfer = `-- name: ListRepaymentsForTransfer :many
+SELECT r.id, r.lent_id, r.amount, r.repaid_on, r.note
+FROM lent_repayments r
+JOIN lents l ON l.id = r.lent_id
+WHERE l.user_id = $1
+ORDER BY r.lent_id ASC, r.repaid_on ASC, r.id ASC
+`
+
+type ListRepaymentsForTransferRow struct {
+	ID       uuid.UUID      `json:"id"`
+	LentID   uuid.UUID      `json:"lent_id"`
+	Amount   pgtype.Numeric `json:"amount"`
+	RepaidOn pgtype.Date    `json:"repaid_on"`
+	Note     string         `json:"note"`
+}
+
+func (q *Queries) ListRepaymentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListRepaymentsForTransferRow, error) {
+	rows, err := q.db.Query(ctx, listRepaymentsForTransfer, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRepaymentsForTransferRow
+	for rows.Next() {
+		var i ListRepaymentsForTransferRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.LentID,
