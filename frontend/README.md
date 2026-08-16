@@ -81,6 +81,22 @@ When a **credit spending threshold** is set in Settings
 progress bar with "within" / "over threshold" text. The same rupee limit applies
 independently to statement-cycle and calendar-month totals.
 
+### Daily spend by day
+
+Below the hero cards, a **Daily Spend by Day** bar chart shows **Daily**
+section incurred spend (`cash` + `credit`) for each calendar day in the
+selected month. Data comes from the same month transaction fetch as the Record
+page (`GET /api/transactions?month=`); the chart is computed client-side in
+`src/lib/txns.ts` (`dailySpendByDay`, `dailySpendAverage`) and rendered with
+`DayBars` in `src/components/charts/Charts.tsx`.
+
+Every day in the month appears on the axis — days with no matching rows show
+₹0. Future-dated transactions in the selected month are included. The card
+header shows the month total and an average rupees-per-day figure: for the
+**current** month the average is through today ("Avg · …/day · so far"); for
+past or future months it uses the full month. Loading, error/retry, and empty
+month states mirror the hero cards.
+
 ### Category group spend
 
 When the user has category groups, a **Category groups** section lists monthly
@@ -179,6 +195,30 @@ Income has no template rows, so it always inserts.
 Dates are shifted into the target month. Existing non-zero rows are never
 replaced. The operation is not fully atomic — if inserts succeed but some fills
 fail, the UI warns against retrying (which would duplicate inserts).
+
+### Quick add
+
+The **Quick add** tile on the Record grid opens `/record/entry` — a single-form
+workflow for rapid cross-section entry without opening each section tile.
+
+**Flow:** type name → amount → Enter (or click +). Section and kind are chosen
+via cycle chips before each add; income always posts as `cash`. Keyboard:
+**Alt+S** cycles section (Essential → Flexible → Daily → Income), **Alt+K**
+cycles kind (Cash → Credit → Settlement). Bare S/K are intentionally ignored so
+typing in the name field is safe.
+
+**Date** defaults to the latest date already present in the open month (same
+`defaultDraftDate` helper as Daily/Income quick-add). It stays sticky across
+adds until the user edits the date field; month navigation always keeps the
+date inside the selected month.
+
+**This session** lists every row created during the visit (newest first). Each
+session row supports inline edit and delete via the same `PATCH`/`DELETE`
+transaction APIs as the Record tables. Session state is visit-local — leaving
+the page clears the log, but saved rows remain in the ledger.
+
+Implementation: `src/pages/RecordEntryPage.tsx`; month bootstrap via
+`openMonth` (`POST /api/months/{month}/open`).
 
 ## Settings page
 
