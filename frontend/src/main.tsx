@@ -3,9 +3,14 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import Clarity from "@microsoft/clarity";
 import { AuthProvider } from "./auth/AuthContext";
 import App from "./App";
 import "./index.css";
+
+if (import.meta.env.PROD) {
+  Clarity.init("y73hfomedf");
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
