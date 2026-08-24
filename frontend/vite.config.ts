@@ -21,7 +21,7 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api/],
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
       },
-      includeAssets: ["favicon.svg", "favicon.ico", "apple-touch-icon-180x180.png"],
+      includeAssets: ["favicon.png", "favicon.ico", "apple-touch-icon-180x180.png"],
       manifest: {
         name: "Pennywise",
         short_name: "Pennywise",
