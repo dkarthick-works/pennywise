@@ -207,13 +207,14 @@ export function ChitDetailPage() {
       )}
 
       <div className="card" style={{ overflow: "hidden" }}>
-        <div style={{ fontWeight: 700, fontSize: 14, padding: "14px 18px 0" }}>Installments</div>
+        <div style={{ fontWeight: 700, fontSize: 14, padding: "14px 12px 0" }}>Installments</div>
         {(chit.installments?.length ?? 0) === 0 ? (
           <p className="muted" style={{ margin: 0, padding: 18, fontSize: 13 }}>
             No installments recorded yet.
           </p>
         ) : (
-          <table className="tbl">
+          <div className="table-scroll">
+            <table className="tbl installment-table">
             <thead>
               <tr>
                 <th>Paid on</th>
@@ -324,7 +325,8 @@ export function ChitDetailPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </div>
     </div>
