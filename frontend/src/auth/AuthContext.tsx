@@ -4,7 +4,12 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { login as apiLogin, logout as apiLogout } from "../api/auth";
-import { getToken, clearToken } from "../api/client";
+import {
+  getToken,
+  refreshSession,
+  RetryableAuthError,
+  TerminalAuthError,
+} from "../api/client";
 import type { LoginRequest, Profile } from "../types";
 import client from "../api/client";
 
@@ -12,11 +17,13 @@ interface AuthState {
   token: string | null;
   profile: Profile | null;
   isLoading: boolean;
+  hasRetryableError: boolean;
 }
 
 interface AuthCtx extends AuthState {
   login: (body: LoginRequest) => Promise<void>;
   logout: () => Promise<void>;
+  retry: () => Promise<void>;
   setProfile: (p: Profile) => void;
 }
 
@@ -28,45 +35,106 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     token: getToken(),
     profile: null,
     isLoading: true,
+    hasRetryableError: false,
   });
 
-  // On mount, if we have a token already, fetch /api/me to rehydrate profile.
-  useEffect(() => {
-    if (!getToken()) {
-      setState((s) => ({ ...s, isLoading: false }));
-      return;
-    }
-    client
-      .get<Profile>("/api/me")
-      .then(({ data }) =>
-        setState({ token: getToken(), profile: data, isLoading: false })
-      )
-      .catch(() => {
-        clearToken();
-        setState({ token: null, profile: null, isLoading: false });
+  const hydrate = useCallback(async () => {
+    setState((s) => ({ ...s, isLoading: true, hasRetryableError: false }));
+    try {
+      if (!getToken()) await refreshSession();
+      const { data } = await client.get<Profile>("/api/me");
+      setState({
+        token: getToken(),
+        profile: data,
+        isLoading: false,
+        hasRetryableError: false,
       });
+    } catch (error) {
+      if (error instanceof TerminalAuthError) {
+        setState({
+          token: null,
+          profile: null,
+          isLoading: false,
+          hasRetryableError: false,
+        });
+        return;
+      }
+      // Network failures, 5xx responses, and explicitly retryable refresh
+      // failures preserve the token and cached user data.
+      const status = typeof error === "object" && error !== null && "response" in error
+        ? (error as { response?: { status?: number } }).response?.status
+        : undefined;
+      const retryable = error instanceof RetryableAuthError
+        || status === undefined
+        || status >= 500;
+      setState((s) => ({
+        ...s,
+        token: getToken(),
+        isLoading: false,
+        hasRetryableError: retryable,
+      }));
+    }
   }, []);
+
+  useEffect(() => {
+    void Promise.resolve().then(hydrate);
+  }, [hydrate]);
 
   // Listen for token-expired events fired by the axios interceptor.
   useEffect(() => {
     const handler = () => {
-      setState({ token: null, profile: null, isLoading: false });
+      setState({
+        token: null,
+        profile: null,
+        isLoading: false,
+        hasRetryableError: false,
+      });
       qc.clear();
     };
     window.addEventListener("auth:expired", handler);
     return () => window.removeEventListener("auth:expired", handler);
   }, [qc]);
 
+  useEffect(() => {
+    const onToken = () => void hydrate();
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && getToken()) {
+        void refreshSession().then(() => hydrate()).catch((error) => {
+          if (error instanceof RetryableAuthError) {
+            setState((s) => ({ ...s, hasRetryableError: true }));
+          }
+        });
+      }
+    };
+    window.addEventListener("auth:token", onToken);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("auth:token", onToken);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [hydrate]);
+
   const login = useCallback(async (body: LoginRequest) => {
     await apiLogin(body);
     const { data } = await client.get<Profile>("/api/me");
-    setState({ token: getToken(), profile: data, isLoading: false });
+    setState({
+      token: getToken(),
+      profile: data,
+      isLoading: false,
+      hasRetryableError: false,
+    });
   }, []);
 
   const logout = useCallback(async () => {
-    await apiLogout();
-    setState({ token: null, profile: null, isLoading: false });
+    const request = apiLogout();
+    setState({
+      token: null,
+      profile: null,
+      isLoading: false,
+      hasRetryableError: false,
+    });
     qc.clear();
+    await request;
   }, [qc]);
 
   const setProfile = useCallback(
@@ -75,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <Ctx.Provider value={{ ...state, login, logout, setProfile }}>
+    <Ctx.Provider value={{ ...state, login, logout, retry: hydrate, setProfile }}>
       {children}
     </Ctx.Provider>
   );

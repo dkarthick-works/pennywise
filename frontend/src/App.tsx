@@ -24,9 +24,28 @@ import { ChitInstallmentCreatePage } from "./pages/ChitInstallmentCreatePage";
 import { currentMonth }  from "./lib/dates";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { token, isLoading } = useAuth();
+  const { token, isLoading, hasRetryableError, retry } = useAuth();
   const location = useLocation();
   if (isLoading) return null; // hold until we know
+  if (hasRetryableError) {
+    return (
+      <main className="min-h-screen grid place-items-center p-6">
+        <div className="max-w-sm text-center">
+          <h1 className="text-xl font-semibold">Connection unavailable</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            Your session is preserved. Reconnect and try again.
+          </p>
+          <button
+            type="button"
+            className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+            onClick={() => void retry()}
+          >
+            Retry
+          </button>
+        </div>
+      </main>
+    );
+  }
   if (!token) return <Navigate to="/login" state={{ from: location }} replace />;
   return <>{children}</>;
 }

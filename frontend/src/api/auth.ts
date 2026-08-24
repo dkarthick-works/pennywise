@@ -1,5 +1,5 @@
 import axios from "axios";
-import { setToken, clearToken } from "./client";
+import { setToken, invalidateSession } from "./client";
 import type {
   LoginRequest,
   SignupRequest,
@@ -30,8 +30,13 @@ export async function forgotPassword(body: ForgotPasswordRequest): Promise<void>
 }
 
 export async function logout(): Promise<void> {
-  clearToken();
-  await axios.post("/api/auth/logout", {}, { withCredentials: true });
+  invalidateSession();
+  try {
+    await axios.post("/api/auth/logout", {}, { withCredentials: true });
+  } catch {
+    // Local logout is authoritative. A failed server request must not restore
+    // authentication; the refresh cookie can be cleared on a later attempt.
+  }
 }
 
 export async function fetchProfile(): Promise<Profile> {

@@ -643,6 +643,24 @@ See `.env.example`. Key vars: `DATABASE_URL`, `JWT_SECRET` (must match Goauth),
 `JWT_USER_CLAIM`/`JWT_EMAIL_CLAIM`, `GOAUTH_BASE_URL`, `CORS_ORIGINS`,
 `SEED_DEMO_DATA`.
 
+### Production refresh-cookie gate
+
+Pennywise rewrites Goauth cookie paths from `/auth` to `/api/auth`, but preserves
+all other attributes. Before deploying session bootstrap changes, inspect a real
+production login response in browser network tools. Redact the cookie value and
+verify the final `Set-Cookie` response has:
+
+- a persistent and sufficiently long `Max-Age` or `Expires` (not a session cookie)
+- `HttpOnly`
+- `Secure`
+- a `SameSite` value suitable for the deployment topology
+- `Path=/api/auth`
+- no `Domain`, or a `Domain` compatible with the Pennywise application host
+
+Do not commit or log the cookie value. If any attribute is wrong, correct the
+Goauth/deployment configuration first; proxy tests only prove preservation and
+cannot prove that a production PWA will retain the cookie.
+
 ### Password reset
 
 Requesting a reset link (`/forgot-password` in the frontend, proxied through
