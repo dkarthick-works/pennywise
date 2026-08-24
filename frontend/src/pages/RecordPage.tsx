@@ -27,7 +27,7 @@ import { CopyLastMonthButton } from "../components/record/CopyLastMonthButton";
 import { MonthDropdown } from "../components/record/MonthDropdown";
 import {
   IconChevL, IconChevR, IconPlus, IconX, IconCheck, IconLock, IconArrowR, IconDownload,
-  IconRecord, IconCreditCard, IconTrend, IconWallet, IconZap,
+  IconRecord, IconCreditCard, IconTrend, IconWallet, IconZap, IconDashboard,
 } from "../components/ui/Icons";
 import type { Transaction, Section, Budgets } from "../types";
 import { preserveApiRowOrder, sortRowsByDateDesc } from "../lib/recordRowOrder";
@@ -838,7 +838,7 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
   return (
     <div className="content fade-in">
       <div className="page-head">
-        <div>
+        <div style={{ flex: "1 1 200px", minWidth: 0 }}>
           <h1 className="page-title">Record Expense</h1>
           <p className="page-sub">
             Log this month's money. One date per row — flag Credit when cash hasn't left, Settlement when it clears a credit.
@@ -884,25 +884,38 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
       )}
 
       {tile === null ? (
-        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
-          <QuickAddTile onOpen={() => navigate("/record/entry")} />
-          {/* Expense tiles with budget tracking */}
-          {(["essential", "flexible", "daily"] as const).map((sec) => (
-            <TileCard
-              key={sec}
-              meta={META[sec]}
-              rows={rowsOf(sec)}
-              budget={effectiveBudgets[sec]}
-              onOpen={() => selectTile(sec)}
+        <>
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+            <QuickAddTile onOpen={() => navigate("/record/entry")} />
+            {/* Expense tiles with budget tracking */}
+            {(["essential", "flexible", "daily"] as const).map((sec) => (
+              <TileCard
+                key={sec}
+                meta={META[sec]}
+                rows={rowsOf(sec)}
+                budget={effectiveBudgets[sec]}
+                onOpen={() => selectTile(sec)}
+              />
+            ))}
+            {/* Income tile — no budget, shows total received */}
+            <IncomeTileCard
+              meta={META.income}
+              rows={rowsOf("income")}
+              onOpen={() => selectTile("income")}
             />
-          ))}
-          {/* Income tile — no budget, shows total received */}
-          <IncomeTileCard
-            meta={META.income}
-            rows={rowsOf("income")}
-            onOpen={() => selectTile("income")}
-          />
-        </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-start", marginTop: 16 }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ width: "auto", padding: "11px 18px" }}
+              onClick={() => navigate(`/dashboard?month=${month}`)}
+              aria-label="Go to dashboard"
+            >
+            <IconDashboard size={16} style={{ color: "#fff" }} /> Dashboard <IconChevR size={15} style={{ color: "#fff" }} />
+            </button>
+          </div>
+        </>
       ) : (
         <div className="fade-in">
           {tile !== "income" && (
