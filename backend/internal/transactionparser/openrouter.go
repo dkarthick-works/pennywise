@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -112,6 +113,7 @@ func (p *OpenRouterParser) Parse(ctx context.Context, input ParseInput) (ParseRe
 		option.WithJSONSet("provider.zdr", true),
 	)
 	if err != nil {
+		logOpenRouterError(ctx, err)
 		return ParseResult{}, classifyError(ctx, err)
 	}
 	if len(completion.Choices) != 1 || completion.Choices[0].Message.Refusal != "" {
@@ -186,6 +188,50 @@ func classifyError(ctx context.Context, err error) error {
 		}
 	}
 	return ErrUnavailable
+}
+
+func logOpenRouterError(ctx context.Context, err error) {
+	var apiErr *openai.Error
+	if errors.As(err, &apiErr) {
+		requestID := ""
+		if apiErr.Response != nil {
+			requestID = apiErr.Response.Header.Get("x-request-id")
+			if requestID == "" {
+				requestID = apiErr.Response.Header.Get("x-openrouter-request-id")
+			}
+		}
+		log.Printf(
+			"OpenRouter request failed status=%d code=%q type=%q request_id=%q message=%q",
+			apiErr.StatusCode,
+			safeLogValue(apiErr.Code, 100),
+			safeLogValue(apiErr.Type, 100),
+			safeLogValue(requestID, 200),
+			safeLogValue(apiErr.Message, 500),
+		)
+		return
+	}
+	log.Printf(
+		"OpenRouter request failed category=%T timeout=%t canceled=%t",
+		err,
+		errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded),
+		errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled),
+	)
+}
+
+func safeLogValue(value string, maxRunes int) string {
+	value = strings.Map(func(r rune) rune {
+		switch r {
+		case '\n', '\r', '\t':
+			return ' '
+		default:
+			return r
+		}
+	}, value)
+	runes := []rune(value)
+	if len(runes) > maxRunes {
+		return string(runes[:maxRunes]) + "…"
+	}
+	return value
 }
 
 func transactionToolSchema() shared.FunctionParameters {

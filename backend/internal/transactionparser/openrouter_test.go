@@ -217,6 +217,15 @@ func TestNewOpenRouterParserRequiresConfiguration(t *testing.T) {
 	}
 }
 
+func TestSafeLogValue(t *testing.T) {
+	if got := safeLogValue("bad\nvalue\tfrom provider", 100); got != "bad value from provider" {
+		t.Fatalf("sanitized value = %q", got)
+	}
+	if got := safeLogValue("123456", 3); got != "123…" {
+		t.Fatalf("truncated value = %q", got)
+	}
+}
+
 func TestOpenRouterSmoke(t *testing.T) {
 	if os.Getenv("PENNYWISE_OPENROUTER_SMOKE") != "1" {
 		t.Skip("set PENNYWISE_OPENROUTER_SMOKE=1 to call real OpenRouter")
