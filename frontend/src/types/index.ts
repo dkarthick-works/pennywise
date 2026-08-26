@@ -32,6 +32,39 @@ export interface ImportValidationError {
   rows?: { index: number; fields: Record<string, string> }[];
 }
 
+export type TransactionParseIssueField =
+  | "section"
+  | "category"
+  | "amount"
+  | "date"
+  | "kind"
+  | "transaction";
+
+export interface TransactionParseIssue {
+  field: TransactionParseIssueField | string;
+  code: string;
+  message: string;
+}
+
+export interface TransactionPreview {
+  ready: boolean;
+  section: Section | null;
+  category: string | null;
+  amount: number | null;
+  date: string | null;
+  kind: TxnKind | null;
+  issues: TransactionParseIssue[];
+}
+
+export interface ParseTransactionsRequest {
+  text: string;
+  reference_date: string;
+}
+
+export interface ParseTransactionsResponse {
+  transactions: TransactionPreview[];
+}
+
 // ─── Settings / templates ─────────────────────────────────────────────────
 
 export interface Budgets {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -14,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/ledger/backend/internal/db"
+	"github.com/ledger/backend/internal/money"
 )
 
 var (
@@ -137,12 +139,21 @@ func (s *Server) handleExportTransactions(w http.ResponseWriter, r *http.Request
 }
 
 type txnInput struct {
-	Section  string   `json:"section"`
-	Category string   `json:"category"`
-	Amount   float64  `json:"amount"`
-	Date     string   `json:"date"`
-	Kind     string   `json:"kind"`
-	Settles  []string `json:"settles"`
+	Section  string       `json:"section"`
+	Category string       `json:"category"`
+	Amount   money.Number `json:"amount"`
+	Date     string       `json:"date"`
+	Kind     string       `json:"kind"`
+	Settles  []string     `json:"settles"`
+}
+
+type txnPatchInput struct {
+	Section  *string       `json:"section"`
+	Category *string       `json:"category"`
+	Amount   *money.Number `json:"amount"`
+	Date     *string       `json:"date"`
+	Kind     *string       `json:"kind"`
+	Settles  *[]string     `json:"settles"`
 }
 
 func (s *Server) handleCreateTransaction(w http.ResponseWriter, r *http.Request) {
@@ -151,15 +162,15 @@ func (s *Server) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if !validSection(in.Section) || !validKind(in.Kind) {
-		writeErr(w, http.StatusBadRequest, "invalid section or kind")
+	values := transactionValues{
+		Section: &in.Section, Category: &in.Category, Amount: numberOrNil(in.Amount), Date: &in.Date, Kind: &in.Kind,
+	}
+	if issues := validateTransactionValues(values, true, true); len(issues) > 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "validation failed", "issues": issues})
 		return
 	}
-	d, err := parseDate(in.Date)
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, "date must be YYYY-MM-DD")
-		return
-	}
+	d, _ := parseDate(in.Date)
+	amount, _ := decimalToNumeric(in.Amount)
 
 	tx, err := s.pool.Begin(r.Context())
 	if err != nil {
@@ -170,8 +181,8 @@ func (s *Server) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 	qtx := s.q.WithTx(tx)
 
 	created, err := qtx.InsertTransaction(r.Context(), db.InsertTransactionParams{
-		UserID: userID(r), Section: db.Section(in.Section), Category: in.Category,
-		Amount: floatToNum(in.Amount), TxnDate: d, Kind: db.TxnKind(in.Kind),
+		UserID: userID(r), Section: db.Section(in.Section), Category: strings.TrimSpace(in.Category),
+		Amount: amount, TxnDate: d, Kind: db.TxnKind(in.Kind),
 	})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not create transaction")
@@ -201,14 +212,7 @@ func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		writeErr(w, http.StatusBadRequest, "invalid id")
 		return
 	}
-	var patch struct {
-		Section  *string   `json:"section"`
-		Category *string   `json:"category"`
-		Amount   *float64  `json:"amount"`
-		Date     *string   `json:"date"`
-		Kind     *string   `json:"kind"`
-		Settles  *[]string `json:"settles"`
-	}
+	var patch txnPatchInput
 	if err := readJSON(r, &patch); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
@@ -220,37 +224,40 @@ func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	params := db.UpdateTransactionParams{
-		ID: id, UserID: userID(r),
-		Section: cur.Section, Category: cur.Category, Amount: cur.Amount, TxnDate: cur.TxnDate, Kind: cur.Kind,
-	}
+	section := string(cur.Section)
+	category := cur.Category
+	amountNumber := numericToJSONNumber(cur.Amount)
+	date := dateToString(cur.TxnDate)
+	kind := string(cur.Kind)
 	if patch.Section != nil {
-		if !validSection(*patch.Section) {
-			writeErr(w, http.StatusBadRequest, "invalid section")
-			return
-		}
-		params.Section = db.Section(*patch.Section)
+		section = *patch.Section
 	}
 	if patch.Category != nil {
-		params.Category = *patch.Category
+		category = *patch.Category
 	}
 	if patch.Amount != nil {
-		params.Amount = floatToNum(*patch.Amount)
+		amountNumber = *patch.Amount
 	}
 	if patch.Date != nil {
-		d, err := parseDate(*patch.Date)
-		if err != nil {
-			writeErr(w, http.StatusBadRequest, "date must be YYYY-MM-DD")
-			return
-		}
-		params.TxnDate = d
+		date = *patch.Date
 	}
 	if patch.Kind != nil {
-		if !validKind(*patch.Kind) {
-			writeErr(w, http.StatusBadRequest, "invalid kind")
-			return
-		}
-		params.Kind = db.TxnKind(*patch.Kind)
+		kind = *patch.Kind
+	}
+
+	values := transactionValues{
+		Section: &section, Category: &category, Amount: &amountNumber, Date: &date, Kind: &kind,
+	}
+	if issues := validateTransactionValues(values, true, true); len(issues) > 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "validation failed", "issues": issues})
+		return
+	}
+	parsedDate, _ := parseDate(date)
+	parsedAmount, _ := decimalToNumeric(amountNumber)
+	params := db.UpdateTransactionParams{
+		ID: id, UserID: userID(r),
+		Section: db.Section(section), Category: strings.TrimSpace(category), Amount: parsedAmount,
+		TxnDate: parsedDate, Kind: db.TxnKind(kind),
 	}
 
 	fieldsUnchanged := params.Section == cur.Section &&

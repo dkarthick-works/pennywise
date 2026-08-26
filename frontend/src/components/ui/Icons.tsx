@@ -170,6 +170,13 @@ export const IconChit = (p: IcProps) => (
 export const IconZap = (p: IcProps) => (
   <Ic {...p}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></Ic>
 );
+export const IconSparkles = (p: IcProps) => (
+  <Ic {...p}>
+    <path d="M12 3l1.6 4.8L18.5 9.5 13.6 11.2 12 16l-1.6-4.8L5.5 9.5l4.9-1.7L12 3z" />
+    <path d="M19 14.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2z" />
+    <path d="M5 15.5l.5 1.4 1.4.5-1.4.5L5 19.3l-.5-1.4-1.4-.5 1.4-.5.5-1.4z" />
+  </Ic>
+);
 export const IconGithub = ({ size = 18, ...p }: IcProps) => (
   <svg
     className="nav-ic"

@@ -117,6 +117,7 @@ only ever talks to this origin.
 | GET    | `/api/templates` | template lists |
 | PUT    | `/api/templates/{section}` | replace a section's ordered template list |
 | GET    | `/api/transactions?month=YYYY-MM` \| `?year=YYYY` | rows + `settles`/`settled` |
+| POST   | `/api/transactions/parse` | turn everyday language into checked transaction previews; never saves |
 | POST   | `/api/transactions` | create (settlement may include `settles[]`) |
 | PATCH  | `/api/transactions/{id}` | partial update; reconciles settlement links |
 | DELETE | `/api/transactions/{id}` | delete |
@@ -178,6 +179,111 @@ Mirrors the prototype shape so the frontend port is a pass-through:
 `settles` appears on settlement rows (omitted when empty). `settled` is always
 present: `true` when a credit row is linked from a settlement, otherwise `false`
 (including non-credit rows).
+
+### AI transaction previews
+
+`POST /api/transactions/parse` converts one everyday-language message into up
+to 20 transaction previews. It requires normal authentication but never writes
+to the database. The first version supports cash, credit, and income
+transactions; credit-card settlements are not supported.
+
+Request:
+
+```json
+{
+  "text": "Spent ₹500 for lunch today and ₹1,200 on petrol yesterday",
+  "reference_date": "2026-08-26"
+}
+```
+
+`reference_date` is required so relative dates have the user's intended local
+meaning. The future frontend must send its local `YYYY-MM-DD` date.
+
+Response:
+
+```json
+{
+  "transactions": [
+    {
+      "ready": true,
+      "section": "daily",
+      "category": "Lunch",
+      "amount": 500,
+      "date": "2026-08-26",
+      "kind": "cash",
+      "issues": []
+    },
+    {
+      "ready": false,
+      "section": null,
+      "category": "Petrol",
+      "amount": null,
+      "date": "2026-08-25",
+      "kind": "cash",
+      "issues": [
+        { "field": "section", "code": "missing_section", "message": "Section is required" },
+        { "field": "amount", "code": "missing_amount", "message": "Amount is required" }
+      ]
+    }
+  ]
+}
+```
+
+Missing or unclear fields are `null`; the backend never fills financial details
+by guessing. A missing date defaults to `reference_date`. A missing payment
+method defaults to `cash`; `credit` is used only when explicitly stated.
+The legacy `category` field carries the specific transaction name shown to the
+user (for example, `ChatGPT subscription`), not a broad label such as
+`Subscriptions`.
+`field` and `code` are stable for client logic. Correct every issue before removing
+`ready`/`issues` and sending the five transaction fields to
+`POST /api/transactions`, which validates them again.
+
+Responses are `200` when at least one complete or partial preview exists, `400`
+for invalid request data, `422` when no supported transaction is found, `429`
+when parser capacity or OpenRouter rate limits are reached, `502` for malformed
+AI output, `503` when parsing is disabled/unavailable, and `504` on timeout.
+Each backend process allows 20 parse requests per signed-in user per minute and
+at most four simultaneous OpenRouter calls. When several backend copies run,
+enforce the same per-user limit at the gateway because process-local limits do
+not share counters.
+
+Only the current message and reference date go to OpenRouter. Pennywise does not
+send saved categories or transaction history and does not log message text or
+generated category names. Every request denies provider data collection, but
+does not require a zero-data-retention endpoint so more function-calling models
+remain available. Provider or account-level retention rules still apply.
+
+Configure:
+
+```dotenv
+OPENROUTER_API_KEY=...
+OPENROUTER_MODEL=...
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_TIMEOUT=15s
+OPENROUTER_SITE_URL=
+OPENROUTER_APP_NAME=Pennywise
+```
+
+Leaving both key and model empty disables only this endpoint. Setting one
+without the other stops startup as a configuration error.
+
+Authenticated check:
+
+```bash
+curl -s localhost:8080/api/transactions/parse \
+  -H "Authorization: Bearer $TOK" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Spent ₹500 for lunch today","reference_date":"2026-08-26"}'
+```
+
+Optional real-provider smoke test (excluded from normal test runs):
+
+```bash
+PENNYWISE_OPENROUTER_SMOKE=1 \
+OPENROUTER_API_KEY=... OPENROUTER_MODEL=... \
+go test ./internal/transactionparser -run TestOpenRouterSmoke -v
+```
 
 ### Transaction-name autocomplete
 

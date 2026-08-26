@@ -8,26 +8,17 @@ import {
   invalidateTransactionNameSuggestions,
   invalidateTransactionNameSuggestionSections,
 } from "../lib/monthCaches";
+import {
+  KIND_LABEL,
+  SECTION_LABEL,
+  nextKind,
+  nextSection,
+} from "../lib/recordLabels";
 import { AmountInput, DateCell, CategoryInput } from "../components/record/TableCells";
+import { AiQuickAdd } from "../components/record/AiQuickAdd";
 import { MonthDropdown } from "../components/record/MonthDropdown";
 import { IconChevL, IconChevR, IconPlus, IconX } from "../components/ui/Icons";
 import type { Transaction, Section, TxnKind } from "../types";
-
-const SECTIONS: Section[] = ["essential", "flexible", "daily", "income"];
-const KINDS: TxnKind[] = ["cash", "credit", "settlement"];
-
-const SECTION_LABEL: Record<Section, string> = {
-  essential: "Bare Minimum",
-  flexible: "Subscriptions",
-  daily: "Daily / Running",
-  income: "Income",
-};
-
-const KIND_LABEL: Record<TxnKind, string> = {
-        cash: "Cash",
-  credit: "Credit",
-  settlement: "Settlement",
-};
 
 const NAME_PLACEHOLDER: Record<Section, string> = {
   essential: "e.g. Rent",
@@ -42,14 +33,6 @@ const NAME_LABEL: Record<Section, string> = {
   daily: "Category",
   income: "Source",
 };
-
-function nextSection(current: Section): Section {
-  return SECTIONS[(SECTIONS.indexOf(current) + 1) % SECTIONS.length];
-}
-
-function nextKind(current: TxnKind): TxnKind {
-  return KINDS[(KINDS.indexOf(current) + 1) % KINDS.length];
-}
 
 export function RecordEntryPage({
   month,
@@ -144,16 +127,22 @@ export function RecordEntryPage({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const rememberCreated = useCallback(
+    (created: Transaction) => {
+      setSessionTransactions((prev) => [created, ...prev]);
+      invalidateMonthCaches(qc, monthKey(created.date));
+      invalidateTransactionNameSuggestions(qc, created.section);
+    },
+    [qc]
+  );
+
   const create = useMutation({
     mutationFn: createTxn,
     onSuccess: (created) => {
-      setSessionTransactions((prev) => [created, ...prev]);
+      rememberCreated(created);
       setCategory("");
       setAmount(0);
       setFormErr("");
-      invalidateMonthCaches(qc, monthKey(created.date));
-      invalidateTransactionNameSuggestions(qc, created.section);
-      // Refocus name for the next entry.
       requestAnimationFrame(() => {
         nameFocusRef.current?.querySelector("input")?.focus();
       });
@@ -333,6 +322,8 @@ export function RecordEntryPage({
         <MonthDropdown month={month} setMonth={changeMonth} disabled={pending} />
       </div>
 
+      <AiQuickAdd month={month} onCreated={rememberCreated} />
+
       <div className="card" style={{ overflow: "visible", marginBottom: 20 }}>
         <div style={{ overflowX: "auto" }}>
           <table className="tbl">
@@ -416,10 +407,10 @@ export function RecordEntryPage({
                 <td>
                   <AmountInput
                     value={amount}
-                    onChange={setAmount}
+                    onChange={(n) => setAmount(n ?? 0)}
                     placeholder="0"
                     immediate
-                    onEnterCommit={(parsed) => submit({ amount: parsed })}
+                    onEnterCommit={(parsed) => submit({ amount: parsed ?? 0 })}
                   />
                 </td>
                 <td>
@@ -434,7 +425,7 @@ export function RecordEntryPage({
                       disabled={pending}
                       onClick={cycleKind}
                       style={{
-                        background: effectiveKind === "cash" ? "var(--surface-2)" : "var(--accent-soft)",
+                        background: effectiveKind === "cash" ? "#fff" : "var(--accent-soft)",
                         color: effectiveKind === "cash" ? "var(--ink-3)" : "var(--accent-ink)",
                         border: "none",
                         cursor: pending ? "default" : "pointer",
@@ -556,7 +547,10 @@ export function RecordEntryPage({
                       <td>
                         <AmountInput
                           value={r.amount}
-                          onChange={(v) => { if (v !== r.amount) patchRow(r.id, { amount: v }); }}
+                          onChange={(v) => {
+                            const next = v ?? 0;
+                            if (next !== r.amount) patchRow(r.id, { amount: next });
+                          }}
                         />
                       </td>
                       <td>

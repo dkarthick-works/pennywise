@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/fs"
 	"mime"
 	"net/http"
@@ -18,29 +19,40 @@ import (
 	"github.com/ledger/backend/internal/auth"
 	"github.com/ledger/backend/internal/config"
 	"github.com/ledger/backend/internal/db"
+	"github.com/ledger/backend/internal/transactionparser"
 	"github.com/ledger/backend/web"
 )
 
 // Server wires together config, the database, and auth into an http.Handler.
 type Server struct {
-	cfg      config.Config
-	pool     *pgxpool.Pool
-	q        *db.Queries
-	verifier *auth.Verifier
-	proxy    *auth.Proxy
+	cfg               config.Config
+	pool              *pgxpool.Pool
+	q                 *db.Queries
+	verifier          *auth.Verifier
+	proxy             *auth.Proxy
+	transactionParser transactionparser.Parser
+	aiSlots           chan struct{}
+	aiRateLimiter     *aiUserRateLimiter
 }
 
 func NewServer(cfg config.Config, pool *pgxpool.Pool) (*Server, error) {
+	return NewServerWithTransactionParser(cfg, pool, nil)
+}
+
+func NewServerWithTransactionParser(cfg config.Config, pool *pgxpool.Pool, parser transactionparser.Parser) (*Server, error) {
 	proxy, err := auth.NewProxy(cfg.GoauthBaseURL)
 	if err != nil {
 		return nil, err
 	}
 	return &Server{
-		cfg:      cfg,
-		pool:     pool,
-		q:        db.New(pool),
-		verifier: auth.NewVerifier(cfg.JWTSecret, cfg.JWTUserClaim, cfg.JWTEmailClaim),
-		proxy:    proxy,
+		cfg:               cfg,
+		pool:              pool,
+		q:                 db.New(pool),
+		verifier:          auth.NewVerifier(cfg.JWTSecret, cfg.JWTUserClaim, cfg.JWTEmailClaim),
+		proxy:             proxy,
+		transactionParser: parser,
+		aiSlots:           make(chan struct{}, 4),
+		aiRateLimiter:     newAIUserRateLimiter(),
 	}, nil
 }
 
@@ -84,6 +96,7 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/transactions", s.handleListTransactions)
 		pr.Get("/api/transactions/export", s.handleExportTransactions)
 		pr.Post("/api/transactions/import", s.handleImportTransactions)
+		pr.Post("/api/transactions/parse", s.handleParseTransactions)
 		pr.Post("/api/transactions", s.handleCreateTransaction)
 		pr.Patch("/api/transactions/{id}", s.handleUpdateTransaction)
 		pr.Delete("/api/transactions/{id}", s.handleDeleteTransaction)
@@ -204,6 +217,9 @@ func readJSON(r *http.Request, dst any) error {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
+		return errors.New("invalid request body")
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
 		return errors.New("invalid request body")
 	}
 	return nil
