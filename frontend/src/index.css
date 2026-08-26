@@ -201,6 +201,7 @@ input, button { font-family: inherit; }
 .btn-primary { background: var(--accent); color: #fff; box-shadow: var(--sh-sm); width: 100%; }
 .btn-primary:hover { background: var(--accent-strong); }
 .btn-primary:active { transform: translateY(1px); }
+.btn-primary .nav-ic { color: #fff; }
 .btn-ghost { background: transparent; border-color: var(--border); color: var(--ink); }
 .btn-ghost:hover { background: var(--surface-2); border-color: var(--ink-3); }
 .btn-soft { background: var(--surface-2); border-color: var(--border); color: var(--ink-2); }
@@ -349,6 +350,24 @@ input, button { font-family: inherit; }
 
 .import-field-err { color: var(--neg); font-size: 11px; font-weight: 600; margin-top: 2px; line-height: 1.3; }
 .import-summary { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+
+.ai-preview-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 var(--pad-x) 14px;
+}
+.ai-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 6px var(--pad-x);
+}
+.ai-preview-toolbar .btn {
+  width: auto;
+}
 
 /* remove row button */
 .x-btn { width: 26px; height: 26px; border-radius: 7px; border: none; background: none; color: var(--ink-3); display: grid; place-items: center; transition: .12s; }

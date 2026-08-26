@@ -86,7 +86,7 @@ function ImportReviewTable({
                 {r.errors.category && <div className="import-field-err">{r.errors.category}</div>}
               </td>
               <td>
-                <AmountInput value={r.row.amount} onChange={(v) => updateRow(i, { amount: v })} />
+                <AmountInput value={r.row.amount} onChange={(v) => updateRow(i, { amount: v ?? 0 })} />
                 {r.errors.amount && <div className="import-field-err">{r.errors.amount}</div>}
               </td>
               <td>

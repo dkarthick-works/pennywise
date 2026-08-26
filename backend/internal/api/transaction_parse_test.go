@@ -54,14 +54,14 @@ func TestHandleParseTransactionsCompleteAndPartial(t *testing.T) {
 		t.Fatalf("transactions = %#v", body.Transactions)
 	}
 	partial := body.Transactions[1]
-	if partial.Ready || partial.Amount != nil || partial.Date == nil || *partial.Date != "2026-08-26" {
+	if partial.Ready || partial.Amount != nil || partial.Date == nil || *partial.Date != "2026-08-26" || partial.Kind == nil || *partial.Kind != "cash" {
 		t.Fatalf("partial = %#v", partial)
 	}
-	if !hasIssueCode(partial.Issues, "missing_amount") || !hasIssueCode(partial.Issues, "missing_section") || !hasIssueCode(partial.Issues, "missing_kind") {
+	if !hasIssueCode(partial.Issues, "missing_amount") || !hasIssueCode(partial.Issues, "missing_section") {
 		t.Fatalf("partial issues = %#v", partial.Issues)
 	}
-	if hasIssueCode(partial.Issues, "missing_date") {
-		t.Fatalf("defaulted date retained missing_date: %#v", partial.Issues)
+	if hasIssueCode(partial.Issues, "missing_date") || hasIssueCode(partial.Issues, "missing_kind") {
+		t.Fatalf("defaulted fields retained missing issues: %#v", partial.Issues)
 	}
 	if parser.input.Text != "Lunch 500 and petrol" || parser.input.ReferenceDate != "2026-08-26" {
 		t.Fatalf("parser input = %#v", parser.input)

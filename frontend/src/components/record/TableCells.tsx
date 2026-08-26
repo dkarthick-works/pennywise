@@ -10,6 +10,7 @@ import {
   normalizeTransactionNameQuery,
   transactionNameSuggestionKeys,
 } from "../../lib/transactionNameSuggestions";
+import { formatIndianAmount, parseIndianAmount } from "../../lib/parseAmount";
 import type {
   TransactionNameSuggestion,
   TransactionNameSuggestionSection,
@@ -27,45 +28,42 @@ export function AmountInput({
   /** When true, parse and report to parent on every keystroke (form-style entry). */
   immediate = false,
 }: {
-  value: number;
-  onChange: (n: number) => void;
-  onEnterCommit?: (parsed: number) => void;
+  value: number | null;
+  onChange: (n: number | null, decimalPlaces?: number) => void;
+  onEnterCommit?: (parsed: number | null, decimalPlaces: number) => void;
   placeholder?: string;
   align?: string;
   immediate?: boolean;
 }) {
-  const fmt = (n: number) => (n ? n.toLocaleString("en-IN") : "");
+  const fmt = (n: number | null) => (n ? formatIndianAmount(n) : "");
   const [local, setLocal] = useState(fmt(value));
   const [focused, setFocused] = useState(false);
 
-  // Sync from outside only when not actively editing
   useEffect(() => {
     if (!focused) setLocal(fmt(value));
   }, [value, focused]);
 
-  function parseLocal(raw: string): number {
-    const n = parseInt(raw.replace(/[^0-9]/g, ""), 10);
-    return isNaN(n) ? 0 : n;
-  }
-
   function commit() {
     setFocused(false);
-    const parsed = parseLocal(local);
-    if (parsed !== value) onChange(parsed);
-    setLocal(fmt(parsed)); // reformat
+    const parsed = parseIndianAmount(local);
+    onChange(parsed.value, parsed.decimalPlaces);
+    setLocal(fmt(parsed.value));
   }
 
   return (
     <input
       className="cell-input num"
-      inputMode="numeric"
+      inputMode="decimal"
       style={{ textAlign: align as "left" | "right", minWidth: 110 }}
       value={local}
       placeholder={placeholder}
       onChange={(e) => {
         const next = e.target.value;
         setLocal(next);
-        if (immediate) onChange(parseLocal(next));
+        if (immediate) {
+          const parsed = parseIndianAmount(next);
+          onChange(parsed.value, parsed.decimalPlaces);
+        }
       }}
       onFocus={() => setFocused(true)}
       onBlur={commit}
@@ -73,11 +71,11 @@ export function AmountInput({
         if (e.key === "Enter") {
           e.preventDefault();
           e.stopPropagation();
-          const parsed = parseLocal(local);
-          if (parsed !== value) onChange(parsed);
-          setLocal(fmt(parsed));
+          const parsed = parseIndianAmount(local);
+          onChange(parsed.value, parsed.decimalPlaces);
+          setLocal(fmt(parsed.value));
           setFocused(false);
-          onEnterCommit?.(parsed);
+          onEnterCommit?.(parsed.value, parsed.decimalPlaces);
         }
       }}
     />

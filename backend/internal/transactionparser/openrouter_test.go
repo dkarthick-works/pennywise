@@ -81,14 +81,26 @@ func TestOpenRouterParserParse(t *testing.T) {
 	if received["model"] != "test/model" {
 		t.Fatalf("model = %#v", received["model"])
 	}
-	if received["max_completion_tokens"] != float64(maxCompletionTokens) {
-		t.Fatalf("max_completion_tokens = %#v", received["max_completion_tokens"])
+	if received["max_tokens"] != float64(maxCompletionTokens) {
+		t.Fatalf("max_tokens = %#v", received["max_tokens"])
+	}
+	if _, ok := received["parallel_tool_calls"]; ok {
+		t.Fatalf("unsupported parallel_tool_calls was sent: %#v", received["parallel_tool_calls"])
+	}
+	tools, ok := received["tools"].([]any)
+	if !ok || len(tools) != 1 {
+		t.Fatalf("tools = %#v", received["tools"])
+	}
+	tool, _ := tools[0].(map[string]any)
+	function, _ := tool["function"].(map[string]any)
+	if _, ok := function["strict"]; ok {
+		t.Fatalf("strict tool enforcement should be omitted for OpenRouter compatibility: %#v", function)
 	}
 	provider, ok := received["provider"].(map[string]any)
 	if !ok || provider["require_parameters"] != true {
 		t.Fatalf("provider settings = %#v", received["provider"])
 	}
-	if provider["data_collection"] != "deny" || provider["zdr"] != true {
+	if provider["data_collection"] != "deny" || provider["zdr"] != false {
 		t.Fatalf("privacy settings = %#v", provider)
 	}
 	messages, _ := received["messages"].([]any)
@@ -217,6 +229,24 @@ func TestNewOpenRouterParserRequiresConfiguration(t *testing.T) {
 	}
 }
 
+func TestCategoryMeansTransactionName(t *testing.T) {
+	if !strings.Contains(parserInstructions, "category is the transaction name") ||
+		!strings.Contains(parserInstructions, `For "ChatGPT subscription"`) {
+		t.Fatal("parser instructions must define category as the specific transaction name")
+	}
+
+	schema := transactionToolSchema()
+	properties := schema["properties"].(map[string]any)
+	transactions := properties["transactions"].(map[string]any)
+	items := transactions["items"].(map[string]any)
+	itemProperties := items["properties"].(map[string]any)
+	category := itemProperties["category"].(map[string]any)
+	description, _ := category["description"].(string)
+	if !strings.Contains(description, "Specific transaction name") {
+		t.Fatalf("category schema description = %q", description)
+	}
+}
+
 func TestSafeLogValue(t *testing.T) {
 	if got := safeLogValue("bad\nvalue\tfrom provider", 100); got != "bad value from provider" {
 		t.Fatalf("sanitized value = %q", got)
@@ -241,14 +271,17 @@ func TestOpenRouterSmoke(t *testing.T) {
 	}
 	started := time.Now()
 	result, err := parser.Parse(context.Background(), ParseInput{
-		Text:          "Spent ₹500 for lunch today and ₹1,200 on petrol yesterday",
+		Text:          "I paid around ₹2,500 for my ChatGPT subscription the day before yesterday",
 		ReferenceDate: "2026-08-26",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Transactions) != 2 {
-		t.Fatalf("draft count = %d, want 2", len(result.Transactions))
+	if len(result.Transactions) != 1 {
+		t.Fatalf("draft count = %d, want 1", len(result.Transactions))
+	}
+	if result.Transactions[0].Category == nil || !strings.Contains(strings.ToLower(*result.Transactions[0].Category), "chatgpt") {
+		t.Fatalf("category = %#v, want specific ChatGPT transaction name", result.Transactions[0].Category)
 	}
 	t.Logf("model=%s duration=%s prompt_tokens=%d completion_tokens=%d total_tokens=%d outcome=success",
 		result.Usage.Model, time.Since(started), result.Usage.PromptTokens, result.Usage.CompletionTokens, result.Usage.TotalTokens)

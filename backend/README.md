@@ -219,11 +219,10 @@ Response:
       "category": "Petrol",
       "amount": null,
       "date": "2026-08-25",
-      "kind": null,
+      "kind": "cash",
       "issues": [
         { "field": "section", "code": "missing_section", "message": "Section is required" },
-        { "field": "amount", "code": "missing_amount", "message": "Amount is required" },
-        { "field": "kind", "code": "missing_kind", "message": "Kind is required" }
+        { "field": "amount", "code": "missing_amount", "message": "Amount is required" }
       ]
     }
   ]
@@ -231,8 +230,12 @@ Response:
 ```
 
 Missing or unclear fields are `null`; the backend never fills financial details
-by guessing. A missing date alone defaults to `reference_date`. `field` and
-`code` are stable for client logic. Correct every issue before removing
+by guessing. A missing date defaults to `reference_date`. A missing payment
+method defaults to `cash`; `credit` is used only when explicitly stated.
+The legacy `category` field carries the specific transaction name shown to the
+user (for example, `ChatGPT subscription`), not a broad label such as
+`Subscriptions`.
+`field` and `code` are stable for client logic. Correct every issue before removing
 `ready`/`issues` and sending the five transaction fields to
 `POST /api/transactions`, which validates them again.
 
@@ -247,9 +250,9 @@ not share counters.
 
 Only the current message and reference date go to OpenRouter. Pennywise does not
 send saved categories or transaction history and does not log message text or
-generated category names. Every request denies provider data collection and
-requires a zero-data-retention endpoint. Choose a function-calling model with a
-provider that supports those privacy requirements.
+generated category names. Every request denies provider data collection, but
+does not require a zero-data-retention endpoint so more function-calling models
+remain available. Provider or account-level retention rules still apply.
 
 Configure:
 

@@ -23,6 +23,8 @@ import type {
   CategoryMapping,
   ImportRowPayload,
   ImportResult,
+  ParseTransactionsRequest,
+  ParseTransactionsResponse,
   TransactionNameSuggestionSection,
   TransactionNameSuggestionsResponse,
 } from "../types";
@@ -109,6 +111,18 @@ export async function exportTransactions(
 
 export const createTxn = (body: Omit<Transaction, "id" | "settled">) =>
   client.post<Transaction>("/api/transactions", body).then((r) => r.data);
+
+export const parseTransactions = (request: ParseTransactionsRequest) =>
+  client
+    .post<ParseTransactionsResponse>("/api/transactions/parse", request)
+    .then((r) => r.data)
+    .catch((e) => {
+      if (axios.isAxiosError(e) && e.response?.data && typeof e.response.data === "object") {
+        const body = e.response.data as { error?: string };
+        throw new Error(body.error ?? "Could not generate previews", { cause: e });
+      }
+      throw e;
+    });
 
 export const importTransactions = (rows: ImportRowPayload[]) =>
   client.post<ImportResult>("/api/transactions/import", { rows }).then((r) => r.data).catch((e) => {

@@ -313,7 +313,7 @@ function EssentialTile({ rows, section, month, settledSet, templates, onCopyPend
                     : <RowCategoryInput value={r.category} placeholder="e.g. Rent" onChange={(v) => upd.mutate({ id: r.id, patch: { category: v } })} />
                   }
                 </td>
-                <td><AmountInput value={r.amount} onChange={(v) => upd.mutate({ id: r.id, patch: { amount: v } })} /></td>
+                <td><AmountInput value={r.amount} onChange={(v) => upd.mutate({ id: r.id, patch: { amount: v ?? 0 } })} /></td>
                 <td><StatusCell row={r} section={section} month={month} settledSet={settledSet} /></td>
                 <td><button className="x-btn" onClick={() => del.mutate(r.id)} aria-label="Remove"><IconX size={15} /></button></td>
               </tr>
@@ -414,7 +414,7 @@ function FlexibleTile({ rows, section, month, settledSet, templates, onCopyPendi
                     : <RowCategoryInput value={r.category} placeholder="e.g. Netflix" onChange={(v) => upd.mutate({ id: r.id, patch: { category: v } })} />
                   }
                 </td>
-                <td><AmountInput value={r.amount} onChange={(v) => upd.mutate({ id: r.id, patch: { amount: v } })} /></td>
+                <td><AmountInput value={r.amount} onChange={(v) => upd.mutate({ id: r.id, patch: { amount: v ?? 0 } })} /></td>
                 <td><StatusCell row={r} section={section} month={month} settledSet={settledSet} /></td>
                 <td><button className="x-btn" onClick={() => del.mutate(r.id)} aria-label="Remove"><IconX size={15} /></button></td>
               </tr>
@@ -501,7 +501,7 @@ function DailyRow({ r, section, month, settledSet, upd, del }: {
             />
         }
       </td>
-      <td><AmountInput value={r.amount} onChange={(v) => upd.mutate({ id: r.id, patch: { amount: v } })} /></td>
+      <td><AmountInput value={r.amount} onChange={(v) => upd.mutate({ id: r.id, patch: { amount: v ?? 0 } })} /></td>
       <td><StatusCell row={r} section={section} month={month} settledSet={settledSet} /></td>
       <td><button className="x-btn" onClick={() => del.mutate(r.id)} aria-label="Remove"><IconX size={15} /></button></td>
     </tr>
@@ -566,7 +566,7 @@ function DailyTile({ rows, section, month, settledSet }: {
                   onSubmit={() => commit()}
                 />
               </td>
-              <td><AmountInput value={draft.amount} onChange={(v) => setDraft({ ...draft, amount: v })} placeholder="0"
+              <td><AmountInput value={draft.amount} onChange={(v) => setDraft({ ...draft, amount: v ?? 0 })} placeholder="0"
                 onEnterCommit={(parsed) => {
                   if (!draft.category.trim() || !parsed) return;
                   add.mutate(
@@ -675,7 +675,7 @@ function IncomeTile({ rows, month, onCopyPendingChange }: {
                   onSubmit={() => commit()}
                 />
               </td>
-              <td><AmountInput value={draft.amount} onChange={(v) => setDraft({ ...draft, amount: v })} placeholder="0"
+              <td><AmountInput value={draft.amount} onChange={(v) => setDraft({ ...draft, amount: v ?? 0 })} placeholder="0"
                 onEnterCommit={(parsed) => {
                   if (!draft.category.trim() || !parsed) return;
                   add.mutate(
@@ -700,7 +700,7 @@ function IncomeTile({ rows, month, onCopyPendingChange }: {
               <tr key={r.id}>
                 <td><DateCell value={r.date} onChange={(v) => upd.mutate({ id: r.id, patch: { date: v } })} /></td>
                 <td><RowCategoryInput value={r.category} onChange={(v) => upd.mutate({ id: r.id, patch: { category: v } })} /></td>
-                <td><AmountInput value={r.amount} onChange={(v) => upd.mutate({ id: r.id, patch: { amount: v } })} /></td>
+                <td><AmountInput value={r.amount} onChange={(v) => upd.mutate({ id: r.id, patch: { amount: v ?? 0 } })} /></td>
                 <td><button className="x-btn" onClick={() => del.mutate(r.id)} aria-label="Remove"><IconX size={15} /></button></td>
               </tr>
             ))}

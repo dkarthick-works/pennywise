@@ -97,6 +97,13 @@ func (s *Server) handleParseTransactions(w http.ResponseWriter, r *http.Request)
 			draft.Date = &date
 			draft.Issues = removeParserIssueCode(draft.Issues, "missing_date")
 		}
+		if draft.Kind == nil &&
+			!hasParserIssue(draft.Issues, "ambiguous_kind") &&
+			!hasParserIssue(draft.Issues, "unsupported_settlement") {
+			kind := "cash"
+			draft.Kind = &kind
+			draft.Issues = removeParserIssueCode(draft.Issues, "missing_kind")
+		}
 		issues := parserIssues(draft)
 		if !hasIssueCode(issues, "unsupported_settlement") {
 			onlyUnsupportedSettlements = false
