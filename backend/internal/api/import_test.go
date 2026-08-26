@@ -15,6 +15,7 @@ import (
 
 	"github.com/ledger/backend/internal/config"
 	"github.com/ledger/backend/internal/db"
+	"github.com/ledger/backend/internal/money"
 )
 
 func TestValidImportKind(t *testing.T) {
@@ -37,40 +38,40 @@ func TestValidateImportRow(t *testing.T) {
 	}{
 		{
 			name: "valid cash",
-			row:  importRowInput{Date: "2026-01-15", Section: "daily", Category: "Food", Amount: 123.4, Kind: "cash"},
+			row:  importRowInput{Date: "2026-01-15", Section: "daily", Category: "Food", Amount: money.Number("123.4"), Kind: "cash"},
 		},
 		{
 			name: "zero amount allowed",
-			row:  importRowInput{Date: "2026-01-01", Section: "essential", Category: "Rent", Amount: 0, Kind: "cash"},
+			row:  importRowInput{Date: "2026-01-01", Section: "essential", Category: "Rent", Amount: money.Number("0"), Kind: "cash"},
 		},
 		{
 			name:    "settlement rejected",
-			row:     importRowInput{Date: "2026-01-15", Section: "daily", Category: "Pay", Amount: 10, Kind: "settlement"},
+			row:     importRowInput{Date: "2026-01-15", Section: "daily", Category: "Pay", Amount: money.Number("10"), Kind: "settlement"},
 			wantKey: "kind",
 		},
 		{
 			name:    "negative amount",
-			row:     importRowInput{Date: "2026-01-15", Section: "daily", Category: "Food", Amount: -1, Kind: "cash"},
+			row:     importRowInput{Date: "2026-01-15", Section: "daily", Category: "Food", Amount: money.Number("-1"), Kind: "cash"},
 			wantKey: "amount",
 		},
 		{
 			name:    "empty category",
-			row:     importRowInput{Date: "20266-01-15", Section: "daily", Category: "  ", Amount: 1, Kind: "cash"},
+			row:     importRowInput{Date: "20266-01-15", Section: "daily", Category: "  ", Amount: money.Number("1"), Kind: "cash"},
 			wantKey: "category",
 		},
 		{
 			name:    "income credit",
-			row:     importRowInput{Date: "2026-01-15", Section: "income", Category: "Salary", Amount: 1, Kind: "credit"},
+			row:     importRowInput{Date: "2026-01-15", Section: "income", Category: "Salary", Amount: money.Number("1"), Kind: "credit"},
 			wantKey: "kind",
 		},
 		{
 			name:    "bad date",
-			row:     importRowInput{Date: "2026-02-30", Section: "daily", Category: "Food", Amount: 1, Kind: "cash"},
+			row:     importRowInput{Date: "2026-02-30", Section: "daily", Category: "Food", Amount: money.Number("1"), Kind: "cash"},
 			wantKey: "date",
 		},
 		{
 			name:    "bad section",
-			row:     importRowInput{Date: "2026-01-15", Section: "misc", Category: "Food", Amount: 1, Kind: "cash"},
+			row:     importRowInput{Date: "2026-01-15", Section: "misc", Category: "Food", Amount: money.Number("1"), Kind: "cash"},
 			wantKey: "section",
 		},
 	}
@@ -109,7 +110,7 @@ func TestValidateImportRowsRoundTripZeroAmount(t *testing.T) {
 
 	importRows := []importRowInput{{
 		Date: rows[1][1], Section: rows[1][2], Category: rows[1][3],
-		Amount: 0, Kind: rows[1][6],
+		Amount: money.Number("0"), Kind: rows[1][6],
 	}}
 	if errs := validateImportRows(importRows); len(errs) != 0 {
 		t.Fatalf("validateImportRows() = %#v, want no errors for zero-amount export row", errs)
@@ -120,7 +121,7 @@ func TestImportRowCap(t *testing.T) {
 	rows := make([]importRowInput, maxImportRows+1)
 	for i := range rows {
 		rows[i] = importRowInput{
-			Date: "2026-01-15", Section: "daily", Category: "Food", Amount: 1, Kind: "cash",
+			Date: "2026-01-15", Section: "daily", Category: "Food", Amount: money.Number("1"), Kind: "cash",
 		}
 	}
 	body, _ := json.Marshal(importRequest{Rows: rows})
@@ -182,8 +183,8 @@ func TestImportTransactionsIntegration(t *testing.T) {
 	}
 
 	importBody := importRequest{Rows: []importRowInput{
-		{Date: "2026-01-15", Section: "daily", Category: "Food, lunch", Amount: 123.4, Kind: "cash"},
-		{Date: "2026-02-01", Section: "income", Category: "Salary", Amount: 0, Kind: "cash"},
+		{Date: "2026-01-15", Section: "daily", Category: "Food, lunch", Amount: money.Number("123.4"), Kind: "cash"},
+		{Date: "2026-02-01", Section: "income", Category: "Salary", Amount: money.Number("0"), Kind: "cash"},
 	}}
 	payload, _ := json.Marshal(importBody)
 
@@ -211,7 +212,7 @@ func TestImportTransactionsIntegration(t *testing.T) {
 	// Row cap via HTTP
 	over := make([]importRowInput, maxImportRows+1)
 	for i := range over {
-		over[i] = importRowInput{Date: "2026-01-15", Section: "daily", Category: "X", Amount: 1, Kind: "cash"}
+		over[i] = importRowInput{Date: "2026-01-15", Section: "daily", Category: "X", Amount: money.Number("1"), Kind: "cash"}
 	}
 	capPayload, _ := json.Marshal(importRequest{Rows: over})
 	capReq := httptest.NewRequest(http.MethodPost, "/api/transactions/import", bytes.NewReader(capPayload))
@@ -232,7 +233,7 @@ func TestImportTransactionsIntegration(t *testing.T) {
 
 	// Settlement rejected
 	settlePayload, _ := json.Marshal(importRequest{Rows: []importRowInput{
-		{Date: "2026-01-15", Section: "daily", Category: "Pay", Amount: 10, Kind: "settlement"},
+		{Date: "2026-01-15", Section: "daily", Category: "Pay", Amount: money.Number("10"), Kind: "settlement"},
 	}})
 	settleReq := httptest.NewRequest(http.MethodPost, "/api/transactions/import", bytes.NewReader(settlePayload))
 	settleReq.Header.Set("Content-Type", "application/json")

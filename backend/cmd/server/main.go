@@ -14,6 +14,7 @@ import (
 	"github.com/ledger/backend/internal/api"
 	"github.com/ledger/backend/internal/config"
 	"github.com/ledger/backend/internal/database"
+	"github.com/ledger/backend/internal/transactionparser"
 )
 
 func main() {
@@ -34,7 +35,23 @@ func main() {
 	}
 	defer pool.Close()
 
-	srv, err := api.NewServer(cfg, pool)
+	var parser transactionparser.Parser
+	switch {
+	case cfg.OpenRouterAPIKey == "" && cfg.OpenRouterModel == "":
+		log.Println("AI transaction parsing disabled: OPENROUTER_API_KEY and OPENROUTER_MODEL are not set")
+	case cfg.OpenRouterAPIKey == "" || cfg.OpenRouterModel == "":
+		log.Fatal("AI transaction parsing configuration requires both OPENROUTER_API_KEY and OPENROUTER_MODEL")
+	default:
+		parser, err = transactionparser.NewOpenRouterParser(transactionparser.OpenRouterConfig{
+			APIKey: cfg.OpenRouterAPIKey, Model: cfg.OpenRouterModel, BaseURL: cfg.OpenRouterBaseURL,
+			Timeout: cfg.OpenRouterTimeout, SiteURL: cfg.OpenRouterSiteURL, AppName: cfg.OpenRouterAppName,
+		})
+		if err != nil {
+			log.Fatalf("OpenRouter: %v", err)
+		}
+	}
+
+	srv, err := api.NewServerWithTransactionParser(cfg, pool, parser)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

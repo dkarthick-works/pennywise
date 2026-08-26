@@ -6,21 +6,22 @@ import (
 	"strings"
 
 	"github.com/ledger/backend/internal/db"
+	"github.com/ledger/backend/internal/money"
 )
 
 const (
-	maxImportRows        = 2000
-	importRowCapMessage  = "import exceeds maximum of 2000 rows"
-	importNoRowsMessage  = "no rows to import"
-	importFailedMessage  = "could not import transactions"
+	maxImportRows       = 2000
+	importRowCapMessage = "import exceeds maximum of 2000 rows"
+	importNoRowsMessage = "no rows to import"
+	importFailedMessage = "could not import transactions"
 )
 
 type importRowInput struct {
-	Date     string  `json:"date"`
-	Section  string  `json:"section"`
-	Category string  `json:"category"`
-	Amount   float64 `json:"amount"`
-	Kind     string  `json:"kind"`
+	Date     string       `json:"date"`
+	Section  string       `json:"section"`
+	Category string       `json:"category"`
+	Amount   money.Number `json:"amount"`
+	Kind     string       `json:"kind"`
 }
 
 type importRequest struct {
@@ -53,36 +54,12 @@ func validImportKind(k string) bool {
 
 func validateImportRow(row importRowInput) importRowFieldErrors {
 	fields := make(importRowFieldErrors)
-
-	if !dateRe.MatchString(row.Date) {
-		fields["date"] = "must be YYYY-MM-DD"
-	} else if _, err := parseDate(row.Date); err != nil {
-		fields["date"] = "must be a valid date"
+	values := transactionValues{
+		Section: &row.Section, Category: &row.Category, Amount: numberOrNil(row.Amount),
+		Date: &row.Date, Kind: &row.Kind,
 	}
-
-	if !validSection(row.Section) {
-		fields["section"] = "must be essential, flexible, daily, or income"
-	}
-
-	if row.Kind == "settlement" {
-		fields["kind"] = "settlement rows cannot be imported"
-	} else if !validImportKind(row.Kind) {
-		fields["kind"] = "must be cash or credit"
-	}
-
-	if row.Amount < 0 {
-		fields["amount"] = "must be zero or greater"
-	}
-
-	if strings.TrimSpace(row.Category) == "" {
-		fields["category"] = "is required"
-	}
-
-	if row.Section == "income" && row.Kind != "" && row.Kind != "cash" {
-		fields["kind"] = "income must be cash"
-	}
-	if row.Kind == "credit" && row.Section == "income" {
-		fields["kind"] = "credit cannot be used with income"
+	for _, item := range validateTransactionValues(values, true, false) {
+		fields[item.Field] = item.Message
 	}
 
 	return fields
@@ -148,11 +125,16 @@ func (s *Server) handleImportTransactions(w http.ResponseWriter, r *http.Request
 			writeErr(w, http.StatusBadRequest, "validation failed")
 			return
 		}
+		amount, err := decimalToNumeric(row.Amount)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "validation failed")
+			return
+		}
 		if _, err := qtx.InsertTransaction(ctx, db.InsertTransactionParams{
 			UserID:   uid,
 			Section:  db.Section(row.Section),
 			Category: strings.TrimSpace(row.Category),
-			Amount:   floatToNum(row.Amount),
+			Amount:   amount,
 			TxnDate:  d,
 			Kind:     db.TxnKind(row.Kind),
 		}); err != nil {
