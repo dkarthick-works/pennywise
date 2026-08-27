@@ -201,6 +201,47 @@ export interface CategoryGroupTransactions {
   transactions: Transaction[];
 }
 
+export interface MonthlyCostHistoryBucket {
+  month: string;
+  total: number;
+}
+
+export interface GroupSpendHistoryMapping {
+  id: string;
+  category: string;
+}
+
+export interface GroupCategoryContribution {
+  category: string;
+  total: number;
+  transaction_count: number;
+}
+
+export interface GroupSpendHistoryBucket {
+  month: string;
+  total: number;
+  transaction_count: number;
+  average_transaction: number | null;
+  median_transaction: number | null;
+  largest_transaction: number | null;
+  categories: GroupCategoryContribution[];
+}
+
+export interface GroupSpendHistoryGroup {
+  group_id: string;
+  group_name: string;
+  mappings: GroupSpendHistoryMapping[];
+  buckets: GroupSpendHistoryBucket[];
+}
+
+export interface GroupSpendHistoryResponse {
+  from: string;
+  to: string;
+  months: number;
+  monthly_costs: MonthlyCostHistoryBucket[];
+  groups: GroupSpendHistoryGroup[];
+}
+
 // ─── Category grouping ──────────────────────────────────────────────────────
 
 export interface CategoryMappingBrief {

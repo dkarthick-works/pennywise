@@ -63,6 +63,7 @@ type Querier interface {
 	// Expense credit rows in a half-open [from, to) date window, for the credit
 	// drill-down. Mirrors SumCreditUsage's filter so totals reconcile.
 	ListCreditTransactionsByDateRange(ctx context.Context, arg ListCreditTransactionsByDateRangeParams) ([]Transaction, error)
+	ListGroupTransactionsForHistory(ctx context.Context, arg ListGroupTransactionsForHistoryParams) ([]ListGroupTransactionsForHistoryRow, error)
 	ListInstallmentsForChit(ctx context.Context, arg ListInstallmentsForChitParams) ([]ChitInstallment, error)
 	ListLents(ctx context.Context, arg ListLentsParams) ([]ListLentsRow, error)
 	ListLentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListLentsForTransferRow, error)
@@ -103,6 +104,7 @@ type Querier interface {
 	SumDashboardMonthly(ctx context.Context, arg SumDashboardMonthlyParams) (SumDashboardMonthlyRow, error)
 	SumEssentialSpendByMonths(ctx context.Context, arg SumEssentialSpendByMonthsParams) ([]SumEssentialSpendByMonthsRow, error)
 	SumLentOutstanding(ctx context.Context, userID uuid.UUID) (SumLentOutstandingRow, error)
+	SumMonthlyCostByMonthRange(ctx context.Context, arg SumMonthlyCostByMonthRangeParams) ([]SumMonthlyCostByMonthRangeRow, error)
 	// Total already repaid against a lent, optionally excluding one repayment row
 	// (used when editing an existing repayment so it does not count against itself).
 	SumRepaymentsForLent(ctx context.Context, arg SumRepaymentsForLentParams) (pgtype.Numeric, error)

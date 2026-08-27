@@ -112,7 +112,8 @@ Both drill-down routes reuse `TransactionListTable` (`src/components/dashboard/T
 | Route | Data source | Notes |
 |-------|-------------|-------|
 | `/dashboard/credits?month=&view=` | `GET /api/dashboard/credit-transactions?month=&view=` | Kind column hidden; month + view read from the URL |
-| `/dashboard/groups/:groupId` | `GET /api/category-groups/{id}/transactions?month=` | Shows date, category, section, kind, amount |
+| `/dashboard/groups/:groupId?month=` | `GET /api/category-groups/{id}/transactions?month=` | Shows date, category, section, kind, amount; links to comparison |
+| `/dashboard/groups/:groupId/compare?to=&range=` | `GET /api/dashboard/group-spend/history` | 3/6/12-month chart, statistics, mappings, and category contributions |
 
 The credit drill-down reads `month` and `view` (`calendar`/`billing`) from the
 query string, canonicalizing invalid values, so refreshes and direct links are
@@ -120,6 +121,16 @@ stable. A segmented control switches views, Back returns to
 `/dashboard?month=YYYY-MM`, and the billing view shows a setup CTA when no
 statement day is configured. Rows come straight from the API (no local calendar
 filtering).
+
+The category-group transaction page accepts an optional URL month and exposes a
+**Compare over time** CTA. Comparison uses the `to` month as its anchor and supports
+exact 3, 6, and 12-month ranges. It shows the average of all displayed calendar
+months (zero months included), previous-month change, transaction count plus
+average/largest amounts, current mapped categories, anchor-month category
+contributions, and share of Dashboard Monthly Cost. Activating an older chart bar opens
+that month's transaction list rather than re-anchoring the analytics. A group
+selector switches directly to another group's comparison while preserving the
+anchor and range.
 
 ### Yearly view
 

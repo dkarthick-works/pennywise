@@ -316,6 +316,72 @@ func (q *Queries) ListCategoryMappingsByGroup(ctx context.Context, arg ListCateg
 	return items, nil
 }
 
+const listGroupTransactionsForHistory = `-- name: ListGroupTransactionsForHistory :many
+SELECT
+    cg.id AS group_id,
+    cm.id AS mapping_id,
+    t.id AS transaction_id,
+    t.amount,
+    t.txn_date
+FROM category_groups cg
+JOIN category_mappings cm
+    ON cm.group_id = cg.id AND cm.user_id = cg.user_id
+JOIN transactions t
+    ON t.user_id = cg.user_id
+    AND lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g')) = cm.normalized_category
+WHERE cg.user_id = $1
+  AND cg.id = ANY($2::uuid[])
+  AND t.txn_date >= $3
+  AND t.txn_date < $4
+ORDER BY cg.id, t.txn_date, t.id
+`
+
+type ListGroupTransactionsForHistoryParams struct {
+	UserID   uuid.UUID   `json:"user_id"`
+	GroupIds []uuid.UUID `json:"group_ids"`
+	FromDate pgtype.Date `json:"from_date"`
+	ToDate   pgtype.Date `json:"to_date"`
+}
+
+type ListGroupTransactionsForHistoryRow struct {
+	GroupID       uuid.UUID      `json:"group_id"`
+	MappingID     uuid.UUID      `json:"mapping_id"`
+	TransactionID uuid.UUID      `json:"transaction_id"`
+	Amount        pgtype.Numeric `json:"amount"`
+	TxnDate       pgtype.Date    `json:"txn_date"`
+}
+
+func (q *Queries) ListGroupTransactionsForHistory(ctx context.Context, arg ListGroupTransactionsForHistoryParams) ([]ListGroupTransactionsForHistoryRow, error) {
+	rows, err := q.db.Query(ctx, listGroupTransactionsForHistory,
+		arg.UserID,
+		arg.GroupIds,
+		arg.FromDate,
+		arg.ToDate,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGroupTransactionsForHistoryRow
+	for rows.Next() {
+		var i ListGroupTransactionsForHistoryRow
+		if err := rows.Scan(
+			&i.GroupID,
+			&i.MappingID,
+			&i.TransactionID,
+			&i.Amount,
+			&i.TxnDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTransactionCategoryTexts = `-- name: ListTransactionCategoryTexts :many
 SELECT MIN(t.category)::text AS category
 FROM transactions t
@@ -448,6 +514,51 @@ func (q *Queries) ListUnmappedCategoryTexts(ctx context.Context, userID uuid.UUI
 			return nil, err
 		}
 		items = append(items, category)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const sumMonthlyCostByMonthRange = `-- name: SumMonthlyCostByMonthRange :many
+SELECT
+    to_char(date_trunc('month', txn_date), 'YYYY-MM') AS month,
+    COALESCE(SUM(amount), 0)::numeric AS total
+FROM transactions
+WHERE user_id = $1
+  AND txn_date >= $2
+  AND txn_date < $3
+  AND section IN ('essential', 'flexible', 'daily')
+  AND kind IN ('cash', 'credit')
+GROUP BY date_trunc('month', txn_date)
+ORDER BY date_trunc('month', txn_date)
+`
+
+type SumMonthlyCostByMonthRangeParams struct {
+	UserID   uuid.UUID   `json:"user_id"`
+	FromDate pgtype.Date `json:"from_date"`
+	ToDate   pgtype.Date `json:"to_date"`
+}
+
+type SumMonthlyCostByMonthRangeRow struct {
+	Month string         `json:"month"`
+	Total pgtype.Numeric `json:"total"`
+}
+
+func (q *Queries) SumMonthlyCostByMonthRange(ctx context.Context, arg SumMonthlyCostByMonthRangeParams) ([]SumMonthlyCostByMonthRangeRow, error) {
+	rows, err := q.db.Query(ctx, sumMonthlyCostByMonthRange, arg.UserID, arg.FromDate, arg.ToDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SumMonthlyCostByMonthRangeRow
+	for rows.Next() {
+		var i SumMonthlyCostByMonthRangeRow
+		if err := rows.Scan(&i.Month, &i.Total); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

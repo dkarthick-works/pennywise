@@ -1,18 +1,22 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getCategoryGroupTransactions } from "../api/ledger";
 import { TransactionListTable } from "../components/dashboard/TransactionListTable";
-import { IconChevL } from "../components/ui/Icons";
+import { IconChevL, IconTrend } from "../components/ui/Icons";
 import { inr } from "../lib/money";
 import { monthLabel } from "../lib/dates";
+import { isMonthKey } from "../lib/groupSpendComparison";
 
 export function CategoryGroupPage({ month }: { month: string }) {
   const navigate = useNavigate();
   const { groupId } = useParams<{ groupId: string }>();
+  const [searchParams] = useSearchParams();
+  const queryMonth = searchParams.get("month");
+  const activeMonth = isMonthKey(queryMonth) ? queryMonth : month;
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["category-group-txns", groupId, month],
-    queryFn: () => getCategoryGroupTransactions(groupId!, month),
+    queryKey: ["category-group-txns", groupId, activeMonth],
+    queryFn: () => getCategoryGroupTransactions(groupId!, activeMonth),
     enabled: Boolean(groupId),
   });
 
@@ -32,8 +36,18 @@ export function CategoryGroupPage({ month }: { month: string }) {
         <div>
           <h1 className="page-title">{data?.group_name ?? "Category Group"}</h1>
           <p className="page-sub">
-            Transactions for {monthLabel(data?.month ?? month)}
+            Transactions for {monthLabel(data?.month ?? activeMonth)}
           </p>
+          {groupId && (
+            <button
+              type="button"
+              className="btn btn-soft"
+              style={{ marginTop: 12, padding: "7px 12px" }}
+              onClick={() => navigate(`/dashboard/groups/${groupId}/compare?to=${activeMonth}&range=6`)}
+            >
+              <IconTrend size={16} /> Compare over time
+            </button>
+          )}
         </div>
         <div
           className="card card-pad"
@@ -55,7 +69,7 @@ export function CategoryGroupPage({ month }: { month: string }) {
           </p>
         ) : rows.length === 0 ? (
           <p className="muted" style={{ margin: 0, padding: 18, fontSize: 13 }}>
-            No transactions for this group in {monthLabel(data?.month ?? month)}.
+            No transactions for this group in {monthLabel(data?.month ?? activeMonth)}.
           </p>
         ) : (
           <TransactionListTable rows={rows} />
