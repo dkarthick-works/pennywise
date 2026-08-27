@@ -888,7 +888,7 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
           <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             <QuickAddTile onOpen={() => navigate("/record/entry")} />
             {/* Expense tiles with budget tracking */}
-            {(["essential", "flexible", "daily"] as const).map((sec) => (
+            {(["daily", "essential", "flexible"] as const).map((sec) => (
               <TileCard
                 key={sec}
                 meta={META[sec]}

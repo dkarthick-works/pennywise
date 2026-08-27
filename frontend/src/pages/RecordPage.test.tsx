@@ -63,7 +63,14 @@ beforeEach(() => {
   mocks.getSettings.mockResolvedValue(settings());
 });
 
-describe("RecordPage dashboard shortcut", () => {
+describe("RecordPage overview", () => {
+  it("shows Daily / Running before Bare Minimum", async () => {
+    renderRecord();
+    const daily = await screen.findByText("Daily / Running");
+    const essential = screen.getByText("Bare Minimum");
+    expect(daily.compareDocumentPosition(essential)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it("navigates to the dashboard for the open month", async () => {
     renderRecord();
     expect(await screen.findByRole("heading", { name: /Record Expense/i })).toBeInTheDocument();
