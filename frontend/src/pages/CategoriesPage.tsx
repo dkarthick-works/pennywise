@@ -10,6 +10,7 @@ import {
   updateCategoryGroup,
   deleteCategoryGroup,
   deleteCategoryMapping,
+  groupSpendHistoryKeys,
 } from "../api/ledger";
 import { IconX } from "../components/ui/Icons";
 import type { CategoryGroup } from "../types";
@@ -25,6 +26,7 @@ const catKeys = {
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["categories"] });
   qc.invalidateQueries({ queryKey: ["group-spend"] });
+  qc.invalidateQueries({ queryKey: groupSpendHistoryKeys.all });
 }
 
 function errorMessage(e: unknown, fallback: string) {

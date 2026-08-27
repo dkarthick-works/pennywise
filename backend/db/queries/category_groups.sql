@@ -45,6 +45,38 @@ LEFT JOIN transactions t
 WHERE cg.user_id = sqlc.arg(user_id)
 GROUP BY cg.id, cg.name;
 
+-- name: ListGroupTransactionsForHistory :many
+SELECT
+    cg.id AS group_id,
+    cm.id AS mapping_id,
+    t.id AS transaction_id,
+    t.amount,
+    t.txn_date
+FROM category_groups cg
+JOIN category_mappings cm
+    ON cm.group_id = cg.id AND cm.user_id = cg.user_id
+JOIN transactions t
+    ON t.user_id = cg.user_id
+    AND lower(regexp_replace(btrim(t.category), '\s+', ' ', 'g')) = cm.normalized_category
+WHERE cg.user_id = sqlc.arg(user_id)
+  AND cg.id = ANY(sqlc.arg(group_ids)::uuid[])
+  AND t.txn_date >= sqlc.arg(from_date)
+  AND t.txn_date < sqlc.arg(to_date)
+ORDER BY cg.id, t.txn_date, t.id;
+
+-- name: SumMonthlyCostByMonthRange :many
+SELECT
+    to_char(date_trunc('month', txn_date), 'YYYY-MM') AS month,
+    COALESCE(SUM(amount), 0)::numeric AS total
+FROM transactions
+WHERE user_id = sqlc.arg(user_id)
+  AND txn_date >= sqlc.arg(from_date)
+  AND txn_date < sqlc.arg(to_date)
+  AND section IN ('essential', 'flexible', 'daily')
+  AND kind IN ('cash', 'credit')
+GROUP BY date_trunc('month', txn_date)
+ORDER BY date_trunc('month', txn_date);
+
 -- name: ListTransactionsByGroupForMonth :many
 SELECT t.*
 FROM transactions t

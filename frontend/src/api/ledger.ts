@@ -19,6 +19,7 @@ import type {
   CreditTransactionView,
   CategoryGroupSpend,
   CategoryGroupTransactions,
+  GroupSpendHistoryResponse,
   CategoryGroup,
   CategoryMapping,
   ImportRowPayload,
@@ -103,7 +104,7 @@ export async function exportTransactions(
       } catch {
         // The backend normally returns JSON errors, but keep the UI readable if not.
       }
-      throw new Error(message);
+      throw new Error(message, { cause: e });
     }
     throw e;
   }
@@ -181,6 +182,34 @@ export const getDashboardMonthly = (month: string) =>
 
 export const getGroupSpend = (month: string): Promise<CategoryGroupSpend[]> =>
   client.get<CategoryGroupSpend[]>("/api/dashboard/group-spend", { params: { month } }).then((r) => r.data);
+
+export const groupSpendHistoryKeys = {
+  all: ["dashboard", "group-spend-history"] as const,
+  detail: (groupId: string, to: string, months: number) =>
+    ["dashboard", "group-spend-history", groupId, to, months] as const,
+};
+
+export const getGroupSpendHistory = ({
+  to,
+  months,
+  groupIds,
+  signal,
+}: {
+  to: string;
+  months: 3 | 6 | 12;
+  groupIds?: string[];
+  signal?: AbortSignal;
+}) =>
+  client
+    .get<GroupSpendHistoryResponse>("/api/dashboard/group-spend/history", {
+      params: {
+        to,
+        months,
+        group_ids: groupIds?.length ? groupIds.join(",") : undefined,
+      },
+      signal,
+    })
+    .then((r) => r.data);
 
 // ─── Credit usage ───────────────────────────────────────────────────────────
 

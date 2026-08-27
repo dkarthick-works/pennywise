@@ -108,6 +108,7 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/insights", s.handleGetInsights)
 		pr.Get("/api/dashboard/monthly", s.handleGetDashboardMonthly)
 		pr.Get("/api/dashboard/group-spend", s.handleGetGroupSpend)
+		pr.Get("/api/dashboard/group-spend/history", s.handleGetGroupSpendHistory)
 		pr.Get("/api/dashboard/credit-usage", s.handleGetCreditUsage)
 		pr.Get("/api/dashboard/credit-transactions", s.handleGetCreditTransactions)
 

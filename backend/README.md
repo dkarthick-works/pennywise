@@ -128,6 +128,7 @@ only ever talks to this origin.
 | GET    | `/api/daily-suggestions` | ghost-autocomplete categories |
 | GET    | `/api/dashboard/monthly?month=YYYY-MM` | dashboard hero-card totals |
 | GET    | `/api/dashboard/group-spend?month=YYYY-MM` | per-group spend for dashboard category cards |
+| GET    | `/api/dashboard/group-spend/history?to=YYYY-MM&months=3|6|12&group_ids=` | category-group history, statistics, mappings, and contributions |
 | GET    | `/api/dashboard/credit-usage?month=YYYY-MM` | calendar-month + statement-cycle credit spend |
 | GET    | `/api/dashboard/credit-transactions?month=YYYY-MM&view=calendar\|billing` | credit rows for one window |
 | GET    | `/api/categories/unmapped` | distinct transaction category strings with no group mapping |
@@ -364,6 +365,51 @@ Response shape — JSON array:
 ```
 
 Handlers: `internal/api/group_spend.go`; query `SumSpendByGroupsForMonth` in
+`db/queries/category_groups.sql`.
+
+### Group spend history (`GET /api/dashboard/group-spend/history`)
+
+Returns 3, 6, or 12 inclusive calendar-month buckets ending at required `to=YYYY-MM`.
+An optional comma-separated `group_ids` list filters by stable, user-owned group IDs;
+omitting it returns every group. Every requested month is present, including explicit
+zero buckets. Empty-bucket average, median, and largest values are JSON `null`.
+
+Each group includes its current category mappings, monthly total/count/average/median/
+largest statistics, and per-mapped-category contributions. Historical calculations use
+the group's mappings at request time, so editing a mapping intentionally changes old
+months. Group matching remains unrestricted by section or kind, matching the existing
+monthly group-spend endpoint.
+
+The top-level `monthly_costs` series uses the Dashboard Monthly Cost definition:
+expense sections (`essential`, `flexible`, `daily`) with kind `cash` or `credit`,
+excluding income and settlements. It is the denominator for the frontend's “Share of
+monthly cost” metric. Reads run in one read-only repeatable-read transaction so all
+parts of the response use one database snapshot.
+
+```json
+{
+  "from": "2026-03",
+  "to": "2026-08",
+  "months": 6,
+  "monthly_costs": [{ "month": "2026-03", "total": 50000 }],
+  "groups": [{
+    "group_id": "uuid",
+    "group_name": "Online Food",
+    "mappings": [{ "id": "uuid", "category": "Swiggy" }],
+    "buckets": [{
+      "month": "2026-08",
+      "total": 12000,
+      "transaction_count": 16,
+      "average_transaction": 750,
+      "median_transaction": 540,
+      "largest_transaction": 2100,
+      "categories": [{ "category": "Swiggy", "total": 12000, "transaction_count": 16 }]
+    }]
+  }]
+}
+```
+
+Handler: `internal/api/group_spend_history.go`; queries in
 `db/queries/category_groups.sql`.
 
 ### Credit usage (`GET /api/dashboard/credit-usage?month=YYYY-MM`)

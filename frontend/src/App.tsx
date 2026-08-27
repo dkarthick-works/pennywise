@@ -6,6 +6,7 @@ import { AuthPage }      from "./pages/AuthPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { CategoryGroupPage } from "./pages/CategoryGroupPage";
+import { CategoryGroupComparisonPage } from "./pages/CategoryGroupComparisonPage";
 import { CreditTransactionsPage } from "./pages/CreditTransactionsPage";
 import { RecordPage }    from "./pages/RecordPage";
 import { RecordEntryPage } from "./pages/RecordEntryPage";
@@ -67,6 +68,7 @@ export default function App() {
               <Routes>
                 <Route path="/dashboard" element={<DashboardPage month={month} setMonth={setMonth} />} />
                 <Route path="/dashboard/groups/:groupId" element={<CategoryGroupPage month={month} />} />
+                <Route path="/dashboard/groups/:groupId/compare" element={<CategoryGroupComparisonPage month={month} />} />
                 <Route path="/dashboard/credits" element={<CreditTransactionsPage month={month} setMonth={setMonth} />} />
                 <Route path="/record"    element={<RecordPage month={month} setMonth={setMonth} />} />
                 <Route path="/record/entry" element={<RecordEntryPage month={month} setMonth={setMonth} />} />

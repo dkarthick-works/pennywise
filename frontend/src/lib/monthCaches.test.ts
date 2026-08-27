@@ -28,6 +28,7 @@ describe("credit cache invalidation", () => {
     // Month-specific keys.
     expect(keys).toContain(JSON.stringify(["txns", "month", "2026-07"]));
     expect(keys).toContain(JSON.stringify(["dashboard", "monthly", "2026-07"]));
+    expect(keys).toContain(JSON.stringify(["dashboard", "group-spend-history"]));
     // Credit prefixes (no month) so adjacent statement cycles refresh too.
     expect(keys).toContain(JSON.stringify(["dashboard", "credit-usage"]));
     expect(keys).toContain(JSON.stringify(["dashboard", "credit-transactions"]));
