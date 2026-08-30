@@ -793,7 +793,9 @@ Handlers: `internal/api/chit_transfer.go`; transfer queries are in
 
 See `.env.example`. Key vars: `DATABASE_URL`, `JWT_SECRET` (must match Goauth),
 `JWT_USER_CLAIM`/`JWT_EMAIL_CLAIM`, `GOAUTH_BASE_URL`, `CORS_ORIGINS`,
-`SEED_DEMO_DATA`.
+`SEED_DEMO_DATA`. Optional `OPENROUTER_API_KEY` + `OPENROUTER_MODEL` enable
+`POST /api/transactions/parse` (see § AI transaction previews); leave both empty
+to disable parsing without affecting other endpoints.
 
 ### Production refresh-cookie gate
 
