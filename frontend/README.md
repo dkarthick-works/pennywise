@@ -22,7 +22,7 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | Path | Page | Notes |
 |------|------|-------|
 | `/record` | Record & Expense | **Default landing page** after login (`/` redirects here) |
-| `/record/entry` | Quick add | Cross-section draft-row entry (section/kind cycle chips, sticky date, visit session log) |
+| `/record/entry` | Quick add | Manual cross-section entry plus AI language parsing; section/kind cycle chips, sticky date, visit session log |
 | `/dashboard` | Dashboard | Month/year charts, hero cards, category-group spend |
 | `/dashboard/credits?month=&view=calendar\|billing` | Credit transactions | Drill-down from the Credit Card Usage hero card; month + view carried in the URL |
 | `/dashboard/groups/:groupId` | Category group | Drill-down from a category-group spend card |
@@ -141,7 +141,8 @@ per-month bars, top categories, and section split donut.
 
 The primary workflow surface. Three section tiles — **Essential**, **Flexible**,
 and **Daily / Running** — each with an editable transaction table for the
-selected month.
+selected month. On the tile grid (not inside a section), a **Dashboard** button
+navigates to `/dashboard?month=` using the shell's current month.
 
 ### Status filter
 
@@ -230,6 +231,24 @@ the page clears the log, but saved rows remain in the ledger.
 
 Implementation: `src/pages/RecordEntryPage.tsx`; month bootstrap via
 `openMonth` (`POST /api/months/{month}/open`).
+
+### AI quick add
+
+Above the manual quick-add table on `/record/entry`, **AI quick add**
+(`src/components/record/AiQuickAdd.tsx`) turns everyday language into editable
+transaction previews via `POST /api/transactions/parse`. Paste one or more
+spend/income lines (e.g. "₹500 lunch today and ₹1,200 petrol yesterday"), click
+**Generate**, and review the preview table. Each row can be edited inline;
+highlighted issues must be cleared before **Save** or **Save all ready**. Saved
+rows call `POST /api/transactions` and also appear in **This session** below.
+
+The client sends `reference_date` as today's local `YYYY-MM-DD`
+(`currentDate()`). Income previews always save as `cash`; settlements are not
+supported. Preview readiness is computed client-side in
+`src/lib/transactionPreview.ts` (section, name, amount, date-in-month, kind).
+Parse failures surface API errors (422 when nothing parseable, 503 when parsing
+is disabled, 429 on rate limits). Backend OpenRouter configuration is required
+— see [backend/README.md § AI transaction previews](../backend/README.md).
 
 ## Settings page
 
@@ -378,3 +397,28 @@ In production the Go server serves the embedded SPA with explicit cache headers:
 so new deployments are picked up immediately; content-hashed files under
 `assets/` are cached as immutable for one year (`spaHandler` in
 `backend/internal/api/server.go`).
+
+### Session resilience
+
+Installed PWAs must survive brief offline periods and multi-tab refresh without
+logging the user out unnecessarily:
+
+| Mechanism | Where | Behavior |
+|-----------|-------|----------|
+| Access token | `sessionStorage` (`pennywise_access_token`) | Attached as Bearer on API calls |
+| Refresh cookie | HttpOnly at `/api/auth/refresh` | Rotated via `withCredentials: true` |
+| Coordinated refresh | `src/api/client.ts` | Single in-flight refresh; `BroadcastChannel` + `navigator.locks` dedupe across tabs |
+| Retryable failures | `AuthContext.tsx` + `App.tsx` | Network/5xx refresh errors show **Connection unavailable** with **Retry**; token kept |
+| Terminal logout | `TerminalAuthError` | Refresh `400`/`401`/`403` clears token and redirects to login |
+| Tab focus | `visibilitychange` listener | When a tab becomes visible and a token exists, refresh + re-hydrate profile |
+
+On 401, the axios interceptor retries once after `refreshSession()`. Deployers
+should verify production `Set-Cookie` attributes — see
+[backend/README.md § Production refresh-cookie gate](../backend/README.md).
+
+## Analytics
+
+Production builds only (`import.meta.env.PROD`) initialize **Microsoft Clarity**
+in `src/main.tsx` for session recordings and heatmaps. Local `npm run dev` does
+not load Clarity. The project id is hard-coded in source; manage retention and
+masking in the Clarity dashboard, not in this repo.

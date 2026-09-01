@@ -64,9 +64,17 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
 
 ## Recent features (see sub-READMEs for detail)
 
+- **AI transaction parsing** — natural-language previews on Quick add (`/record/entry`);
+  `POST /api/transactions/parse` (OpenRouter-backed, never writes)
+  ([frontend/README.md § AI quick add](frontend/README.md),
+  [backend/README.md § AI transaction previews](backend/README.md))
+- **Category group spend comparison** — 3/6/12-month history, statistics, and drill-down
+  from dashboard group cards
+  ([frontend/README.md § Dashboard page](frontend/README.md),
+  [backend/README.md § Group spend history](backend/README.md))
 - **Record page** — default landing route; per-section status filter; daily rows grouped by date;
   transaction-name autocomplete on Daily/Income quick-add; **Copy last month** on Income/Essential/Flexible;
-  **Quick add** cross-section entry at `/record/entry`
+  **Quick add** cross-section entry at `/record/entry`; **Dashboard** shortcut on the tile grid
   ([frontend/README.md § Record page](frontend/README.md))
 - **Dashboard daily spend chart** — Daily-section incurred spend by calendar day with month total and
   average-per-day header (client-side rollups)
@@ -92,5 +100,6 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
   [backend/README.md § Chit JSON transfer](backend/README.md))
 - **Insights** — emergency fund targets from essential spend lookback
   ([backend/README.md § Insights](backend/README.md))
-- **PWA** — installable, offline-capable app shell with safe cache headers on deploy
+- **PWA** — installable, offline-capable app shell with resilient multi-tab sessions and safe
+  cache headers on deploy
   ([frontend/README.md § PWA](frontend/README.md))
