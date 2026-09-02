@@ -109,6 +109,23 @@ describe("Dashboard cash flow card", () => {
 
     expect(await screen.findByText("/dashboard/cash-flow?month=2026-07")).toBeInTheDocument();
   });
+
+  it("omits balance remaining and savings-rate metrics", async () => {
+    mocks.getCreditUsage.mockResolvedValue(unconfigured);
+    mocks.getDashboardMonthly.mockResolvedValue({
+      month: "2026-07", income: 1000, cash_flow: 690, monthly_cost: 750, net_saved: 310,
+      savings_rate: 31, monthly_difference: 60, outstanding_credits_count: 0, outstanding_credits_total: 0,
+    });
+    renderDashboard();
+
+    const card = within(await screen.findByRole("button", {
+      name: "View cash flow transactions for July 2026",
+    }));
+    expect(card.queryByText("Balance remaining")).not.toBeInTheDocument();
+    expect(card.queryByText("Net saved")).not.toBeInTheDocument();
+    expect(card.queryByText(/savings rate/i)).not.toBeInTheDocument();
+    expect(card.queryByText("31%")).not.toBeInTheDocument();
+  });
 });
 
 describe("Dashboard credit usage card", () => {

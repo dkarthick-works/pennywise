@@ -5,12 +5,14 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { CashFlowTransactionsPage } from "./CashFlowTransactionsPage";
 
 const getTxnsByMonth = vi.fn();
+const getDashboardMonthly = vi.fn();
 
 vi.mock("../api/ledger", async (importActual) => {
   const actual = await importActual<typeof import("../api/ledger")>();
   return {
     ...actual,
     getTxnsByMonth: (month: string) => getTxnsByMonth(month),
+    getDashboardMonthly: (month: string) => getDashboardMonthly(month),
   };
 });
 
@@ -33,6 +35,11 @@ function renderAt(url: string, setMonth = vi.fn()) {
 
 beforeEach(() => {
   getTxnsByMonth.mockReset();
+  getDashboardMonthly.mockReset();
+  getDashboardMonthly.mockResolvedValue({
+    month: "2026-08", income: 1000, cash_flow: 425, monthly_cost: 825, net_saved: 575,
+    savings_rate: 57.5, monthly_difference: 400, outstanding_credits_count: 0, outstanding_credits_total: 0,
+  });
 });
 
 describe("CashFlowTransactionsPage", () => {
@@ -48,6 +55,7 @@ describe("CashFlowTransactionsPage", () => {
     const setMonth = renderAt("/dashboard/cash-flow?month=2026-08");
 
     await waitFor(() => expect(getTxnsByMonth).toHaveBeenCalledWith("2026-08"));
+    expect(getDashboardMonthly).toHaveBeenCalledWith("2026-08");
     expect(setMonth).toHaveBeenCalledWith("2026-08");
     expect(await screen.findByRole("heading", { name: "Cash Flow Transactions" })).toBeInTheDocument();
     expect(screen.getByText("Cash Coffee")).toBeInTheDocument();
@@ -57,6 +65,8 @@ describe("CashFlowTransactionsPage", () => {
     expect(screen.queryByText("Credit Shop")).not.toBeInTheDocument();
     expect(screen.queryByText("Salary")).not.toBeInTheDocument();
     expect(screen.getByText("₹425")).toBeInTheDocument();
+    expect(screen.getByText("Balance remaining")).toBeInTheDocument();
+    expect(screen.getByText("+₹575")).toBeInTheDocument();
 
     const sectionHeadings = screen.getAllByRole("heading", { level: 2 });
     expect(sectionHeadings.map((heading) => heading.textContent)).toEqual([

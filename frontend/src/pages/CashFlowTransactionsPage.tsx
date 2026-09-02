@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getTxnsByMonth } from "../api/ledger";
+import { getDashboardMonthly, getTxnsByMonth } from "../api/ledger";
 import { TransactionListTable } from "../components/dashboard/TransactionListTable";
 import { IconChevL, IconChevR } from "../components/ui/Icons";
 import { monthLabel } from "../lib/dates";
@@ -43,6 +43,10 @@ export function CashFlowTransactionsPage({
   const { data = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["txns", "month", month],
     queryFn: () => getTxnsByMonth(month),
+  });
+  const dashboardQuery = useQuery({
+    queryKey: ["dashboard", "monthly", month],
+    queryFn: () => getDashboardMonthly(month),
   });
 
   const rows = data.filter(
@@ -87,10 +91,28 @@ export function CashFlowTransactionsPage({
           <h1 className="page-title">Cash Flow Transactions</h1>
           <p className="page-sub">Cash + settlements · {monthLabel(month)} · by payment date</p>
         </div>
-        <div className="card card-pad" style={{ minWidth: 220, padding: "14px 18px", textAlign: "right" }}>
-          <div className="stat-lbl" style={{ marginBottom: 4 }}>Cash out</div>
-          <div className="num" style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em" }}>
-            {isLoading || isError ? "—" : inr(total)}
+        <div className="card card-pad" style={{ minWidth: 240, padding: "14px 18px", textAlign: "right" }}>
+          <div>
+            <div className="stat-lbl" style={{ marginBottom: 4 }}>Cash out</div>
+            <div className="num" style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em" }}>
+              {isLoading || isError ? "—" : inr(total)}
+            </div>
+          </div>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+            <div className="stat-lbl" style={{ marginBottom: 4 }}>Balance remaining</div>
+            <div
+              className="num"
+              style={{
+                fontSize: 24,
+                fontWeight: 800,
+                letterSpacing: "-0.03em",
+                color: (dashboardQuery.data?.net_saved ?? 0) >= 0 ? "var(--pos)" : "var(--neg)",
+              }}
+            >
+              {dashboardQuery.isLoading || dashboardQuery.isError || !dashboardQuery.data
+                ? "—"
+                : `${dashboardQuery.data.net_saved >= 0 ? "+" : "−"}${inr(Math.abs(dashboardQuery.data.net_saved))}`}
+            </div>
           </div>
         </div>
       </div>
