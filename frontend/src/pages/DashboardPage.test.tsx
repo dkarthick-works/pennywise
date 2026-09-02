@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { DashboardPage } from "./DashboardPage";
 import type { CreditUsageSummary } from "../types";
 
@@ -36,6 +36,11 @@ function renderDashboard() {
       </MemoryRouter>
     </QueryClientProvider>
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div>{location.pathname}{location.search}</div>;
 }
 
 const configured: CreditUsageSummary = {
@@ -82,6 +87,29 @@ function settingsWithThreshold(threshold: number | null) {
     credit_spending_threshold: threshold,
   };
 }
+
+describe("Dashboard cash flow card", () => {
+  it("opens the selected month's cash-flow transactions", async () => {
+    mocks.getCreditUsage.mockResolvedValue(unconfigured);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/dashboard?month=2026-07"]}>
+          <Routes>
+            <Route path="/dashboard" element={<DashboardPage month="2026-07" setMonth={() => {}} />} />
+            <Route path="/dashboard/cash-flow" element={<LocationProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", {
+      name: "View cash flow transactions for July 2026",
+    }));
+
+    expect(await screen.findByText("/dashboard/cash-flow?month=2026-07")).toBeInTheDocument();
+  });
+});
 
 describe("Dashboard credit usage card", () => {
   it("renders both statement-cycle and calendar buckets from the API", async () => {

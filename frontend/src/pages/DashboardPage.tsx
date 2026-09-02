@@ -476,7 +476,13 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
               </div>
             </div>
 
-            <div className="card card-pad">
+            <button
+              type="button"
+              className="card card-pad hero-card-link"
+              aria-label={`View cash flow transactions for ${monthLabel(month)}`}
+              onClick={() => navigate(`/dashboard/cash-flow?month=${month}`)}
+              style={{ width: "100%" }}
+            >
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{
@@ -528,7 +534,7 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
                 </div>
                 <SavingsRing pct={savingsRate} />
               </div>
-            </div>
+            </button>
 
             <CreditUsageCard
               month={month}
