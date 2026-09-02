@@ -65,7 +65,8 @@ async function creditCard(): Promise<HTMLElement> {
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   mocks.getDashboardMonthly.mockResolvedValue({
-    month: "2026-07", income: 0, cash_flow: 0, monthly_cost: 0, net_saved: 0,
+    month: "2026-07", income: 0, cash_spending: 0, remaining_balance: 0, free_money: 0,
+    cash_flow: 0, monthly_cost: 0, net_saved: 0,
     savings_rate: 0, monthly_difference: 0, outstanding_credits_count: 0, outstanding_credits_total: 0,
   });
   mocks.getGroupSpend.mockResolvedValue([]);
@@ -113,7 +114,8 @@ describe("Dashboard cash flow card", () => {
   it("omits balance remaining and savings-rate metrics", async () => {
     mocks.getCreditUsage.mockResolvedValue(unconfigured);
     mocks.getDashboardMonthly.mockResolvedValue({
-      month: "2026-07", income: 1000, cash_flow: 690, monthly_cost: 750, net_saved: 310,
+      month: "2026-07", income: 1000, cash_spending: 690, remaining_balance: 310, free_money: 100,
+      cash_flow: 690, monthly_cost: 750, net_saved: 310,
       savings_rate: 31, monthly_difference: 60, outstanding_credits_count: 0, outstanding_credits_total: 0,
     });
     renderDashboard();

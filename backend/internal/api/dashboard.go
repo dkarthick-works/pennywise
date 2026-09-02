@@ -12,6 +12,9 @@ import (
 type DashboardMonthlyDTO struct {
 	Month                   string  `json:"month"`
 	Income                  float64 `json:"income"`
+	CashSpending            float64 `json:"cash_spending"`
+	RemainingBalance        float64 `json:"remaining_balance"`
+	FreeMoney               float64 `json:"free_money"`
 	CashFlow                float64 `json:"cash_flow"`
 	MonthlyCost             float64 `json:"monthly_cost"`
 	NetSaved                float64 `json:"net_saved"`
@@ -34,8 +37,10 @@ func (s *Server) handleGetDashboardMonthly(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	row, err := s.q.SumDashboardMonthly(r.Context(), db.SumDashboardMonthlyParams{
-		UserID:   userID(r),
+	ctx := r.Context()
+	uid := userID(r)
+	row, err := s.q.SumDashboardMonthly(ctx, db.SumDashboardMonthlyParams{
+		UserID:   uid,
 		FromDate: fromDate,
 		ToDate:   toDate,
 	})
@@ -44,7 +49,17 @@ func (s *Server) handleGetDashboardMonthly(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	writeJSON(w, http.StatusOK, dashboardMonthlyToDTO(month, row))
+	settings, err := s.q.GetSettings(ctx, uid)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "could not load dashboard")
+		return
+	}
+	bareMinimumRemaining := numToFloat(settings.BudgetEssential) - numToFloat(row.EssentialSum)
+	subscriptionsRemaining := numToFloat(settings.BudgetFlexible) - numToFloat(row.FlexibleSum)
+	dailyRemaining := numToFloat(settings.BudgetDaily) - numToFloat(row.DailySum)
+	budgetRemaining := bareMinimumRemaining + subscriptionsRemaining + dailyRemaining
+
+	writeJSON(w, http.StatusOK, dashboardMonthlyToDTO(month, row, budgetRemaining))
 }
 
 func monthDateRange(month string) (pgtype.Date, pgtype.Date, error) {
@@ -55,23 +70,27 @@ func monthDateRange(month string) (pgtype.Date, pgtype.Date, error) {
 	return pgtype.Date{Time: start, Valid: true}, pgtype.Date{Time: start.AddDate(0, 1, 0), Valid: true}, nil
 }
 
-func dashboardMonthlyToDTO(month string, row db.SumDashboardMonthlyRow) DashboardMonthlyDTO {
+func dashboardMonthlyToDTO(month string, row db.SumDashboardMonthlyRow, budgetRemaining float64) DashboardMonthlyDTO {
 	income := numToFloat(row.Income)
-	cashFlow := numToFloat(row.CashFlow)
+	cashSpending := numToFloat(row.CashFlow)
 	monthlyCost := numToFloat(row.MonthlyCost)
-	netSaved := income - cashFlow
+	remainingBalance := income - cashSpending
+	freeMoney := remainingBalance - budgetRemaining
 	monthlyDifference := income - monthlyCost
 	savingsRate := 0.0
 	if income > 0 {
-		savingsRate = (netSaved / income) * 100
+		savingsRate = (remainingBalance / income) * 100
 	}
 
 	return DashboardMonthlyDTO{
 		Month:                   month,
 		Income:                  income,
-		CashFlow:                cashFlow,
+		CashSpending:            cashSpending,
+		RemainingBalance:        remainingBalance,
+		FreeMoney:               freeMoney,
+		CashFlow:                cashSpending,
 		MonthlyCost:             monthlyCost,
-		NetSaved:                netSaved,
+		NetSaved:                remainingBalance,
 		SavingsRate:             savingsRate,
 		MonthlyDifference:       monthlyDifference,
 		OutstandingCreditsCount: row.OutstandingCreditsCount,

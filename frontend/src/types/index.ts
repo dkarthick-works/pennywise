@@ -147,6 +147,9 @@ export interface Insights {
 export interface DashboardMonthly {
   month: string;
   income: number;
+  cash_spending: number;
+  remaining_balance: number;
+  free_money: number;
   cash_flow: number;
   monthly_cost: number;
   net_saved: number;

@@ -37,7 +37,8 @@ beforeEach(() => {
   getTxnsByMonth.mockReset();
   getDashboardMonthly.mockReset();
   getDashboardMonthly.mockResolvedValue({
-    month: "2026-08", income: 1000, cash_flow: 425, monthly_cost: 825, net_saved: 575,
+    month: "2026-08", income: 1000, cash_spending: 425, remaining_balance: 575, free_money: 200,
+    cash_flow: 425, monthly_cost: 825, net_saved: 575,
     savings_rate: 57.5, monthly_difference: 400, outstanding_credits_count: 0, outstanding_credits_total: 0,
   });
 });
@@ -67,6 +68,8 @@ describe("CashFlowTransactionsPage", () => {
     expect(screen.getByText("₹425")).toBeInTheDocument();
     expect(screen.getByText("Balance remaining")).toBeInTheDocument();
     expect(screen.getByText("+₹575")).toBeInTheDocument();
+    expect(screen.getByText("Free money")).toBeInTheDocument();
+    expect(screen.getByText("+₹200")).toBeInTheDocument();
 
     const sectionHeadings = screen.getAllByRole("heading", { level: 2 });
     expect(sectionHeadings.map((heading) => heading.textContent)).toEqual([

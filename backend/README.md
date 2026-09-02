@@ -325,8 +325,14 @@ now.
 **What counts:**
 
 - `income`: all rows where `section = 'income'`.
-- `cash_flow`: expense rows (`essential`, `flexible`, `daily`) where `kind` is
-  `cash` or `settlement`.
+- `cash_spending`: expense rows (`essential`, `flexible`, `daily`) where `kind`
+  is `cash` or `settlement`. `cash_flow` remains as a compatibility alias.
+- `remaining_balance`: income minus `cash_spending`. `net_saved` remains as a
+  compatibility alias.
+- `free_money`: `remaining_balance` minus the combined unspent Essential,
+  Flexible (Subscriptions), and Daily budgets. Each unspent budget is its user
+  setting minus that section's cash + credit transactions; settlements are
+  excluded from these section sums.
 - `monthly_cost`: expense rows where `kind` is `cash` or `credit`.
 - `outstanding_credits_*`: expense `credit` rows incurred in the selected month
   that have no `settlement_links` row.
@@ -339,6 +345,9 @@ Response shape:
 {
   "month": "2026-06",
   "income": 85000,
+  "cash_spending": 62000,
+  "remaining_balance": 23000,
+  "free_money": 14000,
   "cash_flow": 62000,
   "monthly_cost": 71000,
   "net_saved": 23000,

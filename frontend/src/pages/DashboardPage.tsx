@@ -477,20 +477,30 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
               <div
                 style={{
                   margin: "0 0 10px",
-                  padding: "12px 14px",
+                  padding: "16px 18px",
                   borderRadius: 14,
                   background: "var(--surface-2)",
                   border: "1px solid var(--border-2)",
+                  minHeight: 150,
+                  containerType: "inline-size",
+                  overflow: "hidden",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 14 }}>
-                  <div>
-                    <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 3 }}>Cash out</div>
-                    <div className="muted" style={{ fontSize: 11.5 }}>cash + settlements</div>
-                  </div>
-                  <div className="num" style={{ fontSize: 29, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: "var(--ink)" }}>
-                    {inr(cashFlow)}
-                  </div>
+                <div className="stat-lbl" style={{ color: "var(--ink)", fontWeight: 700, marginBottom: 2 }}>Cash out</div>
+                <div className="muted" style={{ fontSize: 11.5, marginBottom: 10 }}>cash + settlements</div>
+                <div
+                  className="num"
+                  style={{
+                    fontSize: "clamp(1.5rem, 14cqi, 3.25rem)",
+                    fontWeight: 800,
+                    letterSpacing: "-0.03em",
+                    lineHeight: 1,
+                    color: "var(--ink)",
+                    whiteSpace: "nowrap",
+                    maxWidth: "100%",
+                  }}
+                >
+                  {inr(cashFlow)}
                 </div>
               </div>
             </button>

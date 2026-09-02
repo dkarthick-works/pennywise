@@ -653,6 +653,15 @@ SELECT
     WHERE section IN ('essential','flexible','daily')
       AND kind IN ('cash','credit')
   ), 0)::numeric AS monthly_cost,
+  COALESCE(SUM(amount) FILTER (
+    WHERE section = 'essential' AND kind <> 'settlement'
+  ), 0)::numeric AS essential_sum,
+  COALESCE(SUM(amount) FILTER (
+    WHERE section = 'flexible' AND kind <> 'settlement'
+  ), 0)::numeric AS flexible_sum,
+  COALESCE(SUM(amount) FILTER (
+    WHERE section = 'daily' AND kind <> 'settlement'
+  ), 0)::numeric AS daily_sum,
   COUNT(*) FILTER (
     WHERE section IN ('essential','flexible','daily')
       AND kind = 'credit'
@@ -683,6 +692,9 @@ type SumDashboardMonthlyRow struct {
 	Income                  pgtype.Numeric `json:"income"`
 	CashFlow                pgtype.Numeric `json:"cash_flow"`
 	MonthlyCost             pgtype.Numeric `json:"monthly_cost"`
+	EssentialSum            pgtype.Numeric `json:"essential_sum"`
+	FlexibleSum             pgtype.Numeric `json:"flexible_sum"`
+	DailySum                pgtype.Numeric `json:"daily_sum"`
 	OutstandingCreditsCount int64          `json:"outstanding_credits_count"`
 	OutstandingCreditsTotal pgtype.Numeric `json:"outstanding_credits_total"`
 }
@@ -694,6 +706,9 @@ func (q *Queries) SumDashboardMonthly(ctx context.Context, arg SumDashboardMonth
 		&i.Income,
 		&i.CashFlow,
 		&i.MonthlyCost,
+		&i.EssentialSum,
+		&i.FlexibleSum,
+		&i.DailySum,
 		&i.OutstandingCreditsCount,
 		&i.OutstandingCreditsTotal,
 	)
