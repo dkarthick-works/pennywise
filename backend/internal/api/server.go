@@ -85,7 +85,6 @@ func (s *Server) Router() http.Handler {
 		pr.Put("/api/profile", s.handleUpdateProfile)
 
 		pr.Get("/api/settings", s.handleGetSettings)
-		pr.Put("/api/settings/budgets", s.handleUpdateBudgets)
 		pr.Put("/api/settings/preferences", s.handleUpdatePreferences)
 		pr.Put("/api/settings/credit-billing-cycle", s.handleUpdateCreditStatementDay)
 		pr.Put("/api/settings/credit-spending-threshold", s.handleUpdateCreditSpendingThreshold)
@@ -107,6 +106,9 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/income-suggestions", s.handleIncomeSuggestions)
 		pr.Get("/api/insights", s.handleGetInsights)
 		pr.Get("/api/dashboard/monthly", s.handleGetDashboardMonthly)
+		pr.Get("/api/budgets", s.handleListMonthlyBudgets)
+		pr.Get("/api/budgets/{month}", s.handleGetMonthlyBudget)
+		pr.Put("/api/budgets/{month}", s.handlePutMonthlyBudget)
 		pr.Get("/api/dashboard/group-spend", s.handleGetGroupSpend)
 		pr.Get("/api/dashboard/group-spend/history", s.handleGetGroupSpendHistory)
 		pr.Get("/api/dashboard/credit-usage", s.handleGetCreditUsage)

@@ -12,6 +12,7 @@ const mocks = {
   getTxnsByMonth: vi.fn(),
   getTxnsByYear: vi.fn(),
   getSettings: vi.fn(),
+  getMonthlyBudget: vi.fn(),
 };
 
 vi.mock("../api/ledger", async (importActual) => {
@@ -24,6 +25,7 @@ vi.mock("../api/ledger", async (importActual) => {
     getTxnsByMonth: (m: string) => mocks.getTxnsByMonth(m),
     getTxnsByYear: (y: string) => mocks.getTxnsByYear(y),
     getSettings: () => mocks.getSettings(),
+    getMonthlyBudget: (m: string) => mocks.getMonthlyBudget(m),
   };
 });
 
@@ -73,16 +75,17 @@ beforeEach(() => {
   mocks.getTxnsByMonth.mockResolvedValue([]);
   mocks.getTxnsByYear.mockResolvedValue([]);
   mocks.getSettings.mockResolvedValue({
-    budgets: { essential: 0, flexible: 0, daily: 0 },
     currency: "INR", theme: "light", templates: { essential: [], flexible: [] },
     credit_statement_day: 15,
     credit_spending_threshold: null,
+  });
+  mocks.getMonthlyBudget.mockResolvedValue({
+    month: "2026-07", essential: 0, flexible: 0, daily: 0,
   });
 });
 
 function settingsWithThreshold(threshold: number | null) {
   return {
-    budgets: { essential: 0, flexible: 0, daily: 0 },
     currency: "INR", theme: "light", templates: { essential: [], flexible: [] },
     credit_statement_day: 15,
     credit_spending_threshold: threshold,
@@ -403,5 +406,56 @@ describe("Dashboard daily spend by day", () => {
       expect(bar.getAttribute("fill")).toBe("var(--c-daily-soft)");
     }
     expect(card.queryByText(/so far/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Dashboard section budgets", () => {
+  it("uses the selected month's budget on section cards", async () => {
+    mocks.getMonthlyBudget.mockResolvedValue({
+      month: "2026-07", essential: 30000, flexible: 10000, daily: 15000,
+    });
+    mocks.getCreditUsage.mockResolvedValue(unconfigured);
+    renderDashboard();
+
+    await waitFor(() => expect(mocks.getMonthlyBudget).toHaveBeenCalledWith("2026-07"));
+    expect(await screen.findAllByText(/Budget ·/)).toHaveLength(3);
+    expect(screen.getByText("₹30,000")).toBeInTheDocument();
+    expect(screen.getByText("₹10,000")).toBeInTheDocument();
+    expect(screen.getByText("₹15,000")).toBeInTheDocument();
+  });
+
+  it("shows a zero-budget empty bar after a successful all-zero response", async () => {
+    mocks.getCreditUsage.mockResolvedValue(unconfigured);
+    renderDashboard();
+    expect(await screen.findAllByText(/Budget ·/)).toHaveLength(3);
+    expect(screen.getAllByText("₹0").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Loading section budgets…")).not.toBeInTheDocument();
+  });
+
+  it("does not treat a pending GET as a zero budget", async () => {
+    mocks.getMonthlyBudget.mockReturnValue(new Promise(() => {}));
+    mocks.getCreditUsage.mockResolvedValue(unconfigured);
+    renderDashboard();
+    expect(await screen.findByText("Loading section budgets…")).toBeInTheDocument();
+    expect(screen.queryByText("Budget ·")).not.toBeInTheDocument();
+  });
+
+  it("shows Retry when the budget GET fails", async () => {
+    mocks.getMonthlyBudget.mockRejectedValue(new Error("nope"));
+    mocks.getCreditUsage.mockResolvedValue(unconfigured);
+    renderDashboard();
+    expect(await screen.findByText("Could not load section budgets.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.queryByText("Budget ·")).not.toBeInTheDocument();
+  });
+
+  it("does not fetch monthly budgets after switching to yearly view", async () => {
+    mocks.getCreditUsage.mockResolvedValue(unconfigured);
+    renderDashboard();
+    await waitFor(() => expect(mocks.getMonthlyBudget).toHaveBeenCalledWith("2026-07"));
+    mocks.getMonthlyBudget.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Yearly" }));
+    await waitFor(() => expect(screen.getByText("Spend per month · 2026")).toBeInTheDocument());
+    expect(mocks.getMonthlyBudget).not.toHaveBeenCalled();
   });
 });

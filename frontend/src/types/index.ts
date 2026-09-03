@@ -73,13 +73,16 @@ export interface Budgets {
   daily: number;
 }
 
+export interface MonthlyBudget extends Budgets {
+  month: string;
+}
+
 export interface Templates {
   essential: string[];
   flexible: string[];
 }
 
 export interface Settings {
-  budgets: Budgets;
   currency: string;
   theme: string;
   templates: Templates;

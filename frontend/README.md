@@ -46,7 +46,9 @@ Unknown authenticated paths fall back to `/record`.
 ## Dashboard page
 
 Monthly and yearly views of spend. The global month selector in the shell drives
-both the main dashboard and the drill-down routes below.
+both the main dashboard and the drill-down routes below. Monthly section cards
+use `GET /api/budgets/{month}` for budget bars; a pending or failed GET is not
+shown as a zero budget. Yearly view does not fetch monthly budgets.
 
 ### Monthly hero cards
 
@@ -141,7 +143,9 @@ per-month bars, top categories, and section split donut.
 
 The primary workflow surface. Three section tiles — **Essential**, **Flexible**,
 and **Daily / Running** — each with an editable transaction table for the
-selected month. On the tile grid (not inside a section), a **Dashboard** button
+selected month. Tile budget amounts (and the detail-header editor) use
+`GET`/`PUT /api/budgets/{month}` for the shell month and save on blur or Enter.
+On the tile grid (not inside a section), a **Dashboard** button
 navigates to `/dashboard?month=` using the shell's current month.
 
 ### Status filter
@@ -256,7 +260,7 @@ Nav item: **Settings** (`/settings`).
 
 | Section | Anchor | Notes |
 |---------|--------|-------|
-| Budgets | — | Per-section budget amounts (autosave) |
+| Budgets | — | Per-month Essential / Flexible / Daily amounts for the shell month (`GET`/`PUT /api/budgets/{month}`). Saves on blur or Enter. Missing months show zeros only after a successful GET. |
 | Templates | — | Ordered category lists per section |
 | Preferences | — | Income, currency, theme |
 | Credit card controls | `#credit-billing-cycle` | Statement closing day + spending threshold |

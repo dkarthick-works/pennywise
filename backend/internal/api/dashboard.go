@@ -1,9 +1,11 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/ledger/backend/internal/db"
@@ -49,14 +51,14 @@ func (s *Server) handleGetDashboardMonthly(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	settings, err := s.q.GetSettings(ctx, uid)
-	if err != nil {
+	budget, err := s.q.GetMonthlyBudget(ctx, db.GetMonthlyBudgetParams{UserID: uid, Month: fromDate})
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		writeErr(w, http.StatusInternalServerError, "could not load dashboard")
 		return
 	}
-	bareMinimumRemaining := numToFloat(settings.BudgetEssential) - numToFloat(row.EssentialSum)
-	subscriptionsRemaining := numToFloat(settings.BudgetFlexible) - numToFloat(row.FlexibleSum)
-	dailyRemaining := numToFloat(settings.BudgetDaily) - numToFloat(row.DailySum)
+	bareMinimumRemaining := numToFloat(budget.BudgetEssential) - numToFloat(row.EssentialSum)
+	subscriptionsRemaining := numToFloat(budget.BudgetFlexible) - numToFloat(row.FlexibleSum)
+	dailyRemaining := numToFloat(budget.BudgetDaily) - numToFloat(row.DailySum)
 	budgetRemaining := bareMinimumRemaining + subscriptionsRemaining + dailyRemaining
 
 	writeJSON(w, http.StatusOK, dashboardMonthlyToDTO(month, row, budgetRemaining))

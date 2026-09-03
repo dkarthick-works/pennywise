@@ -3,7 +3,7 @@ import type { ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  openMonth, getSettings, updateBudgets,
+  openMonth, getSettings,
   createTxn, updateTxn, deleteTxn,
 } from "../api/ledger";
 import { inr } from "../lib/money";
@@ -25,11 +25,13 @@ import {
 import { AmountInput, DateCell, RowCategoryInput, CategoryInput } from "../components/record/TableCells";
 import { CopyLastMonthButton } from "../components/record/CopyLastMonthButton";
 import { MonthDropdown } from "../components/record/MonthDropdown";
+import { BudgetAmountInput } from "../components/budget/BudgetAmountInput";
+import { budgetsFromMonthly, useMonthlyBudgetQuery, useSaveMonthlyBudget } from "../hooks/useMonthlyBudget";
 import {
   IconChevL, IconChevR, IconPlus, IconX, IconCheck, IconLock, IconArrowR, IconDownload,
   IconRecord, IconCreditCard, IconTrend, IconWallet, IconZap, IconDashboard,
 } from "../components/ui/Icons";
-import type { Transaction, Section, Budgets } from "../types";
+import type { Transaction, Section } from "../types";
 import { preserveApiRowOrder, sortRowsByDateDesc } from "../lib/recordRowOrder";
 
 // ─── Status legend ────────────────────────────────────────────────────────
@@ -128,8 +130,8 @@ interface TileMeta {
   label: string; color: string; iconBg: string; icon: ComponentType<{ size?: number }>;
   tag: string; unit: string; desc: string;
 }
-function TileCard({ meta, rows, budget, onOpen }: {
-  meta: TileMeta; rows: Transaction[]; budget: number; onOpen: () => void;
+function TileCard({ meta, rows, budget, budgetReady, onOpen }: {
+  meta: TileMeta; rows: Transaction[]; budget: number; budgetReady: boolean; onOpen: () => void;
 }) {
   const inc = rows.filter((r) => r.kind !== "settlement");
   const spent = inc.reduce((s, r) => s + r.amount, 0);
@@ -164,7 +166,7 @@ function TileCard({ meta, rows, budget, onOpen }: {
       </div>
       <div className="num" style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.1 }}>{inr(spent)}</div>
       <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
-        of {inr(budget)} · {credits > 0 ? `${credits} on credit` : `${filled} ${meta.unit}`}
+        of {budgetReady ? inr(budget) : "—"} · {credits > 0 ? `${credits} on credit` : `${filled} ${meta.unit}`}
       </div>
       <div className="bar"><i style={{ width: `${Math.min(ratio * 100, 100)}%`, background: budgetColor(ratio) }} /></div>
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12 }}>
@@ -186,10 +188,11 @@ function TileCard({ meta, rows, budget, onOpen }: {
 
 // ─── Tile detail header (budget edit + back) ──────────────────────────────
 
-function TileBudgetHead({ meta, spent, budget, onBudget, onBack }: {
-  meta: TileMeta; spent: number; budget: number; onBudget: (v: number) => void; onBack: () => void;
+function TileBudgetHead({ meta, spent, budget, budgetReady, budgetError, saving, saveError, onBudget, onRetry, onBack }: {
+  meta: TileMeta; spent: number; budget: number; budgetReady: boolean; budgetError: boolean;
+  saving: boolean; saveError: boolean; onBudget: (v: number) => void; onRetry: () => void; onBack: () => void;
 }) {
-  const ratio = budget ? spent / budget : 0;
+  const ratio = budgetReady && budget ? spent / budget : 0;
   return (
     <div style={{ marginBottom: 18 }}>
       <button className="btn btn-soft" style={{ padding: "6px 12px", marginBottom: 16 }} onClick={onBack}>
@@ -206,24 +209,39 @@ function TileBudgetHead({ meta, spent, budget, onBudget, onBack }: {
         <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
           <div>
             <div className="stat-lbl" style={{ marginBottom: 3 }}>Incurred</div>
-            <div className="num" style={{ fontSize: 22, fontWeight: 700, color: budgetColor(ratio) }}>{inr(spent)}</div>
+            <div className="num" style={{ fontSize: 22, fontWeight: 700, color: budgetReady ? budgetColor(ratio) : "var(--ink)" }}>{inr(spent)}</div>
           </div>
           <div>
             <label className="stat-lbl" style={{ display: "block", marginBottom: 3 }}>Section budget</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 2, border: "1px solid var(--border)", borderRadius: 9, padding: "5px 9px", background: "var(--surface-2)" }}>
-              <span className="muted num">₹</span>
-              <input
-                className="num"
-                value={budget.toLocaleString("en-IN")}
-                onChange={(e) => { const n = parseInt(e.target.value.replace(/[^0-9]/g, ""), 10); onBudget(isNaN(n) ? 0 : n); }}
-                style={{ width: 80, border: "none", background: "transparent", outline: "none", fontSize: 15, fontWeight: 600, color: "var(--ink)" }}
+            {budgetError ? (
+              <div>
+                <p style={{ margin: "0 0 8px", color: "var(--neg)", fontSize: 12.5 }}>Could not load this month’s budget.</p>
+                <button type="button" className="btn btn-soft" onClick={onRetry}>Retry</button>
+              </div>
+            ) : !budgetReady ? (
+              <p className="muted" style={{ margin: 0, fontSize: 13 }}>Loading budget…</p>
+            ) : (
+              <BudgetAmountInput
+                key={meta.label}
+                value={budget}
+                disabled={saving}
+                aria-label={`${meta.label} section budget`}
+                onCommit={onBudget}
               />
-            </div>
+            )}
+            {saveError && (
+              <div style={{ marginTop: 8 }}>
+                <p style={{ margin: "0 0 6px", color: "var(--neg)", fontSize: 12 }}>Couldn’t save budget.</p>
+                <button type="button" className="btn btn-soft" onClick={onRetry}>Retry</button>
+              </div>
+            )}
           </div>
+          {budgetReady && (
           <div style={{ minWidth: 120 }}>
             <div className="bar" style={{ marginBottom: 6 }}><i style={{ width: `${Math.min(ratio * 100, 100)}%`, background: budgetColor(ratio) }} /></div>
             <div style={{ fontSize: 11.5, fontWeight: 600, color: budgetColor(ratio) }}>{Math.round(ratio * 100)}% of budget</div>
           </div>
+          )}
         </div>
       </div>
     </div>
@@ -792,7 +810,6 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
   const [copyPending, setCopyPending] = useState(false);
   // Changing tiles unmounts the copy button, so drop any lock it still held.
   const selectTile = (t: Section | null) => { setCopyPending(false); setTile(t); };
-  const qc = useQueryClient();
 
   // Open-month call seeds templates if needed and returns this month's txns.
   const { data: monthData, isLoading } = useQuery({
@@ -807,18 +824,26 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
   const settledSet = settledCreditIds(txns);
 
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: getSettings });
-  const [budgets, setBudgets] = useState<Budgets | null>(null);
-  const effectiveBudgets = budgets ?? settings?.budgets ?? { essential: 0, flexible: 0, daily: 0 };
+  const budgetQuery = useMonthlyBudgetQuery(month);
+  const budgetMut = useSaveMonthlyBudget();
+  const budgetReady = budgetQuery.isSuccess && !!budgetQuery.data;
+  const effectiveBudgets = budgetQuery.data
+    ? budgetsFromMonthly(budgetQuery.data)
+    : { essential: 0, flexible: 0, daily: 0 };
 
-  const budgetMut = useMutation({
-    mutationFn: (b: Budgets) => updateBudgets(b),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
-  });
+  function saveBudget(section: "essential" | "flexible" | "daily", value: number) {
+    const current = budgetQuery.data;
+    if (!current) return;
+    const budgets = { ...budgetsFromMonthly(current), [section]: value };
+    budgetMut.mutate({ month: current.month, budgets });
+  }
 
-  function saveBudget(section: Section, value: number) {
-    const nb = { ...effectiveBudgets, [section]: value };
-    setBudgets(nb);
-    budgetMut.mutate(nb);
+  function retryBudget() {
+    if (budgetQuery.isError) {
+      void budgetQuery.refetch();
+      return;
+    }
+    if (budgetMut.variables) budgetMut.mutate(budgetMut.variables);
   }
 
   const rowsOf = (sec: Section) => txns.filter((t) => t.section === sec);
@@ -853,7 +878,7 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
             className="btn btn-soft"
             style={{ padding: "7px 10px" }}
             onClick={() => { setMonth(shiftMonth(month, -1)); selectTile(null); }}
-            disabled={copyPending}
+            disabled={copyPending || budgetMut.isPending}
             aria-label="Previous month"
           >
             <IconChevL size={15} />
@@ -865,12 +890,12 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
             className="btn btn-soft"
             style={{ padding: "7px 10px" }}
             onClick={() => { setMonth(shiftMonth(month, 1)); selectTile(null); }}
-            disabled={copyPending}
+            disabled={copyPending || budgetMut.isPending}
             aria-label="Next month"
           >
             <IconChevR size={15} />
           </button>
-          <MonthDropdown month={month} setMonth={(m) => { setMonth(m); selectTile(null); }} disabled={copyPending} />
+          <MonthDropdown month={month} setMonth={(m) => { setMonth(m); selectTile(null); }} disabled={copyPending || budgetMut.isPending} />
         </div>
       </div>
 
@@ -894,6 +919,7 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
                 meta={META[sec]}
                 rows={rowsOf(sec)}
                 budget={effectiveBudgets[sec]}
+                budgetReady={budgetReady}
                 onOpen={() => selectTile(sec)}
               />
             ))}
@@ -923,7 +949,12 @@ export function RecordPage({ month, setMonth }: { month: string; setMonth: (m: s
               meta={META[tile]}
               spent={incSpent(tile)}
               budget={effectiveBudgets[tile as "essential" | "flexible" | "daily"]}
+              budgetReady={budgetReady}
+              budgetError={budgetQuery.isError}
+              saving={budgetMut.isPending}
+              saveError={budgetMut.isError}
               onBudget={(v) => saveBudget(tile as "essential" | "flexible" | "daily", v)}
+              onRetry={retryBudget}
               onBack={() => selectTile(null)}
             />
           )}

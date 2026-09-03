@@ -52,24 +52,6 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, settingsToDTO(st, tpl))
 }
 
-func (s *Server) handleUpdateBudgets(w http.ResponseWriter, r *http.Request) {
-	var body BudgetsDTO
-	if err := readJSON(r, &body); err != nil {
-		writeErr(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if _, err := s.q.UpdateBudgets(r.Context(), db.UpdateBudgetsParams{
-		UserID:          userID(r),
-		BudgetEssential: floatToNum(body.Essential),
-		BudgetFlexible:  floatToNum(body.Flexible),
-		BudgetDaily:     floatToNum(body.Daily),
-	}); err != nil {
-		writeErr(w, http.StatusInternalServerError, "could not update budgets")
-		return
-	}
-	s.handleGetSettings(w, r)
-}
-
 func (s *Server) handleUpdatePreferences(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Currency string `json:"currency"`

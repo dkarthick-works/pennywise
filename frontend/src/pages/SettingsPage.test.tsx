@@ -1,14 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SettingsPage } from "./SettingsPage";
-import type { Settings } from "../types";
+import type { MonthlyBudget, Settings } from "../types";
 
 const mocks = {
   getSettings: vi.fn(),
   updateCreditStatementDay: vi.fn(),
   updateCreditSpendingThreshold: vi.fn(),
-  updateBudgets: vi.fn(),
+  getMonthlyBudget: vi.fn(),
+  putMonthlyBudget: vi.fn(),
   updatePreferences: vi.fn(),
   putTemplates: vi.fn(),
 };
@@ -20,7 +21,8 @@ vi.mock("../api/ledger", async (importActual) => {
     getSettings: () => mocks.getSettings(),
     updateCreditStatementDay: (d: number | null) => mocks.updateCreditStatementDay(d),
     updateCreditSpendingThreshold: (v: number | null) => mocks.updateCreditSpendingThreshold(v),
-    updateBudgets: (b: unknown) => mocks.updateBudgets(b),
+    getMonthlyBudget: (month: string) => mocks.getMonthlyBudget(month),
+    putMonthlyBudget: (month: string, budgets: unknown) => mocks.putMonthlyBudget(month, budgets),
     updatePreferences: (b: unknown) => mocks.updatePreferences(b),
     putTemplates: (s: unknown, l: unknown) => mocks.putTemplates(s, l),
   };
@@ -28,7 +30,6 @@ vi.mock("../api/ledger", async (importActual) => {
 
 function settings(day: number | null, threshold: number | null = null): Settings {
   return {
-    budgets: { essential: 0, flexible: 0, daily: 0 },
     currency: "INR",
     theme: "light",
     templates: { essential: [], flexible: [] },
@@ -37,23 +38,39 @@ function settings(day: number | null, threshold: number | null = null): Settings
   };
 }
 
-function renderSettings() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function monthlyBudget(month: string, extra: Partial<MonthlyBudget> = {}): MonthlyBudget {
+  return { month, essential: 10000, flexible: 5000, daily: 15000, ...extra };
+}
+
+function renderSettings(month = "2026-07", setMonth = vi.fn()) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const utils = render(
     <QueryClientProvider client={qc}>
-      <SettingsPage />
+      <SettingsPage month={month} setMonth={setMonth} />
     </QueryClientProvider>
   );
-  return { qc, ...utils };
+  return { qc, setMonth, ...utils };
 }
 
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   mocks.updateCreditStatementDay.mockImplementation((d: number | null) => Promise.resolve(settings(d)));
   mocks.updateCreditSpendingThreshold.mockImplementation((v: number | null) => Promise.resolve(settings(15, v)));
+  mocks.getMonthlyBudget.mockResolvedValue(monthlyBudget("2026-07"));
+  mocks.putMonthlyBudget.mockImplementation((month: string, budgets: { essential: number; flexible: number; daily: number }) =>
+    Promise.resolve({ month, essential: budgets.essential, flexible: budgets.flexible, daily: budgets.daily })
+  );
 });
 
 describe("Settings — credit billing cycle", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 6, 10));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("hydrates the saved statement day after the async query resolves", async () => {
     mocks.getSettings.mockResolvedValue(settings(15));
     renderSettings();
@@ -216,5 +233,70 @@ describe("Settings — credit spending threshold", () => {
     // Previous value retained; no success message.
     expect(input.value).toBe("25000");
     expect(section.queryByText("Saved.")).not.toBeInTheDocument();
+  });
+});
+
+describe("Settings — monthly budgets", () => {
+  it("labels the card with the selected month", async () => {
+    mocks.getSettings.mockResolvedValue(settings(null));
+    renderSettings("2026-07");
+    expect(await screen.findByText("Section budgets · July 2026")).toBeInTheDocument();
+    expect(screen.getByText(/apply only to July 2026/i)).toBeInTheDocument();
+    await waitFor(() => expect(mocks.getMonthlyBudget).toHaveBeenCalledWith("2026-07"));
+  });
+
+  it("shows the new month's values after switching months", async () => {
+    mocks.getSettings.mockResolvedValue(settings(null));
+    mocks.getMonthlyBudget.mockImplementation((month: string) =>
+      Promise.resolve(
+        month === "2026-08"
+          ? monthlyBudget("2026-08", { essential: 1, flexible: 2, daily: 3 })
+          : monthlyBudget("2026-07")
+      )
+    );
+    const setMonth = vi.fn();
+    const { rerender, qc } = renderSettings("2026-07", setMonth);
+    expect(await screen.findByLabelText("Essential section budget")).toHaveValue("10,000");
+
+    rerender(
+      <QueryClientProvider client={qc}>
+        <SettingsPage month="2026-08" setMonth={setMonth} />
+      </QueryClientProvider>
+    );
+    await waitFor(() => expect(mocks.getMonthlyBudget).toHaveBeenCalledWith("2026-08"));
+    expect(await screen.findByLabelText("Essential section budget")).toHaveValue("1");
+  });
+
+  it("PUTs to the newly selected month", async () => {
+    mocks.getSettings.mockResolvedValue(settings(null));
+    mocks.getMonthlyBudget.mockImplementation((month: string) => Promise.resolve(monthlyBudget(month)));
+    const setMonth = vi.fn();
+    const { rerender, qc } = renderSettings("2026-07", setMonth);
+    await screen.findByLabelText("Essential section budget");
+
+    rerender(
+      <QueryClientProvider client={qc}>
+        <SettingsPage month="2026-08" setMonth={setMonth} />
+      </QueryClientProvider>
+    );
+    const input = await screen.findByLabelText("Daily section budget");
+    fireEvent.change(input, { target: { value: "20000.5" } });
+    fireEvent.blur(input);
+    await waitFor(() =>
+      expect(mocks.putMonthlyBudget).toHaveBeenCalledWith("2026-08", {
+        essential: 10000,
+        flexible: 5000,
+        daily: 20000.5,
+      })
+    );
+  });
+
+  it("does not PUT placeholder zeros while loading", async () => {
+    mocks.getSettings.mockResolvedValue(settings(null));
+    mocks.getMonthlyBudget.mockReturnValue(new Promise(() => {}));
+    renderSettings();
+    expect(await screen.findByText("Loading budget…")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Essential section budget")).not.toBeInTheDocument();
+    expect(mocks.putMonthlyBudget).not.toHaveBeenCalled();
   });
 });

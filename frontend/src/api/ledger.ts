@@ -8,6 +8,7 @@ import type {
   Transaction,
   Settings,
   Budgets,
+  MonthlyBudget,
   Templates,
   Profile,
   MonthState,
@@ -43,8 +44,22 @@ export const updateProfile = (body: { display_name: string; email: string }) =>
 export const getSettings = () =>
   client.get<Settings>("/api/settings").then((r) => r.data);
 
-export const updateBudgets = (budgets: Budgets) =>
-  client.put<Settings>("/api/settings/budgets", budgets).then((r) => r.data);
+export const budgetKeys = {
+  all: ["budgets"] as const,
+  month: (month: string) => ["budgets", month] as const,
+};
+
+export const getMonthlyBudget = (month: string) =>
+  client.get<MonthlyBudget>(`/api/budgets/${month}`).then((r) => r.data);
+
+export const putMonthlyBudget = (month: string, budgets: Budgets) =>
+  client
+    .put<MonthlyBudget>(`/api/budgets/${month}`, {
+      essential: budgets.essential,
+      flexible: budgets.flexible,
+      daily: budgets.daily,
+    })
+    .then((r) => r.data);
 
 export const updatePreferences = (body: { currency: string; theme: string }) =>
   client.put<Settings>("/api/settings/preferences", body).then((r) => r.data);

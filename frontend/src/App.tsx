@@ -84,7 +84,7 @@ export default function App() {
                 <Route path="/insights"  element={<InsightsPage />} />
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/export"    element={<ImportExportPage />} />
-                <Route path="/settings"  element={<SettingsPage />} />
+                <Route path="/settings"  element={<SettingsPage month={month} setMonth={setMonth} />} />
                 <Route path="/profile"   element={<ProfilePage />} />
                 <Route path="*"          element={<Navigate to="/record" replace />} />
               </Routes>

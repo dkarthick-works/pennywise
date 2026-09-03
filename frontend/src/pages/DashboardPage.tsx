@@ -8,6 +8,7 @@ import { monthLabel, shiftMonth, prettyDate, MONTH_NAMES, currentMonth, currentD
 import type { CreditUsageSummary } from "../types";
 import { Donut, YearBars, DayBars } from "../components/charts/Charts";
 import { IconChevL, IconChevR, IconWallet, IconTrend, IconCreditCard } from "../components/ui/Icons";
+import { useMonthlyBudgetQuery } from "../hooks/useMonthlyBudget";
 
 const SECMETA = {
   essential: { label: "Essential", color: "var(--c-essential)" },
@@ -224,6 +225,8 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
     queryFn: getSettings,
   });
 
+  const monthlyBudgetQuery = useMonthlyBudgetQuery(month, view === "monthly");
+
   const monthTxnsQuery = useQuery({
     queryKey: ["txns", "month", month],
     queryFn: () => getTxnsByMonth(month),
@@ -293,7 +296,7 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month]);
 
-  const budgets = settings?.budgets ?? { essential: 0, flexible: 0, daily: 0 };
+  const budgets = monthlyBudgetQuery.data ?? { essential: 0, flexible: 0, daily: 0 };
 
   // ---- monthly computations ----
   const incBy  = sectionSums(monthTxns, month, "incurred");
@@ -564,6 +567,16 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
           </div>
 
           {/* section cards */}
+          {monthlyBudgetQuery.isPending ? (
+            <div className="card card-pad" aria-busy="true">
+              <p className="muted" style={{ margin: 0, fontSize: 13 }}>Loading section budgets…</p>
+            </div>
+          ) : monthlyBudgetQuery.isError ? (
+            <div className="card card-pad">
+              <p style={{ margin: "0 0 12px", color: "var(--neg)", fontSize: 13 }}>Could not load section budgets.</p>
+              <button type="button" className="btn btn-soft" onClick={() => monthlyBudgetQuery.refetch()}>Retry</button>
+            </div>
+          ) : (
           <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
             {sectionCards.map((s) => (
               <div key={s.k} className="card card-pad">
@@ -595,6 +608,7 @@ export function DashboardPage({ month, setMonth }: { month: string; setMonth: (m
               </div>
             ))}
           </div>
+          )}
 
           {groupSpend.length > 0 && (
             <div id="category-groups" className="card card-pad">

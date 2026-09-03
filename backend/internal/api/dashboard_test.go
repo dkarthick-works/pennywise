@@ -43,7 +43,7 @@ func TestDashboardMonthly(t *testing.T) {
 		{
 			name: "empty month",
 			path: "/api/dashboard/monthly?month=2026-07",
-			want: DashboardMonthlyDTO{Month: "2026-07", FreeMoney: -30000},
+			want: DashboardMonthlyDTO{Month: "2026-07"},
 		},
 		{
 			name: "zero income",
@@ -52,7 +52,7 @@ func TestDashboardMonthly(t *testing.T) {
 				Month:                   "2026-08",
 				CashSpending:            100,
 				RemainingBalance:        -100,
-				FreeMoney:               -29950,
+				FreeMoney:               50,
 				CashFlow:                100,
 				MonthlyCost:             150,
 				NetSaved:                -100,
@@ -70,7 +70,7 @@ func TestDashboardMonthly(t *testing.T) {
 				Income:            100,
 				CashSpending:      250,
 				RemainingBalance:  -150,
-				FreeMoney:         -29900,
+				FreeMoney:         100,
 				CashFlow:          250,
 				MonthlyCost:       250,
 				NetSaved:          -150,
@@ -115,9 +115,9 @@ func seedDashboardTransactions(t *testing.T, pool *pgxpool.Pool, userID uuid.UUI
 	ctx := context.Background()
 
 	if _, err := pool.Exec(ctx, `
-		UPDATE user_settings
-		SET budget_essential = 10000, budget_flexible = 5000, budget_daily = 15000
-		WHERE user_id = $1
+		INSERT INTO monthly_budgets (
+			user_id, month, budget_essential, budget_flexible, budget_daily
+		) VALUES ($1, '2026-06-01', 10000, 5000, 15000)
 	`, userID); err != nil {
 		t.Fatalf("seed user budgets: %v", err)
 	}

@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	chitNameMaxLen     = 120
-	chitNoteMaxLen     = 500
+	chitNameMaxLen      = 120
+	chitNoteMaxLen      = 500
 	chitInstallmentsMax = 360
-	chitMoneyMax       = 999999999999.99
+	chitMoneyMax        = 999999999999.99
 )
 
 type ChitSummaryDTO struct {
