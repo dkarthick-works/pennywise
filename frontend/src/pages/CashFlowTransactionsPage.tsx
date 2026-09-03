@@ -8,6 +8,10 @@ import { monthLabel } from "../lib/dates";
 import { inr } from "../lib/money";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
+
+function signedInr(value: number) {
+  return `${value >= 0 ? "+" : "−"}${inr(Math.abs(value))}`;
+}
 const OUTFLOW_SECTIONS = new Set(["essential", "flexible", "daily"]);
 const SECTION_ORDER = [
   { key: "essential", label: "Essential" },
@@ -91,14 +95,17 @@ export function CashFlowTransactionsPage({
           <h1 className="page-title">Cash Flow Transactions</h1>
           <p className="page-sub">Cash + settlements · {monthLabel(month)} · by payment date</p>
         </div>
-        <div className="card card-pad" style={{ minWidth: 240, padding: "14px 18px", textAlign: "right" }}>
-          <div>
+      </div>
+
+      <div className="card card-pad cash-flow-stats">
+        <div className="cash-flow-stats-grid">
+          <div className="cash-flow-stats-item">
             <div className="stat-lbl" style={{ marginBottom: 4 }}>Cash out</div>
             <div className="num" style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em" }}>
               {isLoading || isError ? "—" : inr(total)}
             </div>
           </div>
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+          <div className="cash-flow-stats-item">
             <div className="stat-lbl" style={{ marginBottom: 4 }}>Balance remaining</div>
             <div
               className="num"
@@ -106,12 +113,28 @@ export function CashFlowTransactionsPage({
                 fontSize: 24,
                 fontWeight: 800,
                 letterSpacing: "-0.03em",
-                color: (dashboardQuery.data?.net_saved ?? 0) >= 0 ? "var(--pos)" : "var(--neg)",
+                color: (dashboardQuery.data?.remaining_balance ?? 0) >= 0 ? "var(--pos)" : "var(--neg)",
               }}
             >
               {dashboardQuery.isLoading || dashboardQuery.isError || !dashboardQuery.data
                 ? "—"
-                : `${dashboardQuery.data.net_saved >= 0 ? "+" : "−"}${inr(Math.abs(dashboardQuery.data.net_saved))}`}
+                : signedInr(dashboardQuery.data.remaining_balance)}
+            </div>
+          </div>
+          <div className="cash-flow-stats-item">
+            <div className="stat-lbl" style={{ marginBottom: 4 }}>Free money</div>
+            <div
+              className="num"
+              style={{
+                fontSize: 24,
+                fontWeight: 800,
+                letterSpacing: "-0.03em",
+                color: (dashboardQuery.data?.free_money ?? 0) >= 0 ? "var(--pos)" : "var(--neg)",
+              }}
+            >
+              {dashboardQuery.isLoading || dashboardQuery.isError || !dashboardQuery.data
+                ? "—"
+                : signedInr(dashboardQuery.data.free_money)}
             </div>
           </div>
         </div>

@@ -50,6 +50,15 @@ SELECT
     WHERE section IN ('essential','flexible','daily')
       AND kind IN ('cash','credit')
   ), 0)::numeric AS monthly_cost,
+  COALESCE(SUM(amount) FILTER (
+    WHERE section = 'essential' AND kind <> 'settlement'
+  ), 0)::numeric AS essential_sum,
+  COALESCE(SUM(amount) FILTER (
+    WHERE section = 'flexible' AND kind <> 'settlement'
+  ), 0)::numeric AS flexible_sum,
+  COALESCE(SUM(amount) FILTER (
+    WHERE section = 'daily' AND kind <> 'settlement'
+  ), 0)::numeric AS daily_sum,
   COUNT(*) FILTER (
     WHERE section IN ('essential','flexible','daily')
       AND kind = 'credit'

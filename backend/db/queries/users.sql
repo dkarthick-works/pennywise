@@ -28,15 +28,6 @@ RETURNING *;
 -- name: GetSettings :one
 SELECT * FROM user_settings WHERE user_id = $1;
 
--- name: UpdateBudgets :one
-UPDATE user_settings
-SET budget_essential = $2,
-    budget_flexible  = $3,
-    budget_daily     = $4,
-    updated_at       = now()
-WHERE user_id = $1
-RETURNING *;
-
 -- name: UpdatePreferences :one
 UPDATE user_settings
 SET currency   = $2,

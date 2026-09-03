@@ -73,13 +73,16 @@ export interface Budgets {
   daily: number;
 }
 
+export interface MonthlyBudget extends Budgets {
+  month: string;
+}
+
 export interface Templates {
   essential: string[];
   flexible: string[];
 }
 
 export interface Settings {
-  budgets: Budgets;
   currency: string;
   theme: string;
   templates: Templates;
@@ -147,6 +150,9 @@ export interface Insights {
 export interface DashboardMonthly {
   month: string;
   income: number;
+  cash_spending: number;
+  remaining_balance: number;
+  free_money: number;
   cash_flow: number;
   monthly_cost: number;
   net_saved: number;

@@ -109,9 +109,8 @@ only ever talks to this origin.
 | *      | `/api/auth/*` | proxied to Goauth (signup, login, refresh, logout, me, …) |
 | GET    | `/api/me` · `/api/profile` | current user / profile |
 | PUT    | `/api/profile` | update name + email |
-| GET    | `/api/settings` | income, budgets, currency, theme, templates, credit statement day, credit spending threshold |
-| PUT    | `/api/settings/budgets` | per-section budgets |
-| PUT    | `/api/settings/preferences` | income, currency, theme |
+| GET    | `/api/settings` | currency, theme, templates, credit statement day, credit spending threshold |
+| PUT    | `/api/settings/preferences` | currency and theme |
 | PUT    | `/api/settings/credit-billing-cycle` | set/clear credit statement closing day (`1..31` or `null`) |
 | PUT    | `/api/settings/credit-spending-threshold` | set/clear per-period credit spend warning (`> 0`, max 2 decimals, or `null`) |
 | GET    | `/api/templates` | template lists |
@@ -127,6 +126,9 @@ only ever talks to this origin.
 | GET    | `/api/sections/{section}/open-credits?exclude={id}` | settlement picker candidates |
 | GET    | `/api/daily-suggestions` | ghost-autocomplete categories |
 | GET    | `/api/dashboard/monthly?month=YYYY-MM` | dashboard hero-card totals |
+| GET    | `/api/budgets` | configured monthly budgets, newest first |
+| GET    | `/api/budgets/{month}` | budget for `YYYY-MM`; unconfigured months return zero values |
+| PUT    | `/api/budgets/{month}` | create or replace the budget for `YYYY-MM` |
 | GET    | `/api/dashboard/group-spend?month=YYYY-MM` | per-group spend for dashboard category cards |
 | GET    | `/api/dashboard/group-spend/history?to=YYYY-MM&months=3|6|12&group_ids=` | category-group history, statistics, mappings, and contributions |
 | GET    | `/api/dashboard/credit-usage?month=YYYY-MM` | calendar-month + statement-cycle credit spend |
@@ -316,6 +318,30 @@ and settlement labels are ignored. Learned names remain available after the
 source transaction is renamed or deleted. Results are always scoped by both
 the authenticated user and requested section.
 
+### Monthly budgets
+
+Budgets are stored independently for each calendar month. Migration `0011`
+copies each user's last global `user_settings` budget into every distinct
+calendar month that already has a transaction, then drops the legacy columns.
+Users with no transactions receive no rows. An unconfigured month reads as zero
+without creating a database row; only configured months appear in
+`GET /api/budgets`. Rollback restores the newest configured monthly budget into
+the recreated `user_settings` columns.
+
+`GET /api/budgets/2026-06` and `PUT /api/budgets/2026-06` use this shape:
+
+```json
+{
+  "month": "2026-06",
+  "essential": 30000,
+  "flexible": 10000,
+  "daily": 15000
+}
+```
+
+All three values are required by `PUT`, must be non-negative, and may have at
+most two decimal places.
+
 ### Dashboard (`GET /api/dashboard/monthly?month=YYYY-MM`)
 
 Returns the monthly hero-card totals for the selected month. Section cards,
@@ -325,8 +351,14 @@ now.
 **What counts:**
 
 - `income`: all rows where `section = 'income'`.
-- `cash_flow`: expense rows (`essential`, `flexible`, `daily`) where `kind` is
-  `cash` or `settlement`.
+- `cash_spending`: expense rows (`essential`, `flexible`, `daily`) where `kind`
+  is `cash` or `settlement`. `cash_flow` remains as a compatibility alias.
+- `remaining_balance`: income minus `cash_spending`. `net_saved` remains as a
+  compatibility alias.
+- `free_money`: `remaining_balance` minus the combined unspent Essential,
+  Flexible (Subscriptions), and Daily budgets. Each unspent budget is its
+  configured monthly value minus that section's cash + credit transactions;
+  settlements are excluded from these section sums.
 - `monthly_cost`: expense rows where `kind` is `cash` or `credit`.
 - `outstanding_credits_*`: expense `credit` rows incurred in the selected month
   that have no `settlement_links` row.
@@ -339,6 +371,9 @@ Response shape:
 {
   "month": "2026-06",
   "income": 85000,
+  "cash_spending": 62000,
+  "remaining_balance": 23000,
+  "free_money": 14000,
   "cash_flow": 62000,
   "monthly_cost": 71000,
   "net_saved": 23000,

@@ -12,7 +12,7 @@ type TransactionDTO struct {
 	Date     string   `json:"date"`
 	Kind     string   `json:"kind"`
 	Settles  []string `json:"settles,omitempty"` // settlement rows: linked credit ids
-	Settled  bool     `json:"settled"` // credit rows: cleared by a settlement
+	Settled  bool     `json:"settled"`           // credit rows: cleared by a settlement
 }
 
 func txnToDTO(t db.Transaction) TransactionDTO {
@@ -24,13 +24,6 @@ func txnToDTO(t db.Transaction) TransactionDTO {
 		Date:     dateToString(t.TxnDate),
 		Kind:     string(t.Kind),
 	}
-}
-
-// BudgetsDTO is the per-section budget triple.
-type BudgetsDTO struct {
-	Essential float64 `json:"essential"`
-	Flexible  float64 `json:"flexible"`
-	Daily     float64 `json:"daily"`
 }
 
 // TemplatesDTO holds the ordered template labels per templated section.
@@ -46,7 +39,6 @@ type TemplatesDTO struct {
 // so an unconfigured value serializes as an explicit JSON null rather than being
 // dropped (clients then see a single stable response shape).
 type SettingsDTO struct {
-	Budgets                 BudgetsDTO   `json:"budgets"`
 	Currency                string       `json:"currency"`
 	Theme                   string       `json:"theme"`
 	Templates               TemplatesDTO `json:"templates"`
@@ -66,11 +58,6 @@ func settingsToDTO(s db.UserSetting, tpl TemplatesDTO) SettingsDTO {
 		threshold = &v
 	}
 	return SettingsDTO{
-		Budgets: BudgetsDTO{
-			Essential: numToFloat(s.BudgetEssential),
-			Flexible:  numToFloat(s.BudgetFlexible),
-			Daily:     numToFloat(s.BudgetDaily),
-		},
 		Currency:                s.Currency,
 		Theme:                   s.Theme,
 		Templates:               tpl,

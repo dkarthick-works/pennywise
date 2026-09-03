@@ -64,7 +64,7 @@ func TestUpdateCreditStatementDay(t *testing.T) {
 	}
 
 	// Invalid payloads.
-	setStatementDay(t, srv, token, map[string]any{}, http.StatusBadRequest)                     // missing property
+	setStatementDay(t, srv, token, map[string]any{}, http.StatusBadRequest) // missing property
 	setStatementDay(t, srv, token, map[string]any{"credit_statement_day": 0}, http.StatusBadRequest)
 	setStatementDay(t, srv, token, map[string]any{"credit_statement_day": 32}, http.StatusBadRequest)
 	setStatementDay(t, srv, token, map[string]any{"credit_statement_day": 15.5}, http.StatusBadRequest)

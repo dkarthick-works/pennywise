@@ -168,6 +168,16 @@ type MonthState struct {
 	Seeded bool      `json:"seeded"`
 }
 
+type MonthlyBudget struct {
+	UserID          uuid.UUID          `json:"user_id"`
+	Month           pgtype.Date        `json:"month"`
+	BudgetEssential pgtype.Numeric     `json:"budget_essential"`
+	BudgetFlexible  pgtype.Numeric     `json:"budget_flexible"`
+	BudgetDaily     pgtype.Numeric     `json:"budget_daily"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type SettlementLink struct {
 	SettlementID uuid.UUID `json:"settlement_id"`
 	CreditID     uuid.UUID `json:"credit_id"`
@@ -212,9 +222,6 @@ type User struct {
 
 type UserSetting struct {
 	UserID                  uuid.UUID          `json:"user_id"`
-	BudgetEssential         pgtype.Numeric     `json:"budget_essential"`
-	BudgetFlexible          pgtype.Numeric     `json:"budget_flexible"`
-	BudgetDaily             pgtype.Numeric     `json:"budget_daily"`
 	Currency                string             `json:"currency"`
 	Theme                   string             `json:"theme"`
 	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`

@@ -16,7 +16,7 @@ const ensureSettings = `-- name: EnsureSettings :one
 INSERT INTO user_settings (user_id)
 VALUES ($1)
 ON CONFLICT (user_id) DO NOTHING
-RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
+RETURNING user_id, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
 `
 
 // Create the default settings row for a user if it does not exist yet.
@@ -25,9 +25,6 @@ func (q *Queries) EnsureSettings(ctx context.Context, userID uuid.UUID) (UserSet
 	var i UserSetting
 	err := row.Scan(
 		&i.UserID,
-		&i.BudgetEssential,
-		&i.BudgetFlexible,
-		&i.BudgetDaily,
 		&i.Currency,
 		&i.Theme,
 		&i.UpdatedAt,
@@ -38,7 +35,7 @@ func (q *Queries) EnsureSettings(ctx context.Context, userID uuid.UUID) (UserSet
 }
 
 const getSettings = `-- name: GetSettings :one
-SELECT user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day, credit_spending_threshold FROM user_settings WHERE user_id = $1
+SELECT user_id, currency, theme, updated_at, credit_statement_day, credit_spending_threshold FROM user_settings WHERE user_id = $1
 `
 
 func (q *Queries) GetSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error) {
@@ -46,9 +43,6 @@ func (q *Queries) GetSettings(ctx context.Context, userID uuid.UUID) (UserSettin
 	var i UserSetting
 	err := row.Scan(
 		&i.UserID,
-		&i.BudgetEssential,
-		&i.BudgetFlexible,
-		&i.BudgetDaily,
 		&i.Currency,
 		&i.Theme,
 		&i.UpdatedAt,
@@ -75,51 +69,12 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 	return i, err
 }
 
-const updateBudgets = `-- name: UpdateBudgets :one
-UPDATE user_settings
-SET budget_essential = $2,
-    budget_flexible  = $3,
-    budget_daily     = $4,
-    updated_at       = now()
-WHERE user_id = $1
-RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
-`
-
-type UpdateBudgetsParams struct {
-	UserID          uuid.UUID      `json:"user_id"`
-	BudgetEssential pgtype.Numeric `json:"budget_essential"`
-	BudgetFlexible  pgtype.Numeric `json:"budget_flexible"`
-	BudgetDaily     pgtype.Numeric `json:"budget_daily"`
-}
-
-func (q *Queries) UpdateBudgets(ctx context.Context, arg UpdateBudgetsParams) (UserSetting, error) {
-	row := q.db.QueryRow(ctx, updateBudgets,
-		arg.UserID,
-		arg.BudgetEssential,
-		arg.BudgetFlexible,
-		arg.BudgetDaily,
-	)
-	var i UserSetting
-	err := row.Scan(
-		&i.UserID,
-		&i.BudgetEssential,
-		&i.BudgetFlexible,
-		&i.BudgetDaily,
-		&i.Currency,
-		&i.Theme,
-		&i.UpdatedAt,
-		&i.CreditStatementDay,
-		&i.CreditSpendingThreshold,
-	)
-	return i, err
-}
-
 const updateCreditSpendingThreshold = `-- name: UpdateCreditSpendingThreshold :one
 UPDATE user_settings
 SET credit_spending_threshold = $1,
     updated_at                = now()
 WHERE user_id = $2
-RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
+RETURNING user_id, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
 `
 
 type UpdateCreditSpendingThresholdParams struct {
@@ -134,9 +89,6 @@ func (q *Queries) UpdateCreditSpendingThreshold(ctx context.Context, arg UpdateC
 	var i UserSetting
 	err := row.Scan(
 		&i.UserID,
-		&i.BudgetEssential,
-		&i.BudgetFlexible,
-		&i.BudgetDaily,
 		&i.Currency,
 		&i.Theme,
 		&i.UpdatedAt,
@@ -151,7 +103,7 @@ UPDATE user_settings
 SET credit_statement_day = $1,
     updated_at           = now()
 WHERE user_id = $2
-RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
+RETURNING user_id, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
 `
 
 type UpdateCreditStatementDayParams struct {
@@ -166,9 +118,6 @@ func (q *Queries) UpdateCreditStatementDay(ctx context.Context, arg UpdateCredit
 	var i UserSetting
 	err := row.Scan(
 		&i.UserID,
-		&i.BudgetEssential,
-		&i.BudgetFlexible,
-		&i.BudgetDaily,
 		&i.Currency,
 		&i.Theme,
 		&i.UpdatedAt,
@@ -184,7 +133,7 @@ SET currency   = $2,
     theme      = $3,
     updated_at = now()
 WHERE user_id = $1
-RETURNING user_id, budget_essential, budget_flexible, budget_daily, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
+RETURNING user_id, currency, theme, updated_at, credit_statement_day, credit_spending_threshold
 `
 
 type UpdatePreferencesParams struct {
@@ -198,9 +147,6 @@ func (q *Queries) UpdatePreferences(ctx context.Context, arg UpdatePreferencesPa
 	var i UserSetting
 	err := row.Scan(
 		&i.UserID,
-		&i.BudgetEssential,
-		&i.BudgetFlexible,
-		&i.BudgetDaily,
 		&i.Currency,
 		&i.Theme,
 		&i.UpdatedAt,

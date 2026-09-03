@@ -28,6 +28,9 @@ func TestDashboardMonthly(t *testing.T) {
 			want: DashboardMonthlyDTO{
 				Month:                   "2026-06",
 				Income:                  85000,
+				CashSpending:            16000,
+				RemainingBalance:        69000,
+				FreeMoney:               58000,
 				CashFlow:                16000,
 				MonthlyCost:             19000,
 				NetSaved:                69000,
@@ -47,6 +50,9 @@ func TestDashboardMonthly(t *testing.T) {
 			path: "/api/dashboard/monthly?month=2026-08",
 			want: DashboardMonthlyDTO{
 				Month:                   "2026-08",
+				CashSpending:            100,
+				RemainingBalance:        -100,
+				FreeMoney:               50,
 				CashFlow:                100,
 				MonthlyCost:             150,
 				NetSaved:                -100,
@@ -62,6 +68,9 @@ func TestDashboardMonthly(t *testing.T) {
 			want: DashboardMonthlyDTO{
 				Month:             "2026-09",
 				Income:            100,
+				CashSpending:      250,
+				RemainingBalance:  -150,
+				FreeMoney:         100,
 				CashFlow:          250,
 				MonthlyCost:       250,
 				NetSaved:          -150,
@@ -104,6 +113,14 @@ func TestDashboardMonthlyInvalidMonth(t *testing.T) {
 func seedDashboardTransactions(t *testing.T, pool *pgxpool.Pool, userID uuid.UUID) {
 	t.Helper()
 	ctx := context.Background()
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO monthly_budgets (
+			user_id, month, budget_essential, budget_flexible, budget_daily
+		) VALUES ($1, '2026-06-01', 10000, 5000, 15000)
+	`, userID); err != nil {
+		t.Fatalf("seed user budgets: %v", err)
+	}
 
 	insertTxn(t, pool, userID, "income", "Salary", 85000, "2026-06-01", "cash")
 	insertTxn(t, pool, userID, "essential", "Rent", 10000, "2026-06-02", "cash")
@@ -148,6 +165,9 @@ func assertDashboardMonthly(t *testing.T, got, want DashboardMonthlyDTO) {
 		t.Fatalf("month = %q, want %q", got.Month, want.Month)
 	}
 	assertFloat(t, "income", got.Income, want.Income)
+	assertFloat(t, "cash_spending", got.CashSpending, want.CashSpending)
+	assertFloat(t, "remaining_balance", got.RemainingBalance, want.RemainingBalance)
+	assertFloat(t, "free_money", got.FreeMoney, want.FreeMoney)
 	assertFloat(t, "cash_flow", got.CashFlow, want.CashFlow)
 	assertFloat(t, "monthly_cost", got.MonthlyCost, want.MonthlyCost)
 	assertFloat(t, "net_saved", got.NetSaved, want.NetSaved)

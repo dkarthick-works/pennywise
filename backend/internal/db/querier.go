@@ -35,6 +35,7 @@ type Querier interface {
 	GetChit(ctx context.Context, arg GetChitParams) (GetChitRow, error)
 	GetLent(ctx context.Context, arg GetLentParams) (GetLentRow, error)
 	GetMonthState(ctx context.Context, arg GetMonthStateParams) (MonthState, error)
+	GetMonthlyBudget(ctx context.Context, arg GetMonthlyBudgetParams) (MonthlyBudget, error)
 	GetSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
 	GetTransaction(ctx context.Context, arg GetTransactionParams) (Transaction, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
@@ -69,6 +70,7 @@ type Querier interface {
 	ListLentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListLentsForTransferRow, error)
 	ListLinksForSettlement(ctx context.Context, settlementID uuid.UUID) ([]uuid.UUID, error)
 	ListMonthStates(ctx context.Context, userID uuid.UUID) ([]MonthState, error)
+	ListMonthlyBudgets(ctx context.Context, userID uuid.UUID) ([]MonthlyBudget, error)
 	ListPopularTransactionNameSuggestions(ctx context.Context, arg ListPopularTransactionNameSuggestionsParams) ([]string, error)
 	ListRepaymentsForLent(ctx context.Context, arg ListRepaymentsForLentParams) ([]ListRepaymentsForLentRow, error)
 	ListRepaymentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListRepaymentsForTransferRow, error)
@@ -110,7 +112,6 @@ type Querier interface {
 	SumRepaymentsForLent(ctx context.Context, arg SumRepaymentsForLentParams) (pgtype.Numeric, error)
 	SumSpendByGroupsForMonth(ctx context.Context, arg SumSpendByGroupsForMonthParams) ([]SumSpendByGroupsForMonthRow, error)
 	SumTransactionsByGroupForMonth(ctx context.Context, arg SumTransactionsByGroupForMonthParams) (pgtype.Numeric, error)
-	UpdateBudgets(ctx context.Context, arg UpdateBudgetsParams) (UserSetting, error)
 	UpdateCategoryGroupName(ctx context.Context, arg UpdateCategoryGroupNameParams) (CategoryGroup, error)
 	UpdateChit(ctx context.Context, arg UpdateChitParams) (Chit, error)
 	UpdateChitInstallment(ctx context.Context, arg UpdateChitInstallmentParams) (ChitInstallment, error)
@@ -126,6 +127,7 @@ type Querier interface {
 	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertMonthClosed(ctx context.Context, arg UpsertMonthClosedParams) (MonthState, error)
+	UpsertMonthlyBudget(ctx context.Context, arg UpsertMonthlyBudgetParams) (MonthlyBudget, error)
 	// Mirror a Goauth subject into our users table on first sight (and keep email fresh).
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)
 }

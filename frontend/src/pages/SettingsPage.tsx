@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getSettings,
-  updateBudgets,
   updatePreferences,
   updateCreditStatementDay,
   updateCreditSpendingThreshold,
@@ -11,8 +10,11 @@ import {
 import { inr } from "../lib/money";
 import { invalidateCreditCaches } from "../lib/monthCaches";
 import { cyclePreviewSentence } from "../lib/billingCycle";
-import { currentMonth } from "../lib/dates";
-import { IconPlus, IconX } from "../components/ui/Icons";
+import { currentMonth, monthLabel, shiftMonth } from "../lib/dates";
+import { IconPlus, IconX, IconChevL, IconChevR } from "../components/ui/Icons";
+import { MonthDropdown } from "../components/record/MonthDropdown";
+import { BudgetAmountInput } from "../components/budget/BudgetAmountInput";
+import { budgetsFromMonthly, useMonthlyBudgetQuery, useSaveMonthlyBudget } from "../hooks/useMonthlyBudget";
 import type { Budgets } from "../types";
 
 function ordinal(n: number): string {
@@ -285,20 +287,6 @@ function Row({ label, sub, children }: { label: string; sub?: string; children: 
   );
 }
 
-function BudgetInput({ value, onChange }: { value: number; onChange: (n: number) => void }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 2, border: "1px solid var(--border)", borderRadius: 9, padding: "6px 10px", background: "var(--surface-2)" }}>
-      <span className="muted num">₹</span>
-      <input
-        className="num"
-        value={(value || 0).toLocaleString("en-IN")}
-        onChange={(e) => { const n = parseInt(e.target.value.replace(/[^0-9]/g, ""), 10); onChange(isNaN(n) ? 0 : n); }}
-        style={{ width: 90, border: "none", background: "transparent", outline: "none", fontSize: 14.5, fontWeight: 600, textAlign: "right", color: "var(--ink)" }}
-      />
-    </div>
-  );
-}
-
 function TemplateEditor({ title, hint, list, onChange, color }: {
   title: string; hint: string; list: string[]; onChange: (l: string[]) => void; color: string;
 }) {
@@ -341,12 +329,16 @@ function TemplateEditor({ title, hint, list, onChange, color }: {
   );
 }
 
-export function SettingsPage() {
+export function SettingsPage({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
   const qc = useQueryClient();
   const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: getSettings });
-
-  const [localBudgets, setLocalBudgets] = useState<Budgets | null>(null);
-  const budgets = localBudgets ?? settings?.budgets ?? { essential: 0, flexible: 0, daily: 0 };
+  const budgetQuery = useMonthlyBudgetQuery(month);
+  const budgetMut = useSaveMonthlyBudget();
+  const budgetReady = budgetQuery.isSuccess && !!budgetQuery.data;
+  const budgets = budgetQuery.data
+    ? budgetsFromMonthly(budgetQuery.data)
+    : { essential: 0, flexible: 0, daily: 0 };
+  const monthLocked = budgetMut.isPending;
 
   const [currency, setCurrency] = useState(settings?.currency ?? "INR");
   const [theme, setTheme]       = useState(settings?.theme ?? "light");
@@ -357,10 +349,6 @@ export function SettingsPage() {
   const essTemplates  = localEss  ?? settings?.templates.essential  ?? [];
   const flexTemplates = localFlex ?? settings?.templates.flexible   ?? [];
 
-  const budgetMut = useMutation({
-    mutationFn: updateBudgets,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
-  });
   const prefMut = useMutation({
     mutationFn: (b: { currency: string; theme: string }) =>
       updatePreferences({ currency: b.currency, theme: b.theme }),
@@ -376,9 +364,20 @@ export function SettingsPage() {
   });
 
   function onBudget(k: keyof Budgets, v: number) {
-    const nb = { ...budgets, [k]: v };
-    setLocalBudgets(nb);
-    budgetMut.mutate(nb);
+    const current = budgetQuery.data;
+    if (!current) return;
+    budgetMut.mutate({
+      month: current.month,
+      budgets: { ...budgetsFromMonthly(current), [k]: v },
+    });
+  }
+
+  function retryBudget() {
+    if (budgetQuery.isError) {
+      void budgetQuery.refetch();
+      return;
+    }
+    if (budgetMut.variables) budgetMut.mutate(budgetMut.variables);
   }
 
   function onPref(field: "currency" | "theme", v: string) {
@@ -403,20 +402,85 @@ export function SettingsPage() {
 
       {/* budgets */}
       <div className="card card-pad" style={{ marginBottom: 18 }}>
-        <h3 className="card-h" style={{ marginBottom: 4 }}>Section budgets</h3>
-        <Row label="Essential — Bare Minimum" sub="Rent, EMIs, savings">
-          <BudgetInput value={budgets.essential} onChange={(v) => onBudget("essential", v)} />
-        </Row>
-        <Row label="Flexible — Subscriptions" sub="Recurring services">
-          <BudgetInput value={budgets.flexible} onChange={(v) => onBudget("flexible", v)} />
-        </Row>
-        <Row label="Daily — Running" sub="Everyday spend">
-          <BudgetInput value={budgets.daily} onChange={(v) => onBudget("daily", v)} />
-        </Row>
-        <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 14, fontSize: 13.5 }}>
-          <span style={{ fontWeight: 600 }}>Total monthly budget</span>
-          <span className="num" style={{ fontWeight: 700 }}>{inr(total)}</span>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 4 }}>
+          <div>
+            <h3 className="card-h" style={{ marginBottom: 4 }}>Section budgets · {monthLabel(month)}</h3>
+            <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+              These amounts apply only to {monthLabel(month)}, not every month.
+            </p>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              className="btn btn-soft"
+              style={{ padding: "7px 10px" }}
+              onClick={() => setMonth(shiftMonth(month, -1))}
+              disabled={monthLocked}
+              aria-label="Previous month"
+            >
+              <IconChevL size={15} />
+            </button>
+            <MonthDropdown month={month} setMonth={setMonth} disabled={monthLocked} />
+            <button
+              type="button"
+              className="btn btn-soft"
+              style={{ padding: "7px 10px" }}
+              onClick={() => setMonth(shiftMonth(month, 1))}
+              disabled={monthLocked}
+              aria-label="Next month"
+            >
+              <IconChevR size={15} />
+            </button>
+          </div>
         </div>
+        {budgetQuery.isError ? (
+          <div style={{ marginTop: 14 }}>
+            <p style={{ margin: "0 0 12px", color: "var(--neg)", fontSize: 13 }}>Could not load this month’s budget.</p>
+            <button type="button" className="btn btn-soft" onClick={retryBudget}>Retry</button>
+          </div>
+        ) : !budgetReady ? (
+          <p className="muted" style={{ margin: "14px 0 0", fontSize: 13 }}>Loading budget…</p>
+        ) : (
+          <>
+            <Row label="Essential — Bare Minimum" sub="Rent, EMIs, savings">
+              <BudgetAmountInput
+                key={`${month}-essential`}
+                value={budgets.essential}
+                disabled={monthLocked}
+                aria-label="Essential section budget"
+                onCommit={(v) => onBudget("essential", v)}
+              />
+            </Row>
+            <Row label="Flexible — Subscriptions" sub="Recurring services">
+              <BudgetAmountInput
+                key={`${month}-flexible`}
+                value={budgets.flexible}
+                disabled={monthLocked}
+                aria-label="Flexible section budget"
+                onCommit={(v) => onBudget("flexible", v)}
+              />
+            </Row>
+            <Row label="Daily — Running" sub="Everyday spend">
+              <BudgetAmountInput
+                key={`${month}-daily`}
+                value={budgets.daily}
+                disabled={monthLocked}
+                aria-label="Daily section budget"
+                onCommit={(v) => onBudget("daily", v)}
+              />
+            </Row>
+            <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 14, fontSize: 13.5 }}>
+              <span style={{ fontWeight: 600 }}>Total monthly budget</span>
+              <span className="num" style={{ fontWeight: 700 }}>{inr(total)}</span>
+            </div>
+            {budgetMut.isError && (
+              <div style={{ marginTop: 12 }}>
+                <p style={{ margin: "0 0 8px", color: "var(--neg)", fontSize: 13 }}>Couldn’t save budget.</p>
+                <button type="button" className="btn btn-soft" onClick={retryBudget}>Retry</button>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* preferences */}
