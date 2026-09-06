@@ -359,6 +359,12 @@ now.
   Flexible (Subscriptions), and Daily budgets. Each unspent budget is its
   configured monthly value minus that section's cash + credit transactions;
   settlements are excluded from these section sums.
+- Free-money breakdown: `bare_minimum_sum`, `bare_minimum_budget`,
+  `bare_minimum_remaining`, `subscriptions_sum`, `subscriptions_budget`,
+  `subscriptions_budget_remaining`, `daily_sum`, `daily_budget`, and
+  `daily_budget_remaining`. Budgets come from `monthly_budgets` for the selected
+  month (zero if absent), not `user_settings`. Sums include cash + credit only;
+  each remaining value is budget minus sum, without zero-clamping.
 - `monthly_cost`: expense rows where `kind` is `cash` or `credit`.
 - `outstanding_credits_*`: expense `credit` rows incurred in the selected month
   that have no `settlement_links` row.
@@ -374,6 +380,15 @@ Response shape:
   "cash_spending": 62000,
   "remaining_balance": 23000,
   "free_money": 14000,
+  "bare_minimum_sum": 40000,
+  "bare_minimum_budget": 45000,
+  "bare_minimum_remaining": 5000,
+  "subscriptions_sum": 11000,
+  "subscriptions_budget": 12000,
+  "subscriptions_budget_remaining": 1000,
+  "daily_sum": 20000,
+  "daily_budget": 23000,
+  "daily_budget_remaining": 3000,
   "cash_flow": 62000,
   "monthly_cost": 71000,
   "net_saved": 23000,

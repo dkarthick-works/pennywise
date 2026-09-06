@@ -12,6 +12,36 @@ const MONTH_RE = /^\d{4}-\d{2}$/;
 function signedInr(value: number) {
   return `${value >= 0 ? "+" : "−"}${inr(Math.abs(value))}`;
 }
+
+function SignedStat({
+  label,
+  value,
+  ready,
+  size = 24,
+}: {
+  label: string;
+  value: number | undefined;
+  ready: boolean;
+  size?: number;
+}) {
+  const amount = value ?? 0;
+  return (
+    <div className="cash-flow-stats-item">
+      <div className="stat-lbl" style={{ marginBottom: 4 }}>{label}</div>
+      <div
+        className="num"
+        style={{
+          fontSize: size,
+          fontWeight: 800,
+          letterSpacing: "-0.03em",
+          color: amount >= 0 ? "var(--pos)" : "var(--neg)",
+        }}
+      >
+        {ready ? signedInr(amount) : "—"}
+      </div>
+    </div>
+  );
+}
 const OUTFLOW_SECTIONS = new Set(["essential", "flexible", "daily"]);
 const SECTION_ORDER = [
   { key: "essential", label: "Essential" },
@@ -29,6 +59,7 @@ export function CashFlowTransactionsPage({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set());
+  const [showBudgetRemaining, setShowBudgetRemaining] = useState(false);
   const rawMonth = searchParams.get("month");
   const month = rawMonth && MONTH_RE.test(rawMonth) ? rawMonth : fallbackMonth;
 
@@ -52,6 +83,7 @@ export function CashFlowTransactionsPage({
     queryKey: ["dashboard", "monthly", month],
     queryFn: () => getDashboardMonthly(month),
   });
+  const dashboardReady = dashboardQuery.isSuccess && !!dashboardQuery.data;
 
   const rows = data.filter(
     (transaction) =>
@@ -105,38 +137,56 @@ export function CashFlowTransactionsPage({
               {isLoading || isError ? "—" : inr(total)}
             </div>
           </div>
-          <div className="cash-flow-stats-item">
-            <div className="stat-lbl" style={{ marginBottom: 4 }}>Balance remaining</div>
-            <div
-              className="num"
+          <SignedStat
+            label="Balance remaining"
+            value={dashboardQuery.data?.remaining_balance}
+            ready={dashboardReady}
+          />
+          <SignedStat
+            label="Free money"
+            value={dashboardQuery.data?.free_money}
+            ready={dashboardReady}
+          />
+        </div>
+        <div className="cash-flow-debug">
+          <button
+            type="button"
+            className="cash-flow-debug-toggle"
+            aria-expanded={showBudgetRemaining}
+            aria-controls="cash-flow-budget-remaining"
+            onClick={() => setShowBudgetRemaining((open) => !open)}
+          >
+            <IconChevR
+              size={14}
               style={{
-                fontSize: 24,
-                fontWeight: 800,
-                letterSpacing: "-0.03em",
-                color: (dashboardQuery.data?.remaining_balance ?? 0) >= 0 ? "var(--pos)" : "var(--neg)",
+                transform: showBudgetRemaining ? "rotate(90deg)" : "none",
+                transition: "transform .15s",
               }}
-            >
-              {dashboardQuery.isLoading || dashboardQuery.isError || !dashboardQuery.data
-                ? "—"
-                : signedInr(dashboardQuery.data.remaining_balance)}
+            />
+            Budget remaining
+          </button>
+          {showBudgetRemaining && (
+            <div id="cash-flow-budget-remaining" className="cash-flow-stats-grid">
+              <SignedStat
+                label="bare_minimum_remaining"
+                value={dashboardQuery.data?.bare_minimum_remaining}
+                ready={dashboardReady}
+                size={18}
+              />
+              <SignedStat
+                label="subscriptions_budget_remaining"
+                value={dashboardQuery.data?.subscriptions_budget_remaining}
+                ready={dashboardReady}
+                size={18}
+              />
+              <SignedStat
+                label="daily_budget_remaining"
+                value={dashboardQuery.data?.daily_budget_remaining}
+                ready={dashboardReady}
+                size={18}
+              />
             </div>
-          </div>
-          <div className="cash-flow-stats-item">
-            <div className="stat-lbl" style={{ marginBottom: 4 }}>Free money</div>
-            <div
-              className="num"
-              style={{
-                fontSize: 24,
-                fontWeight: 800,
-                letterSpacing: "-0.03em",
-                color: (dashboardQuery.data?.free_money ?? 0) >= 0 ? "var(--pos)" : "var(--neg)",
-              }}
-            >
-              {dashboardQuery.isLoading || dashboardQuery.isError || !dashboardQuery.data
-                ? "—"
-                : signedInr(dashboardQuery.data.free_money)}
-            </div>
-          </div>
+          )}
         </div>
       </div>
 

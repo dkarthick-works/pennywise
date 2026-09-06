@@ -12,18 +12,27 @@ import (
 )
 
 type DashboardMonthlyDTO struct {
-	Month                   string  `json:"month"`
-	Income                  float64 `json:"income"`
-	CashSpending            float64 `json:"cash_spending"`
-	RemainingBalance        float64 `json:"remaining_balance"`
-	FreeMoney               float64 `json:"free_money"`
-	CashFlow                float64 `json:"cash_flow"`
-	MonthlyCost             float64 `json:"monthly_cost"`
-	NetSaved                float64 `json:"net_saved"`
-	SavingsRate             float64 `json:"savings_rate"`
-	MonthlyDifference       float64 `json:"monthly_difference"`
-	OutstandingCreditsCount int64   `json:"outstanding_credits_count"`
-	OutstandingCreditsTotal float64 `json:"outstanding_credits_total"`
+	Month                        string  `json:"month"`
+	Income                       float64 `json:"income"`
+	CashSpending                 float64 `json:"cash_spending"`
+	RemainingBalance             float64 `json:"remaining_balance"`
+	FreeMoney                    float64 `json:"free_money"`
+	BareMinimumSum               float64 `json:"bare_minimum_sum"`
+	BareMinimumBudget            float64 `json:"bare_minimum_budget"`
+	BareMinimumRemaining         float64 `json:"bare_minimum_remaining"`
+	SubscriptionsSum             float64 `json:"subscriptions_sum"`
+	SubscriptionsBudget          float64 `json:"subscriptions_budget"`
+	SubscriptionsBudgetRemaining float64 `json:"subscriptions_budget_remaining"`
+	DailySum                     float64 `json:"daily_sum"`
+	DailyBudget                  float64 `json:"daily_budget"`
+	DailyBudgetRemaining         float64 `json:"daily_budget_remaining"`
+	CashFlow                     float64 `json:"cash_flow"`
+	MonthlyCost                  float64 `json:"monthly_cost"`
+	NetSaved                     float64 `json:"net_saved"`
+	SavingsRate                  float64 `json:"savings_rate"`
+	MonthlyDifference            float64 `json:"monthly_difference"`
+	OutstandingCreditsCount      int64   `json:"outstanding_credits_count"`
+	OutstandingCreditsTotal      float64 `json:"outstanding_credits_total"`
 }
 
 func (s *Server) handleGetDashboardMonthly(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +70,17 @@ func (s *Server) handleGetDashboardMonthly(w http.ResponseWriter, r *http.Reques
 	dailyRemaining := numToFloat(budget.BudgetDaily) - numToFloat(row.DailySum)
 	budgetRemaining := bareMinimumRemaining + subscriptionsRemaining + dailyRemaining
 
-	writeJSON(w, http.StatusOK, dashboardMonthlyToDTO(month, row, budgetRemaining))
+	result := dashboardMonthlyToDTO(month, row, budgetRemaining)
+	result.BareMinimumSum = numToFloat(row.EssentialSum)
+	result.BareMinimumBudget = numToFloat(budget.BudgetEssential)
+	result.BareMinimumRemaining = bareMinimumRemaining
+	result.SubscriptionsSum = numToFloat(row.FlexibleSum)
+	result.SubscriptionsBudget = numToFloat(budget.BudgetFlexible)
+	result.SubscriptionsBudgetRemaining = subscriptionsRemaining
+	result.DailySum = numToFloat(row.DailySum)
+	result.DailyBudget = numToFloat(budget.BudgetDaily)
+	result.DailyBudgetRemaining = dailyRemaining
+	writeJSON(w, http.StatusOK, result)
 }
 
 func monthDateRange(month string) (pgtype.Date, pgtype.Date, error) {
