@@ -24,6 +24,7 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/record` | Record & Expense | **Default landing page** after login (`/` redirects here) |
 | `/record/entry` | Quick add | Manual cross-section entry plus AI language parsing; section/kind cycle chips, sticky date, visit session log |
 | `/dashboard` | Dashboard | Month/year charts, hero cards, category-group spend |
+| `/dashboard/cash-flow?month=` | Cash flow transactions | Drill-down from the Cash Flow hero card; cash + settlement rows grouped by section |
 | `/dashboard/credits?month=&view=calendar\|billing` | Credit transactions | Drill-down from the Credit Card Usage hero card; month + view carried in the URL |
 | `/dashboard/groups/:groupId` | Category group | Drill-down from a category-group spend card |
 | `/lents` | Lent | Track money lent to others (open/settled filter, create form) |
@@ -60,8 +61,14 @@ aggregation).
 | Card | What it measures | Basis |
 |------|------------------|-------|
 | Monthly Cost | Incurred spend (`cash` + `credit`) | Transaction date |
-| Cash Flow | Cash that moved (`cash` + `settlement`) | Payment date |
+| Cash Flow | Cash out (`cash` + `settlement`) | Payment date |
 | Credit Card Usage | Expense-section `credit` rows | Recorded transaction date |
+
+The **Cash Flow** card is a real `<button>` that opens
+`/dashboard/cash-flow?month=`. The hero shows **Cash out** only; **Balance
+remaining** (income minus cash out) and **Free money** (balance minus unspent
+section budgets) appear on the drill-down page from the same
+`GET /api/dashboard/monthly` payload.
 
 The **Credit Card Usage** card shows two totals from the summary API: the
 **statement cycle** that closes in the selected month and the **calendar month**.
@@ -113,9 +120,20 @@ Both drill-down routes reuse `TransactionListTable` (`src/components/dashboard/T
 
 | Route | Data source | Notes |
 |-------|-------------|-------|
+| `/dashboard/cash-flow?month=` | `GET /api/transactions?month=` + `GET /api/dashboard/monthly` | Positive `cash`/`settlement` rows in Essential, Flexible, Daily; grouped by section |
 | `/dashboard/credits?month=&view=` | `GET /api/dashboard/credit-transactions?month=&view=` | Kind column hidden; month + view read from the URL |
 | `/dashboard/groups/:groupId?month=` | `GET /api/category-groups/{id}/transactions?month=` | Shows date, category, section, kind, amount; links to comparison |
 | `/dashboard/groups/:groupId/compare?to=&range=` | `GET /api/dashboard/group-spend/history` | 3/6/12-month chart, statistics, mappings, and category contributions |
+
+The cash-flow drill-down reads `month` from the query string (canonicalizing
+invalid values) so refreshes and direct links are stable. **Back** returns to
+`/dashboard?month=YYYY-MM`. A stats strip at the top shows **Cash out** (client
+sum of filtered rows), **Balance remaining**, and **Free money** (signed,
+green/red) from the monthly dashboard API. An expandable **Budget remaining**
+toggle reveals per-section budget headroom (`bare_minimum_remaining`,
+`subscriptions_budget_remaining`, `daily_budget_remaining`) for debugging
+free-money math. Below the strip, collapsible section cards list transactions
+via `TransactionListTable`; income and credit rows are excluded.
 
 The credit drill-down reads `month` and `view` (`calendar`/`billing`) from the
 query string, canonicalizing invalid values, so refreshes and direct links are
@@ -262,7 +280,7 @@ Nav item: **Settings** (`/settings`).
 |---------|--------|-------|
 | Budgets | — | Per-month Essential / Flexible / Daily amounts for the shell month (`GET`/`PUT /api/budgets/{month}`). Saves on blur or Enter. Missing months show zeros only after a successful GET. |
 | Templates | — | Ordered category lists per section |
-| Preferences | — | Income, currency, theme |
+| Preferences | — | Currency and theme |
 | Credit card controls | `#credit-billing-cycle` | Statement closing day + spending threshold |
 
 **Credit card controls** groups two explicit Save/Clear settings (never
