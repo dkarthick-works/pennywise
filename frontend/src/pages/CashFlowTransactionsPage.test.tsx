@@ -38,6 +38,7 @@ beforeEach(() => {
   getDashboardMonthly.mockReset();
   getDashboardMonthly.mockResolvedValue({
     month: "2026-08", income: 1000, cash_spending: 425, remaining_balance: 575, free_money: 200,
+    bare_minimum_remaining: 80, subscriptions_budget_remaining: 50, daily_budget_remaining: 70,
     cash_flow: 425, monthly_cost: 825, net_saved: 575,
     savings_rate: 57.5, monthly_difference: 400, outstanding_credits_count: 0, outstanding_credits_total: 0,
   });
@@ -70,6 +71,17 @@ describe("CashFlowTransactionsPage", () => {
     expect(screen.getByText("+₹575")).toBeInTheDocument();
     expect(screen.getByText("Free money")).toBeInTheDocument();
     expect(screen.getByText("+₹200")).toBeInTheDocument();
+    expect(screen.queryByText("bare_minimum_remaining")).not.toBeInTheDocument();
+    const remainingToggle = screen.getByRole("button", { name: "Budget remaining" });
+    expect(remainingToggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(remainingToggle);
+    expect(remainingToggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("bare_minimum_remaining")).toBeInTheDocument();
+    expect(screen.getByText("+₹80")).toBeInTheDocument();
+    expect(screen.getByText("subscriptions_budget_remaining")).toBeInTheDocument();
+    expect(screen.getByText("+₹50")).toBeInTheDocument();
+    expect(screen.getByText("daily_budget_remaining")).toBeInTheDocument();
+    expect(screen.getByText("+₹70")).toBeInTheDocument();
 
     const sectionHeadings = screen.getAllByRole("heading", { level: 2 });
     expect(sectionHeadings.map((heading) => heading.textContent)).toEqual([

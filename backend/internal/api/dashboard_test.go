@@ -31,6 +31,13 @@ func TestDashboardMonthly(t *testing.T) {
 				CashSpending:            16000,
 				RemainingBalance:        69000,
 				FreeMoney:               58000,
+				BareMinimumSum:          14000,
+				BareMinimumBudget:       10000,
+				BareMinimumRemaining:    -4000,
+				SubscriptionsSum:        5000,
+				SubscriptionsBudget:     5000,
+				DailyBudget:             15000,
+				DailyBudgetRemaining:    15000,
 				CashFlow:                16000,
 				MonthlyCost:             19000,
 				NetSaved:                69000,
@@ -49,33 +56,39 @@ func TestDashboardMonthly(t *testing.T) {
 			name: "zero income",
 			path: "/api/dashboard/monthly?month=2026-08",
 			want: DashboardMonthlyDTO{
-				Month:                   "2026-08",
-				CashSpending:            100,
-				RemainingBalance:        -100,
-				FreeMoney:               50,
-				CashFlow:                100,
-				MonthlyCost:             150,
-				NetSaved:                -100,
-				SavingsRate:             0,
-				MonthlyDifference:       -150,
-				OutstandingCreditsCount: 1,
-				OutstandingCreditsTotal: 50,
+				Month:                        "2026-08",
+				CashSpending:                 100,
+				RemainingBalance:             -100,
+				FreeMoney:                    50,
+				BareMinimumSum:               100,
+				BareMinimumRemaining:         -100,
+				SubscriptionsSum:             50,
+				SubscriptionsBudgetRemaining: -50,
+				CashFlow:                     100,
+				MonthlyCost:                  150,
+				NetSaved:                     -100,
+				SavingsRate:                  0,
+				MonthlyDifference:            -150,
+				OutstandingCreditsCount:      1,
+				OutstandingCreditsTotal:      50,
 			},
 		},
 		{
 			name: "negative savings rate",
 			path: "/api/dashboard/monthly?month=2026-09",
 			want: DashboardMonthlyDTO{
-				Month:             "2026-09",
-				Income:            100,
-				CashSpending:      250,
-				RemainingBalance:  -150,
-				FreeMoney:         100,
-				CashFlow:          250,
-				MonthlyCost:       250,
-				NetSaved:          -150,
-				SavingsRate:       -150,
-				MonthlyDifference: -150,
+				Month:                "2026-09",
+				Income:               100,
+				CashSpending:         250,
+				RemainingBalance:     -150,
+				FreeMoney:            100,
+				DailySum:             250,
+				DailyBudgetRemaining: -250,
+				CashFlow:             250,
+				MonthlyCost:          250,
+				NetSaved:             -150,
+				SavingsRate:          -150,
+				MonthlyDifference:    -150,
 			},
 		},
 	}
@@ -168,6 +181,16 @@ func assertDashboardMonthly(t *testing.T, got, want DashboardMonthlyDTO) {
 	assertFloat(t, "cash_spending", got.CashSpending, want.CashSpending)
 	assertFloat(t, "remaining_balance", got.RemainingBalance, want.RemainingBalance)
 	assertFloat(t, "free_money", got.FreeMoney, want.FreeMoney)
+	assertFloat(t, "bare_minimum_sum", got.BareMinimumSum, want.BareMinimumSum)
+	assertFloat(t, "bare_minimum_budget", got.BareMinimumBudget, want.BareMinimumBudget)
+	assertFloat(t, "bare_minimum_remaining", got.BareMinimumRemaining, want.BareMinimumRemaining)
+	assertFloat(t, "subscriptions_sum", got.SubscriptionsSum, want.SubscriptionsSum)
+	assertFloat(t, "subscriptions_budget", got.SubscriptionsBudget, want.SubscriptionsBudget)
+	assertFloat(t, "subscriptions_budget_remaining", got.SubscriptionsBudgetRemaining, want.SubscriptionsBudgetRemaining)
+	assertFloat(t, "daily_sum", got.DailySum, want.DailySum)
+	assertFloat(t, "daily_budget", got.DailyBudget, want.DailyBudget)
+	assertFloat(t, "daily_budget_remaining", got.DailyBudgetRemaining, want.DailyBudgetRemaining)
+	assertFloat(t, "free_money formula", got.FreeMoney, got.RemainingBalance-(got.BareMinimumRemaining+got.SubscriptionsBudgetRemaining+got.DailyBudgetRemaining))
 	assertFloat(t, "cash_flow", got.CashFlow, want.CashFlow)
 	assertFloat(t, "monthly_cost", got.MonthlyCost, want.MonthlyCost)
 	assertFloat(t, "net_saved", got.NetSaved, want.NetSaved)

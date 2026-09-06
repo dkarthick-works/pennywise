@@ -153,6 +153,9 @@ export interface DashboardMonthly {
   cash_spending: number;
   remaining_balance: number;
   free_money: number;
+  bare_minimum_remaining: number;
+  subscriptions_budget_remaining: number;
+  daily_budget_remaining: number;
   cash_flow: number;
   monthly_cost: number;
   net_saved: number;
