@@ -102,7 +102,7 @@ describe("AuthProvider session bootstrap", () => {
     await waitFor(() => expect(screen.getByTestId("state")).toHaveTextContent("fresh"));
   });
 
-  it("refreshes through the coordinator when the PWA becomes visible", async () => {
+  it("does not refresh or reload the profile on repeated tab switches", async () => {
     getToken.mockReturnValue("stored");
     refreshSession.mockResolvedValue("fresh");
     get.mockResolvedValue({
@@ -111,13 +111,41 @@ describe("AuthProvider session bootstrap", () => {
     renderProvider();
     await screen.findByText("stored");
 
-    Object.defineProperty(document, "visibilityState", {
-      configurable: true,
-      value: "visible",
-    });
-    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    for (let i = 0; i < 3; i++) {
+      for (const visibilityState of ["hidden", "visible"]) {
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: visibilityState });
+        await act(async () => { document.dispatchEvent(new Event("visibilitychange")); });
+      }
+    }
+    expect(refreshSession).not.toHaveBeenCalled();
+    expect(get).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("state")).toHaveTextContent("stored");
+  });
 
-    await waitFor(() => expect(refreshSession).toHaveBeenCalledOnce());
+  it("adopts a cross-tab token without rehydrating an already loaded profile", async () => {
+    let token = "stored";
+    getToken.mockImplementation(() => token);
+    get.mockResolvedValue({ data: { user_id: "u1", email: "user@example.com", display_name: "User" } });
+    renderProvider();
+    await screen.findByText("stored");
+
+    token = "rotated-in-another-tab";
+    await act(async () => { window.dispatchEvent(new Event("auth:token")); });
+    expect(screen.getByTestId("state")).toHaveTextContent(token);
+    expect(get).toHaveBeenCalledOnce();
+    expect(refreshSession).not.toHaveBeenCalled();
+  });
+
+  it("does not start a second hydration when a token arrives during bootstrap", async () => {
+    getToken.mockReturnValue("stored");
+    let finish!: (response: { data: { user_id: string; email: string; display_name: string } }) => void;
+    get.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    renderProvider();
+    await waitFor(() => expect(get).toHaveBeenCalledOnce());
+    await act(async () => { window.dispatchEvent(new Event("auth:token")); });
+    expect(get).toHaveBeenCalledOnce();
+    await act(async () => { finish({ data: { user_id: "u1", email: "user@example.com", display_name: "User" } }); });
+    expect(screen.getByTestId("state")).toHaveTextContent("stored");
   });
 
   it("completes local logout before the server request settles", async () => {

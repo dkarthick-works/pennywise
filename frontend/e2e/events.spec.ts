@@ -6,11 +6,12 @@ async function mockEvents(page: Page) {
   const events = new Map<string, PlannedEventDetail>();
   let sequence = 0;
   const financialWrites: string[] = [];
+  const authRequests = { me: 0, refresh: 0 };
   await page.addInitScript(() => sessionStorage.setItem("pennywise_access_token", "events-test-token"));
   await page.route("**/api/**", async route => {
     const request = route.request(); const url = new URL(request.url()); const path = url.pathname;
-    if (path === "/api/me") return route.fulfill({ json: { user_id: "test", email: "test@example.com", display_name: "Test" } });
-    if (path === "/api/auth/refresh") return route.fulfill({ json: { access_token: "events-test-token" } });
+    if (path === "/api/me") { authRequests.me++; return route.fulfill({ json: { user_id: "test", email: "test@example.com", display_name: "Test" } }); }
+    if (path === "/api/auth/refresh") { authRequests.refresh++; return route.fulfill({ json: { access_token: "events-test-token" } }); }
     if (path.startsWith("/api/transactions") && request.method() !== "GET") financialWrites.push(path);
     if (!path.startsWith("/api/events")) return route.fulfill({ json: {} });
     if (path === "/api/events" && request.method() === "GET") {
@@ -42,7 +43,7 @@ async function mockEvents(page: Page) {
     events.set(eventID, event);
     return route.fulfill({ status: request.method() === "PUT" ? 200 : 201, json: event });
   });
-  return { events, financialWrites };
+  return { events, financialWrites, authRequests };
 }
 
 for (const viewport of [{ name: "desktop", width: 1440, height: 1000 }, { name: "mobile", width: 390, height: 844 }]) {
@@ -105,4 +106,26 @@ test("a stale event draft requires explicit reload", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Save event", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Discard draft and reload", exact: true }).click();
   await expect(page.getByLabel("Event name", { exact: true })).toHaveValue("Changed elsewhere");
+});
+
+test("tab switches and cross-tab tokens preserve an unsaved event without auth requests", async ({ page, context }) => {
+  const { authRequests } = await mockEvents(page);
+  await page.goto("/events/new");
+  await page.getByLabel("Event name", { exact: true }).fill("Unsaved service plan");
+  expect(authRequests).toEqual({ me: 1, refresh: 0 });
+  const other = await context.newPage();
+  for (let i = 0; i < 3; i++) {
+    await other.bringToFront();
+    await page.bringToFront();
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  }
+  await page.evaluate(() => {
+    sessionStorage.setItem("pennywise_access_token", "token-from-another-tab");
+    window.dispatchEvent(new Event("auth:token"));
+  });
+  // Allow the event handlers and any accidental network requests to settle.
+  await page.waitForTimeout(200);
+  await expect(page.getByLabel("Event name", { exact: true })).toHaveValue("Unsaved service plan");
+  expect(authRequests).toEqual({ me: 1, refresh: 0 });
+  await other.close();
 });

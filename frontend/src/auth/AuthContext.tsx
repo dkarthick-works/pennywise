@@ -96,23 +96,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [qc]);
 
   useEffect(() => {
-    const onToken = () => void hydrate();
-    const onVisible = () => {
-      if (document.visibilityState === "visible" && getToken()) {
-        void refreshSession().then(() => hydrate()).catch((error) => {
-          if (error instanceof RetryableAuthError) {
-            setState((s) => ({ ...s, hasRetryableError: true }));
-          }
-        });
+    const onToken = () => {
+      const token = getToken();
+      if (!token) return;
+      // Another tab rotated the access token, not the profile. Rehydrating a
+      // healthy session would set isLoading and unmount the user's active form.
+      if (state.profile && !state.hasRetryableError) {
+        setState((s) => ({ ...s, token }));
+      } else if (!state.isLoading) {
+        // Bootstrap already in flight will read the latest token on completion.
+        void hydrate();
       }
     };
     window.addEventListener("auth:token", onToken);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      window.removeEventListener("auth:token", onToken);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [hydrate]);
+    return () => window.removeEventListener("auth:token", onToken);
+  }, [hydrate, state.profile, state.hasRetryableError, state.isLoading]);
+
+  // Tab visibility alone is not a reason to rotate a healthy session or reload
+  // /api/me. Bootstrap restores missing sessions; the API client's 401 handler
+  // refreshes expired tokens and retries the actual request when necessary.
 
   const login = useCallback(async (body: LoginRequest) => {
     await apiLogin(body);
