@@ -465,9 +465,15 @@ logging the user out unnecessarily:
 | Coordinated refresh | `src/api/client.ts` | Single in-flight refresh; `BroadcastChannel` + `navigator.locks` dedupe across tabs |
 | Retryable failures | `AuthContext.tsx` + `App.tsx` | Network/5xx refresh errors show **Connection unavailable** with **Retry**; token kept |
 | Terminal logout | `TerminalAuthError` | Refresh `400`/`401`/`403` clears token and redirects to login |
-| Tab focus | `visibilitychange` listener | When a tab becomes visible and a token exists, refresh + re-hydrate profile |
+| Tab focus | No unconditional auth requests | Returning to a tab does not refresh auth or reload `/api/me`; stale page queries may refetch normally |
+| Cross-tab token rotation | `auth:token` listener | Updates a healthy session's token without rehydrating the cached profile or unmounting active forms |
 
-On 401, the axios interceptor retries once after `refreshSession()`. Deployers
+Startup still restores a missing session from the refresh cookie and loads `/api/me`.
+On 401, the axios interceptor retries once after `refreshSession()`; merely switching
+tabs does not require a token rotation. Explicit Retry remains available after an
+offline bootstrap. Browser regression tests cover tab returns with an unsaved event,
+cross-tab tokens, expired-token recovery, and logout during an in-flight refresh.
+Deployers
 should verify production `Set-Cookie` attributes — see
 [backend/README.md § Production refresh-cookie gate](../backend/README.md).
 
