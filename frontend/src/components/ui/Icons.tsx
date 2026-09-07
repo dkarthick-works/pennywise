@@ -173,6 +173,12 @@ export const IconChit = (p: IcProps) => (
 export const IconZap = (p: IcProps) => (
   <Ic {...p}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></Ic>
 );
+export const IconWrench = (p: IcProps) => (
+  <Ic {...p}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z" /></Ic>
+);
+export const IconCalendar = (p: IcProps) => (
+  <Ic {...p}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 11h18" /></Ic>
+);
 export const IconSparkles = (p: IcProps) => (
   <Ic {...p}>
     <path d="M12 3l1.6 4.8L18.5 9.5 13.6 11.2 12 16l-1.6-4.8L5.5 9.5l4.9-1.7L12 3z" />
