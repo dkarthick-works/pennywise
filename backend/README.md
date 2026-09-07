@@ -342,6 +342,106 @@ the recreated `user_settings` columns.
 All three values are required by `PUT`, must be non-negative, and may have at
 most two decimal places.
 
+### Events (`/api/events`)
+
+Standalone event planning API. **Event costs are tracked separately and do not
+update cash flow. Record payments in Transactions to include them there.** Actual
+cost is cumulative cost incurred, including unpaid bills, not a payment ledger.
+No event operation changes transactions, budgets, or the free-money formula.
+
+| Method | Path | Result |
+| --- | --- | --- |
+| GET | `/api/events?status=planned&limit=50&offset=0` | Paginated active event summaries; status optional |
+| POST | `/api/events` | Create an event, `201` |
+| GET | `/api/events/{id}` | Event with ordered items and summary |
+| PUT | `/api/events/{id}` | Atomic full replacement of editable fields/items |
+| DELETE | `/api/events/{id}` | Soft delete, `204`; header `If-Match: "1"` required |
+| POST | `/api/events/{id}/duplicate` | Copy planning data, `201`; send `{}` or name/date overrides |
+| GET | `/api/events/suggestions?month=YYYY-MM&timezone=Asia/Kolkata` | Current-month recommendations |
+
+All routes require authentication. Other users' and deleted events return `404`.
+Deleted events retain their items but cannot be edited or duplicated. No restore
+endpoint is provided. Individually removing an item via PUT permanently removes it.
+
+Create example:
+
+```json
+{
+  "name": "Car service",
+  "target_date": null,
+  "items": [
+    { "name": "Service bill", "expected_cost": 8000, "actual_cost": null }
+  ]
+}
+```
+
+Defaults: `status: "planned"`, `suggestions_enabled: true`, `note: ""`,
+`target_date: null`, `items: []`. Item costs may be omitted on create. States are
+`planned`, `in_progress`, `completed`, `cancelled`. Any explicit transition is
+allowed, but a completed event must have at least one item and actual cost entered
+for every item. Missing expected costs do not prevent completion. Completed events
+remain editable while preserving this invariant; reopening and clearing actuals
+can be one PUT. Dates and amounts never change status automatically.
+
+PUT requires `name`, `note`, `target_date`, `status`, `suggestions_enabled`,
+`version`, and `items`. Each item requires `name`, `expected_cost`, `actual_cost`.
+Include existing item IDs to retain them; omit IDs for new items. Array order sets
+position, and old items absent from the array are removed. Duplicate or foreign
+item IDs are rejected. All writes are atomic. `version` starts at 1 and increments
+on update/deletion; stale PUT versions or DELETE If-Match versions return `409`.
+Reload before retrying. DELETE requires a single quoted positive version (not a
+wildcard or weak ETag); deleting again returns `404`.
+
+Money fields are JSON numbers or `null`: null means not entered, zero means an
+explicit zero. Nonnegative values through `999999999999.99`, at most two decimal
+places. Excess precision is rejected, not rounded. Numeric tokens are bounded to
+64 bytes and exponent magnitude 30. Names are trimmed, 1–200 characters; notes
+max 5,000 characters; at most 500 items and 1 MiB per request. Actual cost may
+exceed expected cost. Invalid input returns `400`, oversized bodies `413`.
+
+Detail/create/update/duplicate responses include `id`, `name`, `note`,
+`target_date`, `status`, `suggestions_enabled`, `version`, `created_at`,
+`updated_at`, `items` (with id/name/costs/position), and a backend-computed summary:
+
+```json
+{
+  "item_count": 1,
+  "expected_total": 8000.00,
+  "actual_total": 0.00,
+  "missing_expected_count": 0,
+  "missing_actual_count": 1,
+  "budget_complete": true,
+  "actuals_complete": false,
+  "can_complete": false
+}
+```
+
+This object is nested under `summary`. Totals sum only entered amounts, returning
+zero if none are entered; always use completeness flags before treating totals as
+final. Completeness requires at least one item. No variance fields are returned.
+List/suggestion entries omit items but include the same summary and metadata.
+Lists return `{ "events": [], "limit": 50, "offset": 0, "has_more": false }`.
+Limit defaults to 50, max 100; offset is nonnegative. Normal lists sort newest first.
+
+Duplication accepts `{ "name": "Next service", "target_date": "2027-01-15" }`;
+both fields are optional. Defaults to `<source name> (copy)` (source truncated to
+193 characters if necessary), null date, planned status, new IDs/version 1, and
+all actuals null. Copies note, suggestion preference, item names/order/estimates.
+
+Suggestions require a valid `month`. Optional IANA `timezone` defaults UTC; browser
+clients should send `Intl.DateTimeFormat().resolvedOptions().timeZone`. Server time
+in that zone determines the current month. Historical/future requests return an
+empty page with `free_money: null`. Responses also include `month`, `current_month`,
+`timezone`, and current `free_money` when applicable. Invalid timezones/months are
+`400`. Positive free money is required, even for zero-cost events. Candidates must
+be planned, enabled, nonempty, fully estimated, and undated or dated before next
+month. Expected total must fit the existing dashboard free money, normalized to
+currency precision. Actuals do not reduce that comparison amount. Each event is
+an independent alternative: two suggestions do not imply both fit together.
+Dated events sort earliest first, followed by undated events; ties use newest
+creation time then ID. Pagination applies after eligibility filtering. Finance and
+candidate reads use one consistent snapshot, but do not reserve money.
+
 ### Dashboard (`GET /api/dashboard/monthly?month=YYYY-MM`)
 
 Returns the monthly hero-card totals for the selected month. Section cards,

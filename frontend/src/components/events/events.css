@@ -1,0 +1,58 @@
+.events-page .btn, .event-suggestions .btn { width: auto; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; padding: 9px 14px; }
+.events-page .page-head { margin-top: 20px; gap: 16px; flex-wrap: wrap; }
+.events-page .card { margin-bottom: 16px; }
+.events-page a:not(.btn), .event-suggestions a:not(.btn) { color: var(--accent, #5264cf); text-underline-offset: 3px; }
+.event-accounting { font-size: 13px; line-height: 1.6; margin-bottom: 20px; }
+.event-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.event-section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 24px; }
+.event-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.event-meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; }
+.event-span { grid-column: 1 / -1; }
+.event-checkbox { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.5; }
+.event-checkbox input { margin-top: 4px; accent-color: var(--accent); }
+.event-item-draft { border: 1px solid var(--border); border-radius: 12px; margin: 16px 0; padding: 14px; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px 14px; min-width: 0; }
+.event-item-draft legend { font-size: 13px; padding: 0 6px; color: var(--ink-3); }
+.event-item-draft .event-actions { grid-column: 1 / -1; justify-content: flex-end; }
+.event-form .input { min-width: 0; width: 100%; }
+.event-form .event-actions input { flex: 1; width: auto; }
+.event-form .muted, .event-summary .muted { font-size: 13px; line-height: 1.5; }
+.event-form-actions { margin-top: 20px; }
+.event-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.event-summary strong { font-size: 24px; overflow-wrap: anywhere; }
+.event-summary p { margin: 6px 0 0; }
+.event-filter { max-width: 240px; }
+.event-list-item { display: grid; grid-template-columns: minmax(140px, 1.5fr) auto minmax(110px, 1fr) minmax(110px, 1fr) auto; gap: 18px; align-items: center; }
+.event-list-item .card-h { overflow-wrap: anywhere; margin-bottom: 6px; }
+.event-list-item .num { font-size: 18px; overflow-wrap: anywhere; }
+.event-list-item small { display: block; margin-top: 4px; }
+.event-status-planned { background: var(--bg); color: var(--ink-2); }
+.event-status-in_progress { background: rgba(210, 145, 25, .12); color: var(--amber); }
+.event-status-completed { background: rgba(20, 150, 90, .12); color: var(--pos); }
+.event-status-cancelled { background: var(--bg); color: var(--ink-3); }
+.event-detail-actions { margin-bottom: 18px; }
+.event-detail-item { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; border-top: 1px solid var(--border); padding: 14px 0; }
+.event-detail-item h3 { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+.event-detail-item p { margin: 4px 0 0; }
+.event-note { white-space: pre-wrap; overflow-wrap: anywhere; }
+.events-page .event-danger { color: var(--neg); }
+.event-pagination { justify-content: center; margin: 20px 0; }
+.event-copy-form { margin: 16px 0; }
+.event-suggestions { margin: 20px 0; }
+.event-suggestions .event-section-head { margin: 0 0 14px; }
+.event-suggestions ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.event-suggestions li { padding: 12px; border: 1px solid var(--border); border-radius: 10px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; align-items: center; }
+.event-suggestions li strong { overflow-wrap: anywhere; }
+.event-suggestions .muted { font-size: 13px; }
+@media (max-width: 1000px) {
+  .event-list-item { grid-template-columns: 1fr 1fr; }
+  .event-list-item > .chip { justify-self: end; }
+}
+@media (max-width: 600px) {
+  .event-meta-grid, .event-summary, .event-item-draft, .event-detail-item { grid-template-columns: 1fr; }
+  .events-page .page-head { align-items: flex-start; }
+  .events-page .page-title { overflow-wrap: anywhere; }
+  .event-list-item { gap: 14px 10px; }
+  .event-form, .event-copy-form { padding: 16px; }
+  .event-detail-item { gap: 10px; }
+  .event-summary strong { font-size: 22px; }
+}

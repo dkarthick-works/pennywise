@@ -24,6 +24,11 @@ import { ChitDetailPage } from "./pages/ChitDetailPage";
 import { ChitEditPage } from "./pages/ChitEditPage";
 import { ChitInstallmentCreatePage } from "./pages/ChitInstallmentCreatePage";
 import { currentMonth }  from "./lib/dates";
+import { EventsPage } from "./pages/EventsPage";
+import { EventCreatePage } from "./pages/EventCreatePage";
+import { EventDetailPage } from "./pages/EventDetailPage";
+import { EventEditPage } from "./pages/EventEditPage";
+import "./components/events/events.css";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token, isLoading, hasRetryableError, retry } = useAuth();
@@ -81,6 +86,10 @@ export default function App() {
                 <Route path="/chits/:id/edit" element={<ChitEditPage />} />
                 <Route path="/chits/:id/installments/new" element={<ChitInstallmentCreatePage />} />
                 <Route path="/chits/:id" element={<ChitDetailPage />} />
+                <Route path="/events" element={<EventsPage />} />
+                <Route path="/events/new" element={<EventCreatePage />} />
+                <Route path="/events/:id/edit" element={<EventEditPage />} />
+                <Route path="/events/:id" element={<EventDetailPage />} />
                 <Route path="/insights"  element={<InsightsPage />} />
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/export"    element={<ImportExportPage />} />

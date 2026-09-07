@@ -33,6 +33,10 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/chits/:id` | Chit detail | View installments, record payments, export this chit as JSON |
 | `/chits/:id/edit` | Edit chit | Update scheme fields |
 | `/chits/:id/installments/new` | Add installment | Record a chit payment |
+| `/events` | Events | Standalone plans, status filtering, paginated list |
+| `/events/new` | Create event | Optional date, estimates, incurred costs |
+| `/events/:id` | Event detail | Costs, lifecycle, duplication, soft deletion |
+| `/events/:id/edit` | Edit event | Atomic item/metadata edits with version conflict handling |
 | `/insights` | Insights | Emergency fund targets (from `GET /api/insights`) |
 | `/categories` | Map Categories | Assign transaction labels to high-level groups |
 | `/export` | Import / Export | CSV export (date range) and import with review table |
@@ -42,6 +46,53 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/forgot-password` | Forgot password | Request a reset link by email (always shows the same success copy — anti-enumeration). The emailed link goes straight to Goauth's own domain, not back into Pennywise — the reset form itself is served entirely by Goauth. |
 
 Unknown authenticated paths fall back to `/record`.
+
+## Events
+
+Events appears after Chit funds in the desktop sidebar and mobile menu. It has its
+own list/create/detail/edit routes; the default landing page remains Record Expense.
+The list is independent of the selected transaction month. Status and pagination
+are kept in the URL; links back from detail retain that list context.
+
+- Expected and actual costs remain independent of Transactions. Actual means
+  cumulative incurred cost, including unpaid bills. The UI explains this boundary.
+- Empty plans and partial estimates can be saved. Line items support add/remove and
+  keyboard-friendly move up/down controls. Removing saved items requires confirmation.
+- Blank costs mean null/not entered; explicit zero is preserved, with paise formatting
+  via `money2`. Totals and completeness come only from the backend; edit summaries
+  are labelled Last saved totals and update on Save, not while typing.
+- Planned/In progress/Completed/Cancelled transitions are explicit. Complete uses
+  the backend's `can_complete`; an event needs items and actual costs for every item.
+  All states remain editable. No variance calculations, allocations, or payments.
+- Full PUT saves preserve item IDs and the loaded version. Background refetches do
+  not overwrite an edit draft. A 409 conflict keeps the draft and requires explicit
+  discard/reload rather than automatic merging or blind retries.
+- Dirty forms warn on Cancel/Back, sidebar navigation, and browser unload. The
+  existing declarative router is unchanged: SPA browser-history Back/Forward is
+  not intercepted. Do not rely on it to preserve an unsaved draft.
+- Duplication calls the server's copy endpoint; defaults reset date/actuals/status.
+  Delete sends a quoted `If-Match` version and soft-deletes after confirmation. No
+  restore/Undo is offered. Create/copy requests do not automatically retry after a
+  network failure; users are warned to check the list before retrying.
+
+Cash Flow Transactions includes current-month event suggestions below its totals.
+The browser sends its IANA timezone (UTC fallback); the backend remains authoritative
+for month/eligibility/order. Focus/visibility and a month-boundary timer recheck the
+calendar. Each recommendation is an independent alternative, not a reservation.
+Historical/future views hide the section. Pagination is server-side and failures are
+contained within the suggestions section.
+
+`src/api/events.ts` preserves HTTP status for 404/409 handling. `useEvents` centralizes
+mutations and cache updates. Event writes refresh only Events/suggestions; transaction
+and budget changes also invalidate suggestions (never the reverse financial effect).
+Styles are scoped in `components/events/events.css`. The responsive list uses a shared
+card grid at desktop and mobile sizes so there are no duplicate accessible entries.
+
+Tests: Events API/helpers/hooks/components are covered by Vitest; `e2e/events.spec.ts`
+uses a mocked API for desktop/mobile CRUD and a concurrent-edit conflict flow. On
+Node versions whose experimental Web Storage shadows jsdom, run unit tests with
+`NODE_OPTIONS=--no-experimental-webstorage npm test` (no application behaviour change).
+Build before `npm run test:e2e` because Playwright uses Vite preview.
 
 ## Dashboard page
 

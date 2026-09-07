@@ -140,6 +140,31 @@ type ChitInstallment struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type Event struct {
+	ID                 uuid.UUID          `json:"id"`
+	UserID             uuid.UUID          `json:"user_id"`
+	Name               string             `json:"name"`
+	Note               string             `json:"note"`
+	TargetDate         pgtype.Date        `json:"target_date"`
+	Status             string             `json:"status"`
+	SuggestionsEnabled bool               `json:"suggestions_enabled"`
+	Version            int64              `json:"version"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt          pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type EventItem struct {
+	ID           uuid.UUID          `json:"id"`
+	EventID      uuid.UUID          `json:"event_id"`
+	Name         string             `json:"name"`
+	ExpectedCost pgtype.Numeric     `json:"expected_cost"`
+	ActualCost   pgtype.Numeric     `json:"actual_cost"`
+	Position     int32              `json:"position"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Lent struct {
 	ID           uuid.UUID          `json:"id"`
 	UserID       uuid.UUID          `json:"user_id"`
