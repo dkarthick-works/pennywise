@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/joho/godotenv"
 
 	"github.com/ledger/backend/internal/api"
@@ -22,6 +23,15 @@ func main() {
 	_ = godotenv.Load()
 
 	cfg := config.Load()
+	if cfg.SentryDSN != "" {
+		if err := sentry.Init(sentry.ClientOptions{
+			Dsn: cfg.SentryDSN,
+		}); err != nil {
+			log.Printf("Sentry initialization failed: %v", err)
+		} else {
+			defer sentry.Flush(2 * time.Second)
+		}
+	}
 	ctx := context.Background()
 
 	log.Println("running migrations…")
