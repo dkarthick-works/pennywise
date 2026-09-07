@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { eventFixture } from "../test/eventFixture";
-import { eventAmount, eventDraft, eventsReturnPath, newEventItem, savedEventInput, serializeEvent } from "./events";
+import { eventAmount, eventBudgetSnapshot, eventDraft, eventsReturnPath, newEventItem, savedEventInput, serializeEvent } from "./events";
 
 describe("event form serialization", () => {
   it("defaults to a planned empty event with suggestions enabled", () => {
@@ -39,5 +39,10 @@ describe("event form serialization", () => {
   it("restricts return destinations to the Events list", () => {
     expect(eventsReturnPath({ eventsReturn: "/events?status=planned&offset=50" })).toBe("/events?status=planned&offset=50");
     for (const path of ["https://evil.test", "//evil.test", "/events/123", "/record"]) expect(eventsReturnPath({ eventsReturn: path })).toBe("/events");
+  });
+  it("rounds budget used and saved percents the same way as the list card", () => {
+    expect(eventBudgetSnapshot(3000, 1900)).toMatchObject({ remaining: 1100, usedPct: 63, savedPct: 37, overPct: null, barPct: 1900 / 3000 * 100 });
+    expect(eventBudgetSnapshot(0, 100)).toMatchObject({ usedPct: null, savedPct: null, remaining: -100, barPct: 0 });
+    expect(eventBudgetSnapshot(100, 150)).toMatchObject({ remaining: -50, usedPct: 150, savedPct: null, overPct: 50, barPct: 100 });
   });
 });

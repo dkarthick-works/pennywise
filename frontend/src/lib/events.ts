@@ -39,6 +39,14 @@ export function serializeEvent(draft: EventDraft): EventInput {
 export function savedEventInput(event: PlannedEventDetail, status = event.status): EventUpdateInput {
   return { ...serializeEvent({ ...eventDraft(event), status }), version: event.version };
 }
+export function eventBudgetSnapshot(expected: number, actual: number) {
+  const remaining = expected - actual;
+  if (expected <= 0) return { remaining, usedPct: null as number | null, savedPct: null as number | null, overPct: null as number | null, barPct: 0 };
+  const usedPct = Math.round((actual / expected) * 100);
+  const savedPct = remaining > 0 ? Math.round((remaining / expected) * 100) : remaining === 0 ? 0 : null;
+  const overPct = remaining < 0 ? Math.round((-remaining / expected) * 100) : null;
+  return { remaining, usedPct, savedPct, overPct, barPct: Math.min(100, (actual / expected) * 100) };
+}
 export function eventsReturnPath(state: unknown): string {
   if (state && typeof state === "object" && "eventsReturn" in state && typeof state.eventsReturn === "string" && /^\/events(?:\?[^#]*)?$/.test(state.eventsReturn)) return state.eventsReturn;
   return "/events";
