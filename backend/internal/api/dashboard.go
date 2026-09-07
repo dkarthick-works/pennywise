@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -48,22 +50,28 @@ func (s *Server) handleGetDashboardMonthly(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx := r.Context()
-	uid := userID(r)
-	row, err := s.q.SumDashboardMonthly(ctx, db.SumDashboardMonthlyParams{
+	result, err := loadDashboardMonthly(r.Context(), s.q, userID(r), month, fromDate, toDate)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "could not load dashboard")
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+// Shared by the dashboard and event suggestions; preserves the existing formula.
+func loadDashboardMonthly(ctx context.Context, q *db.Queries, uid uuid.UUID, month string, fromDate, toDate pgtype.Date) (DashboardMonthlyDTO, error) {
+	row, err := q.SumDashboardMonthly(ctx, db.SumDashboardMonthlyParams{
 		UserID:   uid,
 		FromDate: fromDate,
 		ToDate:   toDate,
 	})
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "could not load dashboard")
-		return
+		return DashboardMonthlyDTO{}, err
 	}
 
-	budget, err := s.q.GetMonthlyBudget(ctx, db.GetMonthlyBudgetParams{UserID: uid, Month: fromDate})
+	budget, err := q.GetMonthlyBudget(ctx, db.GetMonthlyBudgetParams{UserID: uid, Month: fromDate})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		writeErr(w, http.StatusInternalServerError, "could not load dashboard")
-		return
+		return DashboardMonthlyDTO{}, err
 	}
 	bareMinimumRemaining := numToFloat(budget.BudgetEssential) - numToFloat(row.EssentialSum)
 	subscriptionsRemaining := numToFloat(budget.BudgetFlexible) - numToFloat(row.FlexibleSum)
@@ -80,7 +88,7 @@ func (s *Server) handleGetDashboardMonthly(w http.ResponseWriter, r *http.Reques
 	result.DailySum = numToFloat(row.DailySum)
 	result.DailyBudget = numToFloat(budget.BudgetDaily)
 	result.DailyBudgetRemaining = dailyRemaining
-	writeJSON(w, http.StatusOK, result)
+	return result, nil
 }
 
 func monthDateRange(month string) (pgtype.Date, pgtype.Date, error) {

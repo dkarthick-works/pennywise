@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { eventKeys } from "./eventQueryKeys";
 import {
   isTransactionNameSuggestionSection,
   transactionNameSuggestionKeys,
@@ -16,6 +17,7 @@ export function invalidateCreditCaches(qc: QueryClient): void {
 }
 
 export function invalidateMonthCaches(qc: QueryClient, month: string): void {
+  qc.invalidateQueries({ queryKey: eventKeys.suggestions });
   qc.invalidateQueries({ queryKey: ["open-month", month] });
   qc.invalidateQueries({ queryKey: ["txns", "month", month] });
   qc.invalidateQueries({ queryKey: ["dashboard", "monthly", month] });

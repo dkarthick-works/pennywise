@@ -29,7 +29,8 @@ func TestMonthlyBudgetsMigrationBackfill(t *testing.T) {
 		_, _ = m.Close()
 	}()
 
-	if err := m.Steps(-1); err != nil {
+	// Target the prerequisite explicitly; newer migrations may follow 0011.
+	if err := m.Migrate(10); err != nil && err != migrate.ErrNoChange {
 		t.Fatalf("migrate down to version 10: %v", err)
 	}
 

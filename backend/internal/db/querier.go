@@ -17,6 +17,7 @@ type Querier interface {
 	ChitTransferPreflight(ctx context.Context, userID uuid.UUID) (ChitTransferPreflightRow, error)
 	CountCategoryMappingsForGroup(ctx context.Context, arg CountCategoryMappingsForGroupParams) (int64, error)
 	CountInstallmentsForChit(ctx context.Context, chitID uuid.UUID) (int64, error)
+	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
 	// Distinct non-settlement daily categories for ghost autocomplete.
 	DailyCategorySuggestions(ctx context.Context, userID uuid.UUID) ([]string, error)
 	DeleteCategoryGroup(ctx context.Context, arg DeleteCategoryGroupParams) error
@@ -24,6 +25,7 @@ type Querier interface {
 	DeleteChit(ctx context.Context, arg DeleteChitParams) (int64, error)
 	DeleteChitInstallment(ctx context.Context, arg DeleteChitInstallmentParams) (int64, error)
 	DeleteLent(ctx context.Context, arg DeleteLentParams) (int64, error)
+	DeleteMissingEventItems(ctx context.Context, arg DeleteMissingEventItemsParams) error
 	DeleteRepayment(ctx context.Context, arg DeleteRepaymentParams) (int64, error)
 	DeleteSettlementLinks(ctx context.Context, settlementID uuid.UUID) error
 	DeleteTemplatesBySection(ctx context.Context, arg DeleteTemplatesBySectionParams) error
@@ -33,6 +35,7 @@ type Querier interface {
 	GetCategoryGroup(ctx context.Context, arg GetCategoryGroupParams) (CategoryGroup, error)
 	GetCategoryMapping(ctx context.Context, arg GetCategoryMappingParams) (CategoryMapping, error)
 	GetChit(ctx context.Context, arg GetChitParams) (GetChitRow, error)
+	GetEvent(ctx context.Context, arg GetEventParams) (Event, error)
 	GetLent(ctx context.Context, arg GetLentParams) (GetLentRow, error)
 	GetMonthState(ctx context.Context, arg GetMonthStateParams) (MonthState, error)
 	GetMonthlyBudget(ctx context.Context, arg GetMonthlyBudgetParams) (MonthlyBudget, error)
@@ -64,6 +67,8 @@ type Querier interface {
 	// Expense credit rows in a half-open [from, to) date window, for the credit
 	// drill-down. Mirrors SumCreditUsage's filter so totals reconcile.
 	ListCreditTransactionsByDateRange(ctx context.Context, arg ListCreditTransactionsByDateRangeParams) ([]Transaction, error)
+	ListEventItems(ctx context.Context, arg ListEventItemsParams) ([]EventItem, error)
+	ListEvents(ctx context.Context, arg ListEventsParams) ([]ListEventsRow, error)
 	ListGroupTransactionsForHistory(ctx context.Context, arg ListGroupTransactionsForHistoryParams) ([]ListGroupTransactionsForHistoryRow, error)
 	ListInstallmentsForChit(ctx context.Context, arg ListInstallmentsForChitParams) ([]ChitInstallment, error)
 	ListLents(ctx context.Context, arg ListLentsParams) ([]ListLentsRow, error)
@@ -90,15 +95,18 @@ type Querier interface {
 	ListTransactionsByYear(ctx context.Context, arg ListTransactionsByYearParams) ([]Transaction, error)
 	ListUnmappedCategoryTexts(ctx context.Context, userID uuid.UUID) ([]string, error)
 	LockChitForUser(ctx context.Context, arg LockChitForUserParams) (Chit, error)
+	LockEvent(ctx context.Context, arg LockEventParams) (Event, error)
 	MarkMonthSeeded(ctx context.Context, arg MarkMonthSeededParams) (MonthState, error)
 	// Open (unsettled) credits in a section, newest first — candidates for a settlement
 	// picker. Excludes any credit already linked to a settlement other than the one
 	// currently being edited (exclude_settlement).
 	OpenCreditsForSection(ctx context.Context, arg OpenCreditsForSectionParams) ([]Transaction, error)
+	SaveEventItem(ctx context.Context, arg SaveEventItemParams) error
 	SearchShortTransactionNameSuggestions(ctx context.Context, arg SearchShortTransactionNameSuggestionsParams) ([]string, error)
 	SearchTransactionNameSuggestions(ctx context.Context, arg SearchTransactionNameSuggestionsParams) ([]string, error)
 	// Credit ids (in this month) that some settlement references — for "Settled" chips.
 	SettledCreditIdsByMonth(ctx context.Context, arg SettledCreditIdsByMonthParams) ([]uuid.UUID, error)
+	SoftDeleteEvent(ctx context.Context, arg SoftDeleteEventParams) error
 	// Total + count of expense credit transactions in a half-open [from, to) date
 	// window. Settlement state is irrelevant: settled and unsettled credits both
 	// count as incurred credit spend.
@@ -121,6 +129,7 @@ type Querier interface {
 	// Set or clear (NULL) the credit card statement closing day. Dedicated so a
 	// currency/theme update never touches this field and vice versa.
 	UpdateCreditStatementDay(ctx context.Context, arg UpdateCreditStatementDayParams) (UserSetting, error)
+	UpdateEvent(ctx context.Context, arg UpdateEventParams) (Event, error)
 	UpdateLent(ctx context.Context, arg UpdateLentParams) (Lent, error)
 	UpdatePreferences(ctx context.Context, arg UpdatePreferencesParams) (UserSetting, error)
 	UpdateRepayment(ctx context.Context, arg UpdateRepaymentParams) (LentRepayment, error)

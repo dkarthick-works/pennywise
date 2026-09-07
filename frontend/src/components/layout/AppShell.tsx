@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { initials } from "../../lib/txns";
 import {
-  IconDashboard, IconLent, IconChit, IconInsights, IconCategories, IconExport, IconSettings, IconProfile, IconMenu, IconPlus,
+  IconDashboard, IconLent, IconChit, IconEvents, IconInsights, IconCategories, IconExport, IconSettings, IconProfile, IconMenu, IconPlus,
 } from "../ui/Icons";
 
 const NAV_CTA = { path: "/record", label: "Record Expense", Icon: IconPlus };
@@ -11,6 +11,7 @@ const NAV_MAIN = [
   { path: "/dashboard",  label: "Dashboard",      Icon: IconDashboard },
   { path: "/lents",      label: "Lent",            Icon: IconLent },
   { path: "/chits",      label: "Chit funds",      Icon: IconChit },
+  { path: "/events",     label: "Events",          Icon: IconEvents },
   { path: "/insights",   label: "Insights",         Icon: IconInsights },
   { path: "/categories", label: "Map Categories",  Icon: IconCategories },
 ];
@@ -35,6 +36,7 @@ export function AppShell({ children }: Props) {
     : "?";
 
   function go(path: string) {
+    if (!window.dispatchEvent(new Event("events:before-navigate", { cancelable: true }))) return;
     navigate(path);
     setNavOpen(false);
   }

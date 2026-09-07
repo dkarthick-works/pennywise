@@ -32,6 +32,9 @@ export const IconDashboard = (p: IcProps) => (
     <rect x="3" y="16" width="7" height="5" rx="1.5" />
   </Ic>
 );
+export const IconEvents = (p: IcProps) => (
+  <Ic {...p}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M7 3v4M17 3v4M3 11h18M8 15h3M8 18h7" /></Ic>
+);
 export const IconRecord = (p: IcProps) => (
   <Ic {...p}>
     <rect x="4" y="3" width="16" height="18" rx="2" />

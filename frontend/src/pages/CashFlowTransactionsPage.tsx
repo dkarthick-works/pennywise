@@ -6,6 +6,7 @@ import { TransactionListTable } from "../components/dashboard/TransactionListTab
 import { IconChevL, IconChevR } from "../components/ui/Icons";
 import { monthLabel } from "../lib/dates";
 import { inr } from "../lib/money";
+import { EventSuggestions } from "../components/events/EventSuggestions";
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
@@ -189,6 +190,8 @@ export function CashFlowTransactionsPage({
           )}
         </div>
       </div>
+
+      <EventSuggestions month={month} />
 
       {isLoading ? (
         <div className="card" style={{ overflow: "hidden" }}>

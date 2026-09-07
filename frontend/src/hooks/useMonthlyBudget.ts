@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { budgetKeys, getMonthlyBudget, putMonthlyBudget } from "../api/ledger";
 import type { Budgets } from "../types";
+import { eventKeys } from "../lib/eventQueryKeys";
 
 export function useMonthlyBudgetQuery(month: string, enabled = true) {
   return useQuery({
@@ -17,6 +18,7 @@ export function useSaveMonthlyBudget() {
       putMonthlyBudget(month, budgets),
     onSuccess: (data, variables) => {
       qc.setQueryData(budgetKeys.month(variables.month), data);
+      void qc.invalidateQueries({ queryKey: eventKeys.suggestions });
       void qc.invalidateQueries({ queryKey: budgetKeys.month(variables.month) });
       void qc.invalidateQueries({ queryKey: ["dashboard", "monthly", variables.month] });
     },

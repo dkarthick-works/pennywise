@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getOpenCredits, updateTxn } from "../../api/ledger";
 import { inr } from "../../lib/money";
 import { prettyDate } from "../../lib/dates";
+import { invalidateMonthCaches } from "../../lib/monthCaches";
 import { IconArrowR, IconCheck } from "../ui/Icons";
 import type { Transaction, TxnKind, Section } from "../../types";
 
@@ -45,7 +46,7 @@ export function StatusCell({ row, section, month, settledSet }: Props) {
 
   const mut = useMutation({
     mutationFn: (patch: Partial<Transaction>) => updateTxn(row.id, patch),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["open-month", month] }),
+    onSuccess: () => invalidateMonthCaches(qc, month),
   });
 
   // Position below the chip when there's room; flip above when there isn't.

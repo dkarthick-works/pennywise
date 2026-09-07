@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -25,6 +26,7 @@ import (
 
 // Server wires together config, the database, and auth into an http.Handler.
 type Server struct {
+	now               func() time.Time
 	cfg               config.Config
 	pool              *pgxpool.Pool
 	q                 *db.Queries
@@ -45,6 +47,7 @@ func NewServerWithTransactionParser(cfg config.Config, pool *pgxpool.Pool, parse
 		return nil, err
 	}
 	return &Server{
+		now:               time.Now,
 		cfg:               cfg,
 		pool:              pool,
 		q:                 db.New(pool),
@@ -64,7 +67,7 @@ func (s *Server) Router() http.Handler {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   s.cfg.CORSOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "If-Match"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -125,6 +128,14 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/category-mappings", s.handleListCategoryMappings)
 		pr.Post("/api/category-mappings", s.handleCreateCategoryMapping)
 		pr.Delete("/api/category-mappings/{id}", s.handleDeleteCategoryMapping)
+
+		pr.Get("/api/events", s.handleListEvents)
+		pr.Post("/api/events", s.handleCreateEvent)
+		pr.Get("/api/events/suggestions", s.handleEventSuggestions)
+		pr.Get("/api/events/{id}", s.handleGetEvent)
+		pr.Put("/api/events/{id}", s.handleUpdateEvent)
+		pr.Delete("/api/events/{id}", s.handleDeleteEvent)
+		pr.Post("/api/events/{id}/duplicate", s.handleDuplicateEvent)
 
 		pr.Get("/api/lents", s.handleListLents)
 		pr.Post("/api/lents", s.handleCreateLent)
