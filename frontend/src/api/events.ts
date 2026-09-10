@@ -29,6 +29,7 @@ export interface PlannedEvent {
   version: number;
   created_at: string;
   updated_at: string;
+  converted_transaction_id: string | null;
   summary: EventSummaryDTO;
 }
 export interface PlannedEventDetail extends PlannedEvent { items: EventItemDTO[] }
@@ -76,9 +77,14 @@ export const createEvent = (body: EventInput) =>
   client.post<PlannedEventDetail>("/api/events", body).then(r => r.data).catch(apiError);
 export const updateEvent = (id: string, body: EventUpdateInput) =>
   client.put<PlannedEventDetail>(`/api/events/${id}`, body).then(r => r.data).catch(apiError);
-export const deleteEvent = (id: string, version: number) =>
-  client.delete(`/api/events/${id}`, { headers: { "If-Match": `"${version}"` } }).then(() => undefined).catch(apiError);
+export const deleteEvent = (id: string, version: number, deleteTransaction?: boolean) =>
+  client.delete(`/api/events/${id}`, {
+    headers: { "If-Match": `"${version}"` },
+    ...(deleteTransaction === undefined ? {} : { params: { delete_transaction: deleteTransaction ? "true" : "false" } }),
+  }).then(() => undefined).catch(apiError);
 export const duplicateEvent = (id: string, body: { name?: string; target_date?: string } = {}) =>
   client.post<PlannedEventDetail>(`/api/events/${id}/duplicate`, body).then(r => r.data).catch(apiError);
+export const convertEvent = (id: string, body: { version: number; date: string; section: "essential" | "flexible" | "daily" }) =>
+  client.post<PlannedEventDetail>(`/api/events/${id}/convert-transaction`, body).then(r => r.data).catch(apiError);
 export const getEventSuggestions = (month: string, timezone: string, offset = 0, signal?: AbortSignal) =>
   client.get<EventSuggestionsPage>("/api/events/suggestions", { params: { month, timezone, limit: 5, offset }, signal }).then(r => r.data).catch(apiError);

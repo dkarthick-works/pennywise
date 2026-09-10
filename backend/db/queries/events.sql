@@ -12,6 +12,12 @@ VALUES ($1,$2,$3,$4,$5,$6) RETURNING *;
 UPDATE events SET name=$3,note=$4,target_date=$5,status=$6,suggestions_enabled=$7,version=version+1,updated_at=now()
 WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL RETURNING *;
 
+-- name: MarkEventConverted :one
+UPDATE events
+SET converted_transaction_id=$3,target_date=$4,version=version+1,updated_at=now()
+WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
+RETURNING *;
+
 -- name: SoftDeleteEvent :exec
 UPDATE events SET deleted_at=now(),updated_at=now(),version=version+1 WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL;
 

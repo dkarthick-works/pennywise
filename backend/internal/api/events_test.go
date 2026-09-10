@@ -157,6 +157,106 @@ func TestEventsCRUDLifecycleDuplicationAndDeletion(t *testing.T) {
 		t.Fatal("event wrote transactions", count, err)
 	}
 }
+
+func TestCompletedEventConversion(t *testing.T) {
+	s, pool, token, uid := setupCategoryAPITest(t)
+	defer pool.Close()
+	max := 999999999999.99
+
+	create := func(name string, items []map[string]any) eventDTO {
+		return decodeEvent(t, eventRequest(t, s, token, "POST", "/api/events", map[string]any{
+			"name": name, "items": items,
+		}, 0), 201)
+	}
+	complete := func(d eventDTO) eventDTO {
+		body := eventPut(d)
+		body["status"] = "completed"
+		return decodeEvent(t, eventRequest(t, s, token, "PUT", "/api/events/"+d.ID.String(), body, 0), 200)
+	}
+
+	exact := complete(create("Exact conversion", []map[string]any{
+		{"name": "Cost", "actual_cost": max, "expected_cost": max},
+	}))
+	path := "/api/events/" + exact.ID.String() + "/convert-transaction"
+	if w := eventRequest(t, s, token, "POST", path, map[string]any{"version": exact.Version, "date": "2026-09-08", "section": "income"}, 0); w.Code != 400 {
+		t.Fatalf("income conversion status %d: %s", w.Code, w.Body.String())
+	}
+	converted := decodeEvent(t, eventRequest(t, s, token, "POST", path, map[string]any{
+		"version": exact.Version, "date": "2026-09-08", "section": "daily",
+	}, 0), 200)
+	if converted.ConvertedTransactionID == nil || converted.TargetDate == nil || *converted.TargetDate != "2026-09-08" {
+		t.Fatalf("conversion did not stamp event: %+v", converted)
+	}
+	if w := eventRequest(t, s, token, "POST", path, map[string]any{
+		"version": converted.Version, "date": "2026-09-08", "section": "daily",
+	}, 0); w.Code != 409 {
+		t.Fatalf("repeat conversion status %d: %s", w.Code, w.Body.String())
+	}
+	var count int
+	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM transactions WHERE user_id=$1", uid).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("transaction count %d: %v", count, err)
+	}
+
+	over := complete(create("Over conversion", []map[string]any{
+		{"name": "Cost 1", "actual_cost": max, "expected_cost": max},
+		{"name": "Cost 2", "actual_cost": max, "expected_cost": max},
+	}))
+	if w := eventRequest(t, s, token, "POST", "/api/events/"+over.ID.String()+"/convert-transaction", map[string]any{
+		"version": over.Version, "date": "2026-09-08", "section": "daily",
+	}, 0); w.Code != 400 || !strings.Contains(w.Body.String(), "maximum") {
+		t.Fatalf("over-limit conversion status %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestConvertedEventDeletionChoices(t *testing.T) {
+	s, pool, token, uid := setupCategoryAPITest(t)
+	defer pool.Close()
+	createCompleted := func(name string) eventDTO {
+		d := decodeEvent(t, eventRequest(t, s, token, "POST", "/api/events", map[string]any{
+			"name": name, "items": []map[string]any{{"name": "Cost", "expected_cost": 100, "actual_cost": 100}},
+		}, 0), 201)
+		body := eventPut(d)
+		body["status"] = "completed"
+		return decodeEvent(t, eventRequest(t, s, token, "PUT", "/api/events/"+d.ID.String(), body, 0), 200)
+	}
+	convert := func(d eventDTO) eventDTO {
+		return decodeEvent(t, eventRequest(t, s, token, "POST", "/api/events/"+d.ID.String()+"/convert-transaction", map[string]any{
+			"version": d.Version, "date": "2026-09-10", "section": "daily",
+		}, 0), 200)
+	}
+
+	keep := convert(createCompleted("Keep transaction"))
+	deletePath := "/api/events/" + keep.ID.String()
+	if w := eventRequest(t, s, token, "DELETE", deletePath, nil, keep.Version); w.Code != 400 {
+		t.Fatalf("missing deletion choice status %d: %s", w.Code, w.Body.String())
+	}
+	if w := eventRequest(t, s, token, "DELETE", deletePath+"?delete_transaction=false", nil, keep.Version); w.Code != 204 {
+		t.Fatalf("keep transaction status %d: %s", w.Code, w.Body.String())
+	}
+	var count int
+	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM transactions WHERE user_id=$1", uid).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("kept transaction count %d: %v", count, err)
+	}
+	reconvert := convert(createCompleted("Reconvert"))
+	if _, err := pool.Exec(context.Background(), "DELETE FROM transactions WHERE id=$1 AND user_id=$2", reconvert.ConvertedTransactionID, uid); err != nil {
+		t.Fatal(err)
+	}
+	reloaded := decodeEvent(t, eventRequest(t, s, token, "GET", "/api/events/"+reconvert.ID.String(), nil, 0), 200)
+	if reloaded.ConvertedTransactionID != nil {
+		t.Fatal("transaction deletion did not clear event association")
+	}
+	_ = convert(reloaded)
+
+	both := convert(createCompleted("Delete both"))
+	bothPath := "/api/events/" + both.ID.String()
+	if w := eventRequest(t, s, token, "DELETE", bothPath+"?delete_transaction=true", nil, both.Version); w.Code != 204 {
+		t.Fatalf("delete both status %d: %s", w.Code, w.Body.String())
+	}
+	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM transactions WHERE user_id=$1", uid).Scan(&count); err != nil || count != 2 {
+		t.Fatalf("deleted transaction count %d: %v", count, err)
+	}
+}
+
 func TestEventSuggestions(t *testing.T) {
 	s, pool, token, uid := setupCategoryAPITest(t)
 	defer pool.Close()

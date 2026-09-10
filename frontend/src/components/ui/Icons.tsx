@@ -62,6 +62,15 @@ export const IconChevR = (p: IcProps) => (
 export const IconChevD = (p: IcProps) => (
   <Ic {...p}><path d="M6 9l6 6 6-6" /></Ic>
 );
+export const IconArrowU = (p: IcProps) => (
+  <Ic {...p}><path d="M12 19V5M6 11l6-6 6 6" /></Ic>
+);
+export const IconArrowD = (p: IcProps) => (
+  <Ic {...p}><path d="M12 5v14M6 13l6 6 6-6" /></Ic>
+);
+export const IconTrash = (p: IcProps) => (
+  <Ic {...p}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" /></Ic>
+);
 export const IconPlus = (p: IcProps) => (
   <Ic {...p}><path d="M12 5v14M5 12h14" /></Ic>
 );

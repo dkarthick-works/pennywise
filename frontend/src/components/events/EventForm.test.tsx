@@ -21,9 +21,17 @@ describe("EventForm", () => {
   });
   it("saves zero actual distinctly from unknown and retains item ID/version", async () => {
     const { save } = mount(eventFixture());
-    fireEvent.change(screen.getByLabelText("Actual incurred so far"), { target: { value: "0" } });
+    fireEvent.change(screen.getByLabelText("Item 1 actual incurred cost"), { target: { value: "0" } });
     fireEvent.click(screen.getByRole("button", { name: "Save event" })); await screen.findByText("Saved detail");
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ version: 1, items: [{ id: "item-1", name: "Service bill", expected_cost: 8000.25, actual_cost: 0 }] }));
+  });
+  it("uses compact table headers and adds editable rows inline", () => {
+    mount(eventFixture());
+    expect(screen.getByText("Expected cost (₹)")).toBeInTheDocument();
+    expect(screen.getByText("Actual incurred so far (₹)")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add row" }));
+    expect(screen.getByLabelText("Item 1 name")).toHaveValue("Service bill");
+    expect(screen.getByLabelText("Item 2 name")).toBeInTheDocument();
   });
   it("reorders retained rows without moving IDs and supports new rows", async () => {
     const event = eventFixture(); event.items.push({ id: "item-2", name: "Second", expected_cost: null, actual_cost: null, position: 1 });

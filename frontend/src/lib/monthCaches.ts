@@ -26,6 +26,21 @@ export function invalidateMonthCaches(qc: QueryClient, month: string): void {
   invalidateCreditCaches(qc);
 }
 
+export function invalidateEventCaches(qc: QueryClient): void {
+  qc.invalidateQueries({ queryKey: eventKeys.lists });
+  qc.invalidateQueries({ queryKey: eventKeys.details });
+  qc.invalidateQueries({ queryKey: eventKeys.suggestions });
+}
+
+export function invalidateAllTransactionCaches(qc: QueryClient): void {
+  qc.invalidateQueries({ queryKey: ["txns"] });
+  qc.invalidateQueries({ queryKey: ["dashboard"] });
+  qc.invalidateQueries({ queryKey: ["group-spend"] });
+  qc.invalidateQueries({ queryKey: ["category-group-txns"] });
+  qc.invalidateQueries({ queryKey: ["open-month"] });
+  invalidateCreditCaches(qc);
+}
+
 export function invalidateTransactionNameSuggestions(
   qc: QueryClient,
   section: string

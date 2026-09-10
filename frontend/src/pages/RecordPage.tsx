@@ -12,6 +12,7 @@ import { monthCode, shiftMonth, MONTH_NAMES, monthLabel, defaultDraftDate } from
 import { settledCreditIds } from "../lib/txns";
 import {
   invalidateMonthCaches,
+  invalidateEventCaches,
   invalidateTransactionNameSuggestionSections,
   invalidateTransactionNameSuggestions,
 } from "../lib/monthCaches";
@@ -266,7 +267,10 @@ function useRowMutations(month: string, section: Section) {
   });
   const del = useMutation({
     mutationFn: (id: string) => deleteTxn(id),
-    onSuccess: () => invalidateMonthCaches(qc, month),
+    onSuccess: () => {
+      invalidateMonthCaches(qc, month);
+      invalidateEventCaches(qc);
+    },
   });
   const add = useMutation({
     mutationFn: (t: Omit<Transaction, "id" | "settled">) => createTxn(t),

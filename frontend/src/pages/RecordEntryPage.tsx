@@ -5,6 +5,7 @@ import { openMonth, createTxn, updateTxn, deleteTxn } from "../api/ledger";
 import { monthCode, shiftMonth, monthLabel, monthKey, defaultDraftDate, shiftDateToMonth, prettyDate } from "../lib/dates";
 import {
   invalidateMonthCaches,
+  invalidateEventCaches,
   invalidateTransactionNameSuggestions,
   invalidateTransactionNameSuggestionSections,
 } from "../lib/monthCaches";
@@ -185,6 +186,7 @@ export function RecordEntryPage({
       setSessionTransactions((prev) => prev.filter((r) => r.id !== id));
       setRowErr("");
       invalidateMonthCaches(qc, txnMonth);
+      invalidateEventCaches(qc);
     },
     onError: (e: unknown, { id }) => {
       setPendingIds((prev) => { const next = new Set(prev); next.delete(id); return next; });

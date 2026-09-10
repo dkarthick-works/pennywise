@@ -25,4 +25,9 @@ describe("Events list", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Planned" })); await screen.findByText("Page 1");
     expect(listEvents).toHaveBeenCalledWith({ status: "planned", limit: 50, offset: 0 }, expect.any(AbortSignal));
   });
+  it("marks converted events as already added to transactions", async () => {
+    vi.mocked(listEvents).mockResolvedValue({ events: [eventFixture({ converted_transaction_id: "txn-1" })], limit: 50, offset: 0, has_more: false });
+    mount();
+    expect(await screen.findByText("In transactions")).toBeInTheDocument();
+  });
 });

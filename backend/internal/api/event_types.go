@@ -50,17 +50,18 @@ type eventItemDTO struct {
 	Position     int32        `json:"position"`
 }
 type eventDTO struct {
-	ID                 uuid.UUID       `json:"id"`
-	Name               string          `json:"name"`
-	Note               string          `json:"note"`
-	TargetDate         *string         `json:"target_date"`
-	Status             string          `json:"status"`
-	SuggestionsEnabled bool            `json:"suggestions_enabled"`
-	Version            int64           `json:"version"`
-	CreatedAt          time.Time       `json:"created_at"`
-	UpdatedAt          time.Time       `json:"updated_at"`
-	Summary            eventSummary    `json:"summary"`
-	Items              *[]eventItemDTO `json:"items,omitempty"`
+	ID                     uuid.UUID       `json:"id"`
+	Name                   string          `json:"name"`
+	Note                   string          `json:"note"`
+	TargetDate             *string         `json:"target_date"`
+	Status                 string          `json:"status"`
+	SuggestionsEnabled     bool            `json:"suggestions_enabled"`
+	Version                int64           `json:"version"`
+	CreatedAt              time.Time       `json:"created_at"`
+	UpdatedAt              time.Time       `json:"updated_at"`
+	ConvertedTransactionID *string         `json:"converted_transaction_id"`
+	Summary                eventSummary    `json:"summary"`
+	Items                  *[]eventItemDTO `json:"items,omitempty"`
 }
 
 func validEventStatus(s string) bool {
@@ -144,6 +145,10 @@ func eventBase(e db.Event) eventDTO {
 	if e.TargetDate.Valid {
 		v := dateToString(e.TargetDate)
 		d.TargetDate = &v
+	}
+	if e.ConvertedTransactionID.Valid {
+		v := uuid.UUID(e.ConvertedTransactionID.Bytes).String()
+		d.ConvertedTransactionID = &v
 	}
 	return d
 }

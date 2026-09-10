@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,7 +10,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/ledger/backend/internal/db"
+	"github.com/ledger/backend/internal/money"
 )
 
 func eventError(w http.ResponseWriter, err error) {
@@ -58,6 +61,108 @@ func (s *Server) handleGetEvent(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) handleCreateEvent(w http.ResponseWriter, r *http.Request) { s.saveEvent(w, r, false) }
 func (s *Server) handleUpdateEvent(w http.ResponseWriter, r *http.Request) { s.saveEvent(w, r, true) }
+
+type convertEventInput struct {
+	Version int64  `json:"version"`
+	Date    string `json:"date"`
+	Section string `json:"section"`
+}
+
+func (s *Server) handleConvertEvent(w http.ResponseWriter, r *http.Request) {
+	id, ok := eventID(w, r)
+	if !ok {
+		return
+	}
+	var in convertEventInput
+	if err := readJSON(r, &in); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if in.Section != "essential" && in.Section != "flexible" && in.Section != "daily" {
+		writeErr(w, http.StatusBadRequest, "conversion section must be essential, flexible, or daily")
+		return
+	}
+	targetDate, err := parseDate(in.Date)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "date must be a valid calendar date")
+		return
+	}
+	ctx := r.Context()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		eventError(w, err)
+		return
+	}
+	defer tx.Rollback(ctx)
+	q := s.q.WithTx(tx)
+	uid := userID(r)
+	event, err := q.LockEvent(ctx, db.LockEventParams{ID: id, UserID: uid})
+	if err != nil {
+		eventError(w, err)
+		return
+	}
+	if event.Version != in.Version {
+		writeErr(w, http.StatusConflict, "event changed; reload before saving")
+		return
+	}
+	if event.Status != "completed" {
+		writeErr(w, http.StatusBadRequest, "only completed events can be converted")
+		return
+	}
+	if event.ConvertedTransactionID.Valid {
+		writeErr(w, http.StatusConflict, "event is already converted to a transaction")
+		return
+	}
+	items, err := q.ListEventItems(ctx, db.ListEventItemsParams{ID: id, UserID: uid})
+	if err != nil {
+		eventError(w, err)
+		return
+	}
+	totalPaise := new(big.Int)
+	for _, item := range items {
+		totalPaise.Add(totalPaise, numericPaise(item.ActualCost))
+	}
+	amount := money.Number(string(paiseJSON(totalPaise)))
+	values := transactionValues{
+		Section: &in.Section, Category: &event.Name, Amount: &amount, Date: &in.Date, Kind: stringPtr("cash"),
+	}
+	if issues := validateTransactionValues(values, true, true); len(issues) > 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "validation failed", "issues": issues})
+		return
+	}
+	numericAmount, err := decimalToNumeric(amount)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	created, err := q.InsertTransaction(ctx, db.InsertTransactionParams{
+		UserID: uid, Section: db.Section(in.Section), Category: event.Name,
+		Amount: numericAmount, TxnDate: targetDate, Kind: db.TxnKindCash,
+	})
+	if err != nil {
+		eventError(w, err)
+		return
+	}
+	event, err = q.MarkEventConverted(ctx, db.MarkEventConvertedParams{
+		ID: id, UserID: uid, ConvertedTransactionID: pgtype.UUID{Bytes: created.ID, Valid: true}, TargetDate: targetDate,
+	})
+	if err != nil {
+		eventError(w, err)
+		return
+	}
+	items, err = q.ListEventItems(ctx, db.ListEventItemsParams{ID: id, UserID: uid})
+	if err != nil {
+		eventError(w, err)
+		return
+	}
+	if err = tx.Commit(ctx); err != nil {
+		eventError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, eventDetail(event, items))
+}
+
+func stringPtr(s string) *string { return &s }
 func (s *Server) saveEvent(w http.ResponseWriter, r *http.Request, update bool) {
 	var id uuid.UUID
 	var ok bool
@@ -184,6 +289,23 @@ func (s *Server) handleDeleteEvent(w http.ResponseWriter, r *http.Request) {
 	if e.Version != version {
 		writeErr(w, 409, "event changed; reload before deleting")
 		return
+	}
+	deleteTransaction := r.URL.Query().Get("delete_transaction")
+	if e.ConvertedTransactionID.Valid && deleteTransaction == "" {
+		writeErr(w, http.StatusBadRequest, "choose whether to delete the associated transaction")
+		return
+	}
+	if deleteTransaction != "" && deleteTransaction != "true" && deleteTransaction != "false" {
+		writeErr(w, http.StatusBadRequest, "delete_transaction must be true or false")
+		return
+	}
+	if deleteTransaction == "true" {
+		if err = q.DeleteTransaction(ctx, db.DeleteTransactionParams{
+			ID: uuid.UUID(e.ConvertedTransactionID.Bytes), UserID: userID(r),
+		}); err != nil {
+			eventError(w, err)
+			return
+		}
 	}
 	if err = q.SoftDeleteEvent(ctx, db.SoftDeleteEventParams{ID: id, UserID: userID(r)}); err == nil {
 		err = tx.Commit(ctx)

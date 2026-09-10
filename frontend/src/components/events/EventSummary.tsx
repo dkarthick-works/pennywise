@@ -3,7 +3,7 @@ import type { EventStatus, EventSummaryDTO, PlannedEvent } from "../../api/event
 import { eventBudgetSnapshot, eventStatusLabel } from "../../lib/events";
 import { money2 } from "../../lib/money";
 import { prettyDate } from "../../lib/dates";
-import { IconCalendar, IconCheck, IconSparkles, IconWrench } from "../ui/Icons";
+import { IconCalendar, IconCheck, IconChevR, IconEvents, IconSparkles } from "../ui/Icons";
 
 export const eventAccountingNote = "Event costs are tracked separately and do not update cash flow. Record payments in Transactions to include them there.";
 export function EventStatusChip({ status }: { status: EventStatus }) {
@@ -24,19 +24,22 @@ export function EventListCard({ event, returnState }: { event: PlannedEvent; ret
   const varianceNote = snap.savedPct != null && snap.remaining > 0 ? `${snap.savedPct}% saved` : snap.overPct != null ? `${snap.overPct}% over` : null;
   return <article className="card card-pad event-list-item" role="listitem">
     <div className="event-list-head">
-      <span className="event-list-icon" aria-hidden="true"><IconWrench size={20} /></span>
+      <span className="event-list-icon" aria-hidden="true"><IconEvents size={20} /></span>
       <div className="event-list-title">
-        <h2 className="event-list-name"><Link to={`/events/${event.id}`} state={returnState}>{event.name}</Link></h2>
+        <div className="event-list-title-row"><h2 className="event-list-name"><Link to={`/events/${event.id}`} state={returnState}>{event.name}</Link></h2><EventStatusChip status={event.status} /></div>
         <span className="muted event-list-date"><IconCalendar size={14} />{event.target_date ? prettyDate(event.target_date) : "Date not set"}</span>
       </div>
-      <EventStatusChip status={event.status} />
+      {event.converted_transaction_id && <span className="chip event-converted-chip">In transactions</span>}
+      <Link className="event-list-open" to={`/events/${event.id}`} state={returnState} aria-label={`Open ${event.name} details`}><IconChevR size={18} /></Link>
     </div>
     <div className="event-list-metrics">
-      <div><span className="stat-lbl">{event.summary.budget_complete ? "Expected" : "Known expected"}</span><div className="num">{money2(event.summary.expected_total)}</div>{!event.summary.budget_complete && <small className="muted">Estimate incomplete · {event.summary.missing_expected_count} missing{!event.summary.item_count ? " · no items" : ""}</small>}</div>
-      <div><span className="stat-lbl">Actual</span><div className="num">{money2(event.summary.actual_total)}</div>{!event.summary.actuals_complete && <small className="muted">{event.summary.item_count ? `Actuals incomplete · ${event.summary.missing_actual_count} missing` : "No costs entered"}</small>}</div>
-      <div><span className="stat-lbl">{varianceLabel}</span><div className={`num${event.summary.expected_total > 0 && snap.remaining > 0 ? " event-list-pos" : event.summary.expected_total > 0 && snap.remaining < 0 ? " event-list-neg" : ""}`}>{event.summary.expected_total <= 0 ? "—" : money2(Math.abs(snap.remaining))}</div>{varianceNote && <small className="muted">{varianceNote}</small>}</div>
+      <div className="event-list-metric event-list-metric-expected"><span className="stat-lbl" title="Total planned cost across event items">{event.summary.budget_complete ? "Expected cost" : "Known expected cost"}</span><div className="num">{money2(event.summary.expected_total)}</div>{!event.summary.budget_complete && <small className="muted">Estimate incomplete · {event.summary.missing_expected_count} missing{!event.summary.item_count ? " · no items" : ""}</small>}</div>
+      <div className="event-list-metric event-list-metric-actual"><span className="stat-lbl" title="Total cost incurred so far">{event.summary.actuals_complete ? "Actual incurred" : "Recorded actual"}</span><div className="num">{money2(event.summary.actual_total)}</div>{!event.summary.actuals_complete && <small className="muted">{event.summary.item_count ? `Actuals incomplete · ${event.summary.missing_actual_count} missing` : "No costs entered"}</small>}</div>
+      <div className={`event-list-metric event-list-metric-variance${event.summary.expected_total > 0 && snap.remaining > 0 ? " event-list-positive" : event.summary.expected_total > 0 && snap.remaining < 0 ? " event-list-negative" : ""}`}><span className="stat-lbl">{varianceLabel}</span><div className="num">{event.summary.expected_total <= 0 ? "—" : money2(Math.abs(snap.remaining))}</div>{varianceNote && <small className="event-list-variance-note"><strong>{varianceNote}</strong></small>}</div>
     </div>
-    <div className="event-list-used"><span>Budget used</span><div className="event-list-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={snap.usedPct ?? 0} aria-label="Budget used"><span style={{ width: `${snap.barPct}%`, background: snap.remaining < 0 ? "var(--neg)" : "var(--accent)" }} /></div><span>{snap.usedPct == null ? "—" : `${snap.usedPct}%`}</span></div>
-    <div className="event-list-foot"><IconSparkles size={14} /><span>Suggestions {event.suggestions_enabled ? "on" : "off"}</span></div>
+    <div className="event-list-used">
+      <div className="event-list-bar-wrap"><div className="event-list-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={snap.usedPct ?? 0} aria-label="Spent versus budget"><span style={{ width: `${snap.barPct}%`, background: snap.remaining < 0 ? "var(--neg)" : "var(--accent)" }} /><i className="event-list-bar-limit" aria-hidden="true" /></div>{snap.usedPct == null ? <span className="event-list-bar-value muted">—</span> : <strong className="event-list-bar-value">{snap.usedPct}% used</strong>}</div>
+    </div>
+    <div className="event-list-foot"><IconSparkles size={16} /><div><strong>Free money</strong><span>{event.suggestions_enabled ? "Shown when it fits your free money" : "Hidden from free-money suggestions"}</span></div><span className={`event-list-suggestion-state${event.suggestions_enabled ? " is-on" : ""}`}>{event.suggestions_enabled ? "On" : "Off"}</span></div>
   </article>;
 }

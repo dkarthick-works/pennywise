@@ -5,6 +5,7 @@ import type { EventInput, EventUpdateInput, PlannedEventDetail } from "../../api
 import { eventDraft, eventStatuses, eventStatusLabel, newEventItem, serializeEvent } from "../../lib/events";
 import type { EventItemDraft } from "../../lib/events";
 import { EventSummary, eventAccountingNote } from "./EventSummary";
+import { IconArrowD, IconArrowU, IconPlus, IconTrash } from "../ui/Icons";
 
 interface Props {
   event?: PlannedEventDetail;
@@ -86,16 +87,23 @@ export function EventForm({ event, onSave, onReload, returnPath }: Props) {
           <div className="field event-span"><label htmlFor="event-note">Note (optional)</label><textarea id="event-note" className="input" rows={3} maxLength={5000} value={draft.note} onChange={e => setDraft({ ...draft, note: e.target.value })} /></div>
         </div>
         <label className="event-checkbox"><input type="checkbox" checked={draft.suggestions} onChange={e => setDraft({ ...draft, suggestions: e.target.checked })} />Suggest this when it fits my free money</label>
-        <div className="event-section-head"><h2 className="card-h">Line items</h2><button type="button" className="btn btn-soft" disabled={draft.items.length >= 500} onClick={() => setDraft({ ...draft, items: [...draft.items, newEventItem()] })}>+ Add item</button></div>
-        <p className="muted">Leave costs blank when unknown; enter 0 for a genuine zero. Actual cost includes unpaid bills. Totals update after saving.</p>
-        {draft.items.length === 0 && <p className="muted">No items yet. You can save this plan now and add estimates later.</p>}
-        <div className="event-items-editor">{draft.items.map((item, index) => <fieldset className="event-item-draft" key={item.key}>
-          <legend>Item {index + 1}</legend>
-          <div className="field"><label htmlFor={`name-${item.key}`}>Item name</label><input id={`name-${item.key}`} className="input" value={item.name} maxLength={200} required onChange={e => patchItem(item.key, { name: e.target.value })} /></div>
-          <div className="field"><label htmlFor={`expected-${item.key}`}>Expected cost</label><input id={`expected-${item.key}`} className="input" inputMode="decimal" placeholder="Not entered" value={item.expected} onChange={e => patchItem(item.key, { expected: e.target.value })} /></div>
-          <div className="field"><label htmlFor={`actual-${item.key}`}>Actual incurred so far</label><input id={`actual-${item.key}`} className="input" inputMode="decimal" placeholder="Not entered" value={item.actual} onChange={e => patchItem(item.key, { actual: e.target.value })} /></div>
-          <div className="event-actions"><button type="button" className="btn btn-ghost" aria-label={`Move item ${index + 1} up`} disabled={index === 0} onClick={() => move(index, -1)}>↑</button><button type="button" className="btn btn-ghost" aria-label={`Move item ${index + 1} down`} disabled={index === draft.items.length - 1} onClick={() => move(index, 1)}>↓</button><button type="button" className="btn btn-ghost" aria-label={`Remove item ${index + 1}`} onClick={() => remove(item)}>Remove</button></div>
-        </fieldset>)}</div>
+        <div className="event-section-head"><h2 className="card-h">Line items</h2><span className="muted">Enter 0 for a genuine zero. Actual cost includes unpaid bills. Totals update after saving.</span></div>
+        {draft.items.length === 0 && <p className="muted event-items-empty">No items yet. You can save this plan now and add estimates later.</p>}
+        <div className="event-items-editor">
+          {draft.items.length > 0 && <div className="event-items-header" aria-hidden="true"><span>#</span><span>Item name</span><span>Expected cost (₹)</span><span>Actual incurred so far (₹)</span><span>Actions</span></div>}
+          {draft.items.map((item, index) => <fieldset className="event-item-row" aria-label={`Line item ${index + 1}`} key={item.key}>
+            <span className="event-item-index">{index + 1}</span>
+            <input id={`name-${item.key}`} className="input" aria-label={`Item ${index + 1} name`} value={item.name} maxLength={200} required onChange={e => patchItem(item.key, { name: e.target.value })} />
+            <input id={`expected-${item.key}`} className="input" aria-label={`Item ${index + 1} expected cost`} inputMode="decimal" placeholder="Not entered" value={item.expected} onChange={e => patchItem(item.key, { expected: e.target.value })} />
+            <input id={`actual-${item.key}`} className="input" aria-label={`Item ${index + 1} actual incurred cost`} inputMode="decimal" placeholder="Not entered" value={item.actual} onChange={e => patchItem(item.key, { actual: e.target.value })} />
+            <div className="event-item-actions">
+              <button type="button" className="btn btn-ghost" aria-label={`Move item ${index + 1} up`} disabled={index === 0} onClick={() => move(index, -1)}><IconArrowU size={17} /></button>
+              <button type="button" className="btn btn-ghost" aria-label={`Move item ${index + 1} down`} disabled={index === draft.items.length - 1} onClick={() => move(index, 1)}><IconArrowD size={17} /></button>
+              <button type="button" className="btn btn-ghost event-item-delete" aria-label={`Remove item ${index + 1}`} onClick={() => remove(item)}><IconTrash size={17} /></button>
+            </div>
+          </fieldset>)}
+          <button type="button" className="event-add-row" disabled={draft.items.length >= 500} onClick={() => setDraft({ ...draft, items: [...draft.items, newEventItem()] })}><IconPlus size={17} /> Add row</button>
+        </div>
       </fieldset>
       {error && <p className="err-msg" role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
       {blocked && <button type="button" className="btn btn-soft" onClick={() => void reload()} disabled={pending}>Discard draft and reload</button>}

@@ -143,6 +143,7 @@ func (s *Server) Router() http.Handler {
 		pr.Put("/api/events/{id}", s.handleUpdateEvent)
 		pr.Delete("/api/events/{id}", s.handleDeleteEvent)
 		pr.Post("/api/events/{id}/duplicate", s.handleDuplicateEvent)
+		pr.Post("/api/events/{id}/convert-transaction", s.handleConvertEvent)
 
 		pr.Get("/api/lents", s.handleListLents)
 		pr.Post("/api/lents", s.handleCreateLent)

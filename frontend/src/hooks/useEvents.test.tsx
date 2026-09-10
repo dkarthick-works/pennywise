@@ -33,6 +33,18 @@ describe("event mutation caches", () => {
     await act(async () => { await result.current.remove.mutateAsync({ id: event.id, version: 1 }); });
     expect(api.deleteEvent).toHaveBeenCalledWith(event.id, 1); expect(qc.getQueryData(eventKeys.detail(event.id))).toBeUndefined();
   });
+  it("invalidates transaction caches when deleting linked transaction", async () => {
+    const { qc, wrapper } = setup(); const event = eventFixture({ converted_transaction_id: "txn-1" });
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    vi.mocked(api.deleteEvent).mockResolvedValue(undefined);
+    const { result } = renderHook(useEventMutations, { wrapper });
+    await act(async () => { await result.current.remove.mutateAsync({ id: event.id, version: 2, deleteTransaction: true }); });
+    expect(api.deleteEvent).toHaveBeenCalledWith(event.id, 2, true);
+    const keys = spy.mock.calls.map(c => c[0]?.queryKey);
+    expect(keys).toContainEqual(eventKeys.lists);
+    expect(keys).toContainEqual(["txns"]);
+    expect(keys).toContainEqual(["dashboard"]);
+  });
   it("budget changes invalidate event suggestions", async () => {
     const { qc, wrapper } = setup(); const spy = vi.spyOn(qc, "invalidateQueries");
     vi.mocked(putMonthlyBudget).mockResolvedValue({ month: "2026-09", essential: 1, flexible: 2, daily: 3 });

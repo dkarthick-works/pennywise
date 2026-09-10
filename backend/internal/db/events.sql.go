@@ -14,7 +14,7 @@ import (
 
 const createEvent = `-- name: CreateEvent :one
 INSERT INTO events(user_id,name,note,target_date,status,suggestions_enabled)
-VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, user_id, name, note, target_date, status, suggestions_enabled, version, created_at, updated_at, deleted_at
+VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, user_id, name, note, target_date, status, suggestions_enabled, version, created_at, updated_at, deleted_at, converted_transaction_id
 `
 
 type CreateEventParams struct {
@@ -48,6 +48,7 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (Event
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.ConvertedTransactionID,
 	)
 	return i, err
 }
@@ -67,7 +68,7 @@ func (q *Queries) DeleteMissingEventItems(ctx context.Context, arg DeleteMissing
 }
 
 const getEvent = `-- name: GetEvent :one
-SELECT id, user_id, name, note, target_date, status, suggestions_enabled, version, created_at, updated_at, deleted_at FROM events WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
+SELECT id, user_id, name, note, target_date, status, suggestions_enabled, version, created_at, updated_at, deleted_at, converted_transaction_id FROM events WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
 `
 
 type GetEventParams struct {
@@ -90,6 +91,7 @@ func (q *Queries) GetEvent(ctx context.Context, arg GetEventParams) (Event, erro
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.ConvertedTransactionID,
 	)
 	return i, err
 }
@@ -134,7 +136,7 @@ func (q *Queries) ListEventItems(ctx context.Context, arg ListEventItemsParams) 
 }
 
 const listEvents = `-- name: ListEvents :many
-SELECT e.id, e.user_id, e.name, e.note, e.target_date, e.status, e.suggestions_enabled, e.version, e.created_at, e.updated_at, e.deleted_at, COUNT(i.id)::bigint AS item_count,
+SELECT e.id, e.user_id, e.name, e.note, e.target_date, e.status, e.suggestions_enabled, e.version, e.created_at, e.updated_at, e.deleted_at, e.converted_transaction_id, COUNT(i.id)::bigint AS item_count,
  COALESCE(SUM(i.expected_cost),0)::numeric AS expected_total,
  COALESCE(SUM(i.actual_cost),0)::numeric AS actual_total,
  COUNT(i.id) FILTER (WHERE i.expected_cost IS NULL)::bigint AS missing_expected_count,
@@ -162,22 +164,23 @@ type ListEventsParams struct {
 }
 
 type ListEventsRow struct {
-	ID                   uuid.UUID          `json:"id"`
-	UserID               uuid.UUID          `json:"user_id"`
-	Name                 string             `json:"name"`
-	Note                 string             `json:"note"`
-	TargetDate           pgtype.Date        `json:"target_date"`
-	Status               string             `json:"status"`
-	SuggestionsEnabled   bool               `json:"suggestions_enabled"`
-	Version              int64              `json:"version"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt            pgtype.Timestamptz `json:"deleted_at"`
-	ItemCount            int64              `json:"item_count"`
-	ExpectedTotal        pgtype.Numeric     `json:"expected_total"`
-	ActualTotal          pgtype.Numeric     `json:"actual_total"`
-	MissingExpectedCount int64              `json:"missing_expected_count"`
-	MissingActualCount   int64              `json:"missing_actual_count"`
+	ID                     uuid.UUID          `json:"id"`
+	UserID                 uuid.UUID          `json:"user_id"`
+	Name                   string             `json:"name"`
+	Note                   string             `json:"note"`
+	TargetDate             pgtype.Date        `json:"target_date"`
+	Status                 string             `json:"status"`
+	SuggestionsEnabled     bool               `json:"suggestions_enabled"`
+	Version                int64              `json:"version"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt              pgtype.Timestamptz `json:"deleted_at"`
+	ConvertedTransactionID pgtype.UUID        `json:"converted_transaction_id"`
+	ItemCount              int64              `json:"item_count"`
+	ExpectedTotal          pgtype.Numeric     `json:"expected_total"`
+	ActualTotal            pgtype.Numeric     `json:"actual_total"`
+	MissingExpectedCount   int64              `json:"missing_expected_count"`
+	MissingActualCount     int64              `json:"missing_actual_count"`
 }
 
 func (q *Queries) ListEvents(ctx context.Context, arg ListEventsParams) ([]ListEventsRow, error) {
@@ -209,6 +212,7 @@ func (q *Queries) ListEvents(ctx context.Context, arg ListEventsParams) ([]ListE
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.ConvertedTransactionID,
 			&i.ItemCount,
 			&i.ExpectedTotal,
 			&i.ActualTotal,
@@ -226,7 +230,7 @@ func (q *Queries) ListEvents(ctx context.Context, arg ListEventsParams) ([]ListE
 }
 
 const lockEvent = `-- name: LockEvent :one
-SELECT id, user_id, name, note, target_date, status, suggestions_enabled, version, created_at, updated_at, deleted_at FROM events WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL FOR UPDATE
+SELECT id, user_id, name, note, target_date, status, suggestions_enabled, version, created_at, updated_at, deleted_at, converted_transaction_id FROM events WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL FOR UPDATE
 `
 
 type LockEventParams struct {
@@ -249,6 +253,46 @@ func (q *Queries) LockEvent(ctx context.Context, arg LockEventParams) (Event, er
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.ConvertedTransactionID,
+	)
+	return i, err
+}
+
+const markEventConverted = `-- name: MarkEventConverted :one
+UPDATE events
+SET converted_transaction_id=$3,target_date=$4,version=version+1,updated_at=now()
+WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
+RETURNING id, user_id, name, note, target_date, status, suggestions_enabled, version, created_at, updated_at, deleted_at, converted_transaction_id
+`
+
+type MarkEventConvertedParams struct {
+	ID                     uuid.UUID   `json:"id"`
+	UserID                 uuid.UUID   `json:"user_id"`
+	ConvertedTransactionID pgtype.UUID `json:"converted_transaction_id"`
+	TargetDate             pgtype.Date `json:"target_date"`
+}
+
+func (q *Queries) MarkEventConverted(ctx context.Context, arg MarkEventConvertedParams) (Event, error) {
+	row := q.db.QueryRow(ctx, markEventConverted,
+		arg.ID,
+		arg.UserID,
+		arg.ConvertedTransactionID,
+		arg.TargetDate,
+	)
+	var i Event
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Note,
+		&i.TargetDate,
+		&i.Status,
+		&i.SuggestionsEnabled,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ConvertedTransactionID,
 	)
 	return i, err
 }
@@ -298,7 +342,7 @@ func (q *Queries) SoftDeleteEvent(ctx context.Context, arg SoftDeleteEventParams
 
 const updateEvent = `-- name: UpdateEvent :one
 UPDATE events SET name=$3,note=$4,target_date=$5,status=$6,suggestions_enabled=$7,version=version+1,updated_at=now()
-WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL RETURNING id, user_id, name, note, target_date, status, suggestions_enabled, version, created_at, updated_at, deleted_at
+WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL RETURNING id, user_id, name, note, target_date, status, suggestions_enabled, version, created_at, updated_at, deleted_at, converted_transaction_id
 `
 
 type UpdateEventParams struct {
@@ -334,6 +378,7 @@ func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) (Event
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.ConvertedTransactionID,
 	)
 	return i, err
 }

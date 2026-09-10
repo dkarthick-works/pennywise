@@ -96,6 +96,7 @@ type Querier interface {
 	ListUnmappedCategoryTexts(ctx context.Context, userID uuid.UUID) ([]string, error)
 	LockChitForUser(ctx context.Context, arg LockChitForUserParams) (Chit, error)
 	LockEvent(ctx context.Context, arg LockEventParams) (Event, error)
+	MarkEventConverted(ctx context.Context, arg MarkEventConvertedParams) (Event, error)
 	MarkMonthSeeded(ctx context.Context, arg MarkMonthSeededParams) (MonthState, error)
 	// Open (unsettled) credits in a section, newest first — candidates for a settlement
 	// picker. Excludes any credit already linked to a settlement other than the one
