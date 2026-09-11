@@ -64,6 +64,16 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
 
 ## Recent features (see sub-READMEs for detail)
 
+- **Per-month budgets** — Essential, Flexible, and Daily amounts stored per calendar
+  month (`GET`/`PUT /api/budgets/{month}`); Record, Settings, and dashboard section
+  cards read the shell month
+  ([frontend/README.md § Settings page](frontend/README.md),
+  [backend/README.md § Monthly budgets](backend/README.md))
+- **Cash flow drill-down** — Cash Flow hero card opens section-grouped cash +
+  settlement transactions with balance remaining, free money, and optional per-section
+  budget-remaining breakdown
+  ([frontend/README.md § Dashboard page](frontend/README.md),
+  [backend/README.md § Dashboard](backend/README.md))
 - **AI transaction parsing** — natural-language previews on Quick add (`/record/entry`);
   `POST /api/transactions/parse` (OpenRouter-backed, never writes)
   ([frontend/README.md § AI quick add](frontend/README.md),
