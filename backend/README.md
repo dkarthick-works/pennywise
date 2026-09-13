@@ -344,10 +344,11 @@ most two decimal places.
 
 ### Events (`/api/events`)
 
-Standalone event planning API. **Event costs are tracked separately and do not
-update cash flow. Record payments in Transactions to include them there.** Actual
-cost is cumulative cost incurred, including unpaid bills, not a payment ledger.
-No event operation changes transactions, budgets, or the free-money formula.
+Standalone event planning API. **Event item costs are tracked separately from the
+ledger until you convert or record transactions manually.** Actual cost is
+cumulative cost incurred, including unpaid bills, not a payment ledger. Create,
+update, duplicate, and soft-delete (without conversion) do not change
+transactions, monthly budgets, or the free-money formula.
 
 | Method | Path | Result |
 | --- | --- | --- |
@@ -357,6 +358,7 @@ No event operation changes transactions, budgets, or the free-money formula.
 | PUT | `/api/events/{id}` | Atomic full replacement of editable fields/items |
 | DELETE | `/api/events/{id}` | Soft delete, `204`; header `If-Match: "1"` required |
 | POST | `/api/events/{id}/duplicate` | Copy planning data, `201`; send `{}` or name/date overrides |
+| POST | `/api/events/{id}/convert-transaction` | Create one cash transaction from a completed event, `200` |
 | GET | `/api/events/suggestions?month=YYYY-MM&timezone=Asia/Kolkata` | Current-month recommendations |
 
 All routes require authentication. Other users' and deleted events return `404`.
@@ -390,7 +392,23 @@ position, and old items absent from the array are removed. Duplicate or foreign
 item IDs are rejected. All writes are atomic. `version` starts at 1 and increments
 on update/deletion; stale PUT versions or DELETE If-Match versions return `409`.
 Reload before retrying. DELETE requires a single quoted positive version (not a
-wildcard or weak ETag); deleting again returns `404`.
+wildcard or weak ETag); deleting again returns `404`. When
+`converted_transaction_id` is set, DELETE also requires query
+`delete_transaction=true` or `delete_transaction=false` (`400` if omitted).
+`false` soft-deletes the event and leaves the linked transaction; `true` deletes
+both in one transaction. Events without a conversion link behave as before (no
+query param).
+
+**Convert to transaction** — `POST /api/events/{id}/convert-transaction` with
+`version`, `date` (`YYYY-MM-DD`), and `section` (`essential`, `flexible`, or
+`daily` only). The event must be `completed`, not already converted, and pass
+normal transaction validation. The handler inserts one `cash` row: category is
+the event name, amount is the sum of item actual costs (paise-accurate), and
+`txn_date` is the supplied date. It stamps `converted_transaction_id` and sets
+`target_date` to the conversion date, then bumps `version`. Repeat conversion
+returns `409`. Totals above the transaction maximum return `400`. The foreign
+key uses `ON DELETE SET NULL`, so deleting the transaction elsewhere clears the
+link and conversion can be retried.
 
 Money fields are JSON numbers or `null`: null means not entered, zero means an
 explicit zero. Nonnegative values through `999999999999.99`, at most two decimal
@@ -399,9 +417,10 @@ places. Excess precision is rejected, not rounded. Numeric tokens are bounded to
 max 5,000 characters; at most 500 items and 1 MiB per request. Actual cost may
 exceed expected cost. Invalid input returns `400`, oversized bodies `413`.
 
-Detail/create/update/duplicate responses include `id`, `name`, `note`,
+Detail/create/update/duplicate/conversion responses include `id`, `name`, `note`,
 `target_date`, `status`, `suggestions_enabled`, `version`, `created_at`,
-`updated_at`, `items` (with id/name/costs/position), and a backend-computed summary:
+`updated_at`, `converted_transaction_id` (`null` until converted), `items` (with
+id/name/costs/position), and a backend-computed summary:
 
 ```json
 {
