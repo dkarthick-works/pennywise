@@ -57,13 +57,17 @@ Health check: `GET /health` (also used by the container `HEALTHCHECK`).
 
 ```
 backend/              Go API, migrations, sqlc queries, dev Postgres compose
-frontend/             React SPA (Record, Dashboard, Lent, Chits, Insights, Categories, Settings, Profile)
+frontend/             React SPA (Record, Dashboard, Lent, Chits, Events, Insights, Categories, Settings, Profile)
 auth-api-spec.json    Goauth OpenAPI spec (signup, login, refresh, …)
 Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine runtime
 ```
 
 ## Recent features (see sub-READMEs for detail)
 
+- **Events** — standalone cost plans, free-money suggestions on Cash Flow, optional
+  one-shot **convert to transaction** for completed events
+  ([frontend/README.md § Events](frontend/README.md),
+  [backend/README.md § Events](backend/README.md))
 - **AI transaction parsing** — natural-language previews on Quick add (`/record/entry`);
   `POST /api/transactions/parse` (OpenRouter-backed, never writes)
   ([frontend/README.md § AI quick add](frontend/README.md),
