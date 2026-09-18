@@ -145,6 +145,10 @@ func (s *Server) Router() http.Handler {
 		pr.Post("/api/events/{id}/duplicate", s.handleDuplicateEvent)
 		pr.Post("/api/events/{id}/convert-transaction", s.handleConvertEvent)
 
+		pr.Get("/api/reserves", s.handleListReserves)
+		pr.Post("/api/reserves", s.handleCreateReserve)
+		pr.Patch("/api/reserves/{id}", s.handleRenameReserve)
+
 		pr.Get("/api/lents", s.handleListLents)
 		pr.Post("/api/lents", s.handleCreateLent)
 		pr.Get("/api/lents/export", s.handleExportLents)

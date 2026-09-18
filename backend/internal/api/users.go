@@ -47,6 +47,9 @@ func (s *Server) provisionUser(ctx context.Context, id auth.Identity) error {
 	if _, err := qtx.EnsureSettings(ctx, id.UserID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
+	if err := qtx.EnsureGeneralReserve(ctx, id.UserID); err != nil {
+		return err
+	}
 
 	return tx.Commit(ctx)
 }

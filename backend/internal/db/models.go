@@ -204,6 +204,42 @@ type MonthlyBudget struct {
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Reserve struct {
+	ID         uuid.UUID          `json:"id"`
+	UserID     uuid.UUID          `json:"user_id"`
+	Name       string             `json:"name"`
+	IsGeneral  bool               `json:"is_general"`
+	ArchivedAt pgtype.Timestamptz `json:"archived_at"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ReserveEntry struct {
+	ID          uuid.UUID          `json:"id"`
+	OperationID uuid.UUID          `json:"operation_id"`
+	ReserveID   uuid.UUID          `json:"reserve_id"`
+	Direction   string             `json:"direction"`
+	Amount      pgtype.Numeric     `json:"amount"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
+type ReserveOperation struct {
+	ID            uuid.UUID          `json:"id"`
+	UserID        uuid.UUID          `json:"user_id"`
+	OperationType string             `json:"operation_type"`
+	OccurredOn    pgtype.Date        `json:"occurred_on"`
+	Description   string             `json:"description"`
+	Note          string             `json:"note"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ReserveOperationTransaction struct {
+	ReserveOperationID uuid.UUID `json:"reserve_operation_id"`
+	TransactionID      uuid.UUID `json:"transaction_id"`
+	Role               string    `json:"role"`
+}
+
 type SettlementLink struct {
 	SettlementID uuid.UUID `json:"settlement_id"`
 	CreditID     uuid.UUID `json:"credit_id"`

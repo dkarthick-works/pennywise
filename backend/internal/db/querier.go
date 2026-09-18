@@ -15,9 +15,11 @@ type Querier interface {
 	CategoryTextExistsForUser(ctx context.Context, arg CategoryTextExistsForUserParams) (bool, error)
 	ChitTransferChitPreflight(ctx context.Context, arg ChitTransferChitPreflightParams) (ChitTransferChitPreflightRow, error)
 	ChitTransferPreflight(ctx context.Context, userID uuid.UUID) (ChitTransferPreflightRow, error)
+	CountActiveReserves(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountCategoryMappingsForGroup(ctx context.Context, arg CountCategoryMappingsForGroupParams) (int64, error)
 	CountInstallmentsForChit(ctx context.Context, chitID uuid.UUID) (int64, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
+	CreateReserve(ctx context.Context, arg CreateReserveParams) (Reserve, error)
 	// Distinct non-settlement daily categories for ghost autocomplete.
 	DailyCategorySuggestions(ctx context.Context, userID uuid.UUID) ([]string, error)
 	DeleteCategoryGroup(ctx context.Context, arg DeleteCategoryGroupParams) error
@@ -30,6 +32,7 @@ type Querier interface {
 	DeleteSettlementLinks(ctx context.Context, settlementID uuid.UUID) error
 	DeleteTemplatesBySection(ctx context.Context, arg DeleteTemplatesBySectionParams) error
 	DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) error
+	EnsureGeneralReserve(ctx context.Context, userID uuid.UUID) error
 	// Create the default settings row for a user if it does not exist yet.
 	EnsureSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
 	GetCategoryGroup(ctx context.Context, arg GetCategoryGroupParams) (CategoryGroup, error)
@@ -39,6 +42,8 @@ type Querier interface {
 	GetLent(ctx context.Context, arg GetLentParams) (GetLentRow, error)
 	GetMonthState(ctx context.Context, arg GetMonthStateParams) (MonthState, error)
 	GetMonthlyBudget(ctx context.Context, arg GetMonthlyBudgetParams) (MonthlyBudget, error)
+	GetReserveForUser(ctx context.Context, arg GetReserveForUserParams) (GetReserveForUserRow, error)
+	GetReserveForUserForUpdate(ctx context.Context, arg GetReserveForUserForUpdateParams) (Reserve, error)
 	GetSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
 	GetTransaction(ctx context.Context, arg GetTransactionParams) (Transaction, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
@@ -79,6 +84,7 @@ type Querier interface {
 	ListPopularTransactionNameSuggestions(ctx context.Context, arg ListPopularTransactionNameSuggestionsParams) ([]string, error)
 	ListRepaymentsForLent(ctx context.Context, arg ListRepaymentsForLentParams) ([]ListRepaymentsForLentRow, error)
 	ListRepaymentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListRepaymentsForTransferRow, error)
+	ListReserves(ctx context.Context, arg ListReservesParams) ([]ListReservesRow, error)
 	// ---- settlement links --------------------------------------------------
 	// All (settlement_id, credit_id) pairs where the SETTLEMENT falls in the month.
 	ListSettlementLinksByMonth(ctx context.Context, arg ListSettlementLinksByMonthParams) ([]SettlementLink, error)
@@ -96,12 +102,16 @@ type Querier interface {
 	ListUnmappedCategoryTexts(ctx context.Context, userID uuid.UUID) ([]string, error)
 	LockChitForUser(ctx context.Context, arg LockChitForUserParams) (Chit, error)
 	LockEvent(ctx context.Context, arg LockEventParams) (Event, error)
+	LockUserForReserveCount(ctx context.Context, userID uuid.UUID) (uuid.UUID, error)
 	MarkEventConverted(ctx context.Context, arg MarkEventConvertedParams) (Event, error)
 	MarkMonthSeeded(ctx context.Context, arg MarkMonthSeededParams) (MonthState, error)
 	// Open (unsettled) credits in a section, newest first — candidates for a settlement
 	// picker. Excludes any credit already linked to a settlement other than the one
 	// currently being edited (exclude_settlement).
 	OpenCreditsForSection(ctx context.Context, arg OpenCreditsForSectionParams) ([]Transaction, error)
+	RenameReserve(ctx context.Context, arg RenameReserveParams) (Reserve, error)
+	ReserveBalance(ctx context.Context, reserveID uuid.UUID) (pgtype.Numeric, error)
+	ReserveNameExists(ctx context.Context, arg ReserveNameExistsParams) (bool, error)
 	SaveEventItem(ctx context.Context, arg SaveEventItemParams) error
 	SearchShortTransactionNameSuggestions(ctx context.Context, arg SearchShortTransactionNameSuggestionsParams) ([]string, error)
 	SearchTransactionNameSuggestions(ctx context.Context, arg SearchTransactionNameSuggestionsParams) ([]string, error)

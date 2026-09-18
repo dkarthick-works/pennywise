@@ -426,3 +426,42 @@ export interface ChitInstallmentInput {
   amount: number;
   note: string;
 }
+
+// ─── Reserves (isolated allocation ledger) ────────────────────────────────
+
+export interface Reserve {
+  id: string;
+  name: string;
+  is_general: boolean;
+  archived: boolean;
+  balance: number;
+}
+
+export interface ReserveInput {
+  name: string;
+}
+
+export type ReserveOperationType =
+  | "deposit"
+  | "reserve_spend"
+  | "move_to_income"
+  | "funded_expense"
+  | "transfer";
+
+export type ReserveEntryDirection = "deposit" | "withdrawal";
+
+export interface ReserveEntry {
+  id: string;
+  reserve_id: string;
+  direction: ReserveEntryDirection;
+  amount: number;
+}
+
+export interface ReserveOperation {
+  id: string;
+  operation_type: ReserveOperationType;
+  date: string;
+  description: string;
+  note: string;
+  entries: ReserveEntry[];
+}

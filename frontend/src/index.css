@@ -703,3 +703,18 @@ input, button { font-family: inherit; }
 @media (max-width: 560px) {
   .hide-sm { display: none !important; }
 }
+
+/* ============ RESERVES ============ */
+.reserve-create-button { width: auto; }
+.reserve-summary { margin-bottom: var(--card-gap); }
+.reserve-summary .stat-big { margin: 6px 0; }
+.reserve-summary .muted { margin: 0; }
+.reserve-grid { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.reserve-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.reserve-card-head .chip { margin-top: 8px; }
+.reserve-balance { font-size: 20px; }
+.reserve-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.reserve-actions .btn { width: auto; }
+.reserve-create { margin-bottom: var(--card-gap); }
+.reserve-create .card-h, .reserve-rename label { margin-bottom: 10px; }
+.reserve-create label, .reserve-rename label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
