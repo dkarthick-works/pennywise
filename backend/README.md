@@ -58,7 +58,9 @@ lifecycle state; `reserve_operations` records user intent; and signed
 an operation, without adding reserve flags to transaction rows. Provisioning uses
 an idempotent insert backed by a partial unique index so every user has exactly one
 renameable General Reserve. Creating a reserve locks the user row before enforcing
-the five-active-reserve limit.
+the five-active-reserve limit. Direct deposits create one operation and one
+positive entry per distinct active-reserve allocation in a transaction. They
+never create normal transaction rows, so existing analytics remain unchanged.
 
 ## Layout
 
@@ -161,6 +163,8 @@ only ever talks to this origin.
 | GET    | `/api/reserves?include_archived=false` | list user-owned reserves with entry-derived balances |
 | POST   | `/api/reserves` | create an active reserve (maximum five, including General) |
 | PATCH  | `/api/reserves/{id}` | rename a user-owned reserve, including General |
+| GET    | `/api/reserve-operations?year=YYYY` | list direct reserve deposits with allocation details in reverse chronology |
+| POST   | `/api/reserve-operations/deposits` | atomically create one direct deposit with one or more distinct allocations |
 | GET    | `/api/lents?status=open\|settled\|all` | list money lent to others (default `all`) |
 | POST   | `/api/lents` | create a lent |
 | GET    | `/api/lents/export` | download all lents and repayments as a versioned JSON archive |

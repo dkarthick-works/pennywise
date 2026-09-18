@@ -718,3 +718,26 @@ input, button { font-family: inherit; }
 .reserve-create { margin-bottom: var(--card-gap); }
 .reserve-create .card-h, .reserve-rename label { margin-bottom: 10px; }
 .reserve-create label, .reserve-rename label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.reserve-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.reserve-head-actions .btn { width: auto; }
+.reserve-deposit-fields { display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 12px; margin-top: 14px; }
+.reserve-deposit-fields label, .reserve-allocation label { display: block; margin-bottom: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.reserve-allocations { border: 0; padding: 0; margin: 18px 0 0; }
+.reserve-allocations legend { margin-bottom: 8px; font-weight: 650; }
+.reserve-allocation { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(140px, 1fr) auto; align-items: end; gap: 10px; margin-top: 10px; }
+.reserve-allocation .btn { margin-bottom: 1px; }
+.reserve-deposit-total { margin-top: 16px; padding: 12px; border-radius: var(--r-sm); background: var(--surface-2); }
+.reserve-history { margin-top: 30px; }
+.reserve-history > .page-title { margin-bottom: 14px; font-size: 20px; }
+.reserve-operation h3 { margin: 10px 0 2px; }
+.reserve-operation ul { margin: 14px 0 0; padding-left: 20px; color: var(--ink-2); }
+.reserve-operation li + li { margin-top: 5px; }
+@media (max-width: 700px) {
+  .reserve-deposit-fields, .reserve-allocation { grid-template-columns: 1fr; }
+  .reserve-allocation .btn { justify-self: start; }
+}
+.reserve-history-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+.reserve-history-head > .page-title { font-size: 20px; }
+.reserve-history-filters { display: grid; grid-template-columns: auto 100px auto minmax(160px, 1fr); align-items: center; gap: 8px; }
+.reserve-history-filters label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+@media (max-width: 560px) { .reserve-history-filters { width: 100%; grid-template-columns: auto 1fr; } }

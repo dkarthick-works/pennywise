@@ -333,8 +333,11 @@ autosave):
 Nav item: **Reserves** (`/reserves`). The page lists entry-derived aggregate and
 individual balances from a ledger isolated from normal transactions. Every user
 starts with one renameable General Reserve and can create or rename reserves up to
-a five-active-reserve limit. General Reserve management intentionally omits
-archive and delete actions. API wrappers and centralized query keys live in
+a five-active-reserve limit. **Add to reserves** records one direct deposit with
+one or more distinct allocations, previews the allocated total, and keeps the
+activity outside normal income and spending. The page shows reverse-chronological
+deposit history with allocation details. General Reserve management intentionally
+omits archive and delete actions. API wrappers and centralized query keys live in
 `src/api/reserves.ts`.
 
 ## Lent page

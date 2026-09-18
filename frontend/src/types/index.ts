@@ -453,6 +453,7 @@ export type ReserveEntryDirection = "deposit" | "withdrawal";
 export interface ReserveEntry {
   id: string;
   reserve_id: string;
+  reserve_name: string;
   direction: ReserveEntryDirection;
   amount: number;
 }
@@ -463,5 +464,20 @@ export interface ReserveOperation {
   date: string;
   description: string;
   note: string;
+  total: number;
   entries: ReserveEntry[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReserveAllocationInput {
+  reserve_id: string;
+  amount: number;
+}
+
+export interface ReserveDepositInput {
+  description: string;
+  date: string;
+  note: string;
+  allocations: ReserveAllocationInput[];
 }

@@ -172,6 +172,195 @@ func TestReserveOwnershipUsesNotFoundResponse(t *testing.T) {
 	assertReserveError(t, apiRequest(t, srv, otherToken, http.MethodPatch, "/api/reserves/"+reserve.ID, map[string]any{"name": "Stolen"}), http.StatusNotFound, "reserve not found")
 }
 
+func TestSplitReserveDepositCreatesOneIsolatedOperation(t *testing.T) {
+	srv, pool, token, userID := setupCategoryAPITest(t)
+	defer pool.Close()
+
+	general := listTestReserves(t, srv, token, false)[0]
+	ceremony := createTestReserve(t, srv, token, "Ceremony Reserve")
+	loan := createTestReserve(t, srv, token, "Loan Reserve")
+	insertTxn(t, pool, userID, "income", "Salary", 85000, "2026-09-01", "cash")
+	analyticsPaths := []string{
+		"/api/dashboard/monthly?month=2026-09",
+		"/api/dashboard/credit-usage?month=2026-09",
+		"/api/budgets",
+		"/api/categories/unmapped",
+		"/api/insights",
+		"/api/transactions?month=2026-09",
+	}
+	beforeAnalytics := make(map[string]string, len(analyticsPaths))
+	for _, path := range analyticsPaths {
+		beforeAnalytics[path] = apiRequest(t, srv, token, http.MethodGet, path, nil).Body.String()
+	}
+
+	rr := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{
+		"description": "  RSU vest  ",
+		"date":        "2026-09-18",
+		"note":        "September vest",
+		"allocations": []map[string]any{
+			{"reserve_id": ceremony.ID, "amount": 100000},
+			{"reserve_id": loan.ID, "amount": 100000},
+			{"reserve_id": general.ID, "amount": 60000},
+		},
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create deposit status = %d body = %s", rr.Code, rr.Body.String())
+	}
+	var operation struct {
+		ID          string  `json:"id"`
+		Type        string  `json:"operation_type"`
+		Description string  `json:"description"`
+		Total       float64 `json:"total"`
+		Entries     []struct {
+			ReserveID string  `json:"reserve_id"`
+			Amount    float64 `json:"amount"`
+			Direction string  `json:"direction"`
+		} `json:"entries"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &operation); err != nil {
+		t.Fatalf("decode operation: %v", err)
+	}
+	if operation.Type != "deposit" || operation.Description != "RSU vest" || operation.Total != 260000 || len(operation.Entries) != 3 {
+		t.Fatalf("operation = %#v, want one 260000 split deposit", operation)
+	}
+	for _, entry := range operation.Entries {
+		if entry.Direction != "deposit" {
+			t.Fatalf("entry direction = %q, want deposit", entry.Direction)
+		}
+	}
+
+	balances := map[string]float64{}
+	var aggregate float64
+	for _, reserve := range listTestReserves(t, srv, token, false) {
+		balances[reserve.ID] = reserve.Balance
+		aggregate += reserve.Balance
+	}
+	if balances[ceremony.ID] != 100000 || balances[loan.ID] != 100000 || balances[general.ID] != 60000 || aggregate != 260000 {
+		t.Fatalf("balances = %#v aggregate = %v", balances, aggregate)
+	}
+
+	history := apiRequest(t, srv, token, http.MethodGet, "/api/reserve-operations?year=2026", nil)
+	if history.Code != http.StatusOK {
+		t.Fatalf("history status = %d body = %s", history.Code, history.Body.String())
+	}
+	var operations []json.RawMessage
+	if err := json.Unmarshal(history.Body.Bytes(), &operations); err != nil || len(operations) != 1 {
+		t.Fatalf("history = %s err = %v, want one operation", history.Body.String(), err)
+	}
+
+	for _, path := range analyticsPaths {
+		after := apiRequest(t, srv, token, http.MethodGet, path, nil).Body.String()
+		if after != beforeAnalytics[path] {
+			t.Fatalf("reserve deposit changed %s. before=%s after=%s", path, beforeAnalytics[path], after)
+		}
+	}
+	var transactionCount int
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM transactions WHERE user_id = $1`, userID).Scan(&transactionCount); err != nil {
+		t.Fatalf("count transactions: %v", err)
+	}
+	if transactionCount != 1 {
+		t.Fatalf("transactions = %d, want only pre-existing salary", transactionCount)
+	}
+}
+
+func TestReserveDepositValidationIsAtomicAndOwnershipSafe(t *testing.T) {
+	srv, pool, token, _ := setupCategoryAPITest(t)
+	defer pool.Close()
+	general := listTestReserves(t, srv, token, false)[0]
+	second := createTestReserve(t, srv, token, "Second")
+
+	otherID := uuid.New()
+	if err := srv.provisionUser(context.Background(), auth.Identity{UserID: otherID, Email: "deposit-other@example.com"}); err != nil {
+		t.Fatalf("provision other user: %v", err)
+	}
+	otherReserve := listTestReserves(t, srv, signedTestToken(t, otherID), false)[0]
+	archived := createTestReserve(t, srv, token, "Archived")
+	if _, err := pool.Exec(context.Background(), `UPDATE reserves SET archived_at = now() WHERE id = $1`, archived.ID); err != nil {
+		t.Fatalf("archive reserve fixture: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		allocations any
+		status      int
+		message     string
+	}{
+		{name: "no allocations", allocations: []any{}, status: http.StatusBadRequest, message: "at least one allocation is required"},
+		{name: "zero", allocations: []map[string]any{{"reserve_id": general.ID, "amount": 0}}, status: http.StatusBadRequest, message: "allocation amount must be greater than zero"},
+		{name: "negative", allocations: []map[string]any{{"reserve_id": general.ID, "amount": -1}}, status: http.StatusBadRequest, message: "Amount must be zero or greater"},
+		{name: "over precision", allocations: []map[string]any{{"reserve_id": general.ID, "amount": 1.001}}, status: http.StatusBadRequest, message: "Amount must have at most two decimal places"},
+		{name: "overflow", allocations: []map[string]any{{"reserve_id": general.ID, "amount": 1000000000000}}, status: http.StatusBadRequest, message: "Amount exceeds the supported maximum"},
+		{name: "duplicate reserve", allocations: []map[string]any{{"reserve_id": second.ID, "amount": 1}, {"reserve_id": second.ID, "amount": 2}}, status: http.StatusBadRequest, message: "each reserve may be allocated only once"},
+		{name: "malformed id", allocations: []map[string]any{{"reserve_id": "bad", "amount": 1}}, status: http.StatusBadRequest, message: "allocation reserve_id must be a valid UUID"},
+		{name: "other owner", allocations: []map[string]any{{"reserve_id": otherReserve.ID, "amount": 1}}, status: http.StatusNotFound, message: "reserve not found"},
+		{name: "archived", allocations: []map[string]any{{"reserve_id": archived.ID, "amount": 1}}, status: http.StatusConflict, message: "archived reserves cannot receive allocations"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rr := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{
+				"description": "Deposit", "date": "2026-09-18", "allocations": tc.allocations,
+			})
+			assertReserveError(t, rr, tc.status, tc.message)
+			var operations, entries int
+			if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM reserve_operations`).Scan(&operations); err != nil {
+				t.Fatalf("count operations: %v", err)
+			}
+			if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM reserve_entries`).Scan(&entries); err != nil {
+				t.Fatalf("count entries: %v", err)
+			}
+			if operations != 0 || entries != 0 {
+				t.Fatalf("rejected deposit persisted %d operations and %d entries", operations, entries)
+			}
+		})
+	}
+}
+
+func TestReserveDepositHistoryIsReverseChronological(t *testing.T) {
+	srv, pool, token, _ := setupCategoryAPITest(t)
+	defer pool.Close()
+	general := listTestReserves(t, srv, token, false)[0]
+	for _, item := range []struct{ description, date string }{{"Older", "2026-01-01"}, {"Newer", "2026-12-31"}} {
+		rr := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{
+			"description": item.description, "date": item.date,
+			"allocations": []map[string]any{{"reserve_id": general.ID, "amount": 10.25}},
+		})
+		if rr.Code != http.StatusCreated {
+			t.Fatalf("create %s status = %d body = %s", item.description, rr.Code, rr.Body.String())
+		}
+	}
+	rr := apiRequest(t, srv, token, http.MethodGet, "/api/reserve-operations?year=2026", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("history status = %d body = %s", rr.Code, rr.Body.String())
+	}
+	var history []struct {
+		Description string  `json:"description"`
+		Total       float64 `json:"total"`
+		Entries     []any   `json:"entries"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &history); err != nil {
+		t.Fatalf("decode history: %v", err)
+	}
+	if len(history) != 2 || history[0].Description != "Newer" || history[1].Description != "Older" {
+		t.Fatalf("history order = %#v", history)
+	}
+	if history[0].Total != 10.25 || len(history[0].Entries) != 1 {
+		t.Fatalf("single deposit = %#v", history[0])
+	}
+}
+
+func createTestReserve(t *testing.T, srv *Server, token, name string) reserveTestDTO {
+	t.Helper()
+	rr := apiRequest(t, srv, token, http.MethodPost, "/api/reserves", map[string]any{"name": name})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create reserve %q status = %d body = %s", name, rr.Code, rr.Body.String())
+	}
+	var reserve reserveTestDTO
+	if err := json.Unmarshal(rr.Body.Bytes(), &reserve); err != nil {
+		t.Fatalf("decode reserve: %v", err)
+	}
+	return reserve
+}
+
 func listTestReserves(t *testing.T, srv *Server, token string, includeArchived bool) []reserveTestDTO {
 	t.Helper()
 	value := "false"

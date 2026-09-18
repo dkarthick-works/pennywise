@@ -4,13 +4,15 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReservesPage } from "./ReservesPage";
-import { createReserve, listReserves, renameReserve } from "../api/reserves";
+import { createReserve, createReserveDeposit, listReserveOperations, listReserves, renameReserve } from "../api/reserves";
 
 vi.mock("../api/reserves", async (original) => ({
   ...await original<typeof import("../api/reserves")>(),
   listReserves: vi.fn(),
   createReserve: vi.fn(),
   renameReserve: vi.fn(),
+  createReserveDeposit: vi.fn(),
+  listReserveOperations: vi.fn(),
 }));
 
 function mount() {
@@ -22,7 +24,10 @@ function mount() {
   );
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(listReserveOperations).mockResolvedValue([]);
+});
 
 describe("Reserves page", () => {
   it("shows aggregate and individual ledger balances with General restrictions", async () => {
@@ -68,6 +73,79 @@ describe("Reserves page", () => {
     fireEvent.change(renameName, { target: { value: " Safety Net " } });
     await user.keyboard("{Enter}");
     await waitFor(() => expect(renameReserve).toHaveBeenCalledWith("general", { name: "Safety Net" }));
+  });
+
+  it("creates a split deposit and renders reverse-chronological allocation history", async () => {
+    const user = userEvent.setup();
+    const reserves = [
+      { id: "general", name: "General Reserve", is_general: true, archived: false, balance: 60000 },
+      { id: "ceremony", name: "Ceremony Reserve", is_general: false, archived: false, balance: 100000 },
+      { id: "loan", name: "Loan Reserve", is_general: false, archived: false, balance: 100000 },
+    ];
+    vi.mocked(listReserves).mockResolvedValue(reserves);
+    vi.mocked(listReserveOperations).mockResolvedValue([
+      {
+        id: "newer", operation_type: "deposit", date: "2026-09-18", description: "RSU vest", note: "September vest", total: 260000,
+        entries: [
+          { id: "e1", reserve_id: "ceremony", reserve_name: "Ceremony Reserve", direction: "deposit", amount: 100000 },
+          { id: "e2", reserve_id: "loan", reserve_name: "Loan Reserve", direction: "deposit", amount: 100000 },
+          { id: "e3", reserve_id: "general", reserve_name: "General Reserve", direction: "deposit", amount: 60000 },
+        ], created_at: "2026-09-18T12:00:00Z", updated_at: "2026-09-18T12:00:00Z",
+      },
+      { id: "older", operation_type: "deposit", date: "2026-01-01", description: "Older bonus", note: "", total: 10, entries: [], created_at: "2026-01-01T12:00:00Z", updated_at: "2026-01-01T12:00:00Z" },
+    ]);
+    vi.mocked(createReserveDeposit).mockResolvedValue({
+      id: "created", operation_type: "deposit", date: "2026-09-18", description: "RSU vest", note: "", total: 260000, entries: [], created_at: "", updated_at: "",
+    });
+    mount();
+
+    expect(await screen.findAllByText("₹2,60,000")).toHaveLength(2);
+    const historyHeadings = screen.getAllByRole("heading", { level: 3 });
+    expect(historyHeadings.map((heading) => heading.textContent)).toEqual(["RSU vest", "Older bonus"]);
+    expect(screen.getByText((_, element) => element?.tagName === "LI" && element.textContent === "Ceremony Reserve · ₹1,00,000")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add to reserves" }));
+    await user.type(screen.getByLabelText("Description"), "RSU vest");
+    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-09-18" } });
+    fireEvent.change(screen.getByLabelText("Reserve 1"), { target: { value: "ceremony" } });
+    await user.type(screen.getByLabelText("Amount 1"), "100000");
+    await user.click(screen.getByRole("button", { name: "Add allocation" }));
+    fireEvent.change(screen.getByLabelText("Reserve 2"), { target: { value: "loan" } });
+    await user.type(screen.getByLabelText("Amount 2"), "100000");
+    await user.click(screen.getByRole("button", { name: "Add allocation" }));
+    fireEvent.change(screen.getByLabelText("Reserve 3"), { target: { value: "general" } });
+    await user.type(screen.getByLabelText("Amount 3"), "60000");
+    expect(screen.getByText((_, element) => element?.classList.contains("reserve-deposit-total") === true && element.textContent === "Total allocated: ₹2,60,000")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save deposit" }));
+    await waitFor(() => expect(createReserveDeposit).toHaveBeenCalledWith({
+      description: "RSU vest", date: "2026-09-18", note: "",
+      allocations: [
+        { reserve_id: "ceremony", amount: 100000 },
+        { reserve_id: "loan", amount: 100000 },
+        { reserve_id: "general", amount: 60000 },
+      ],
+    }));
+  });
+
+  it("validates and submits a single exact allocation", async () => {
+    const user = userEvent.setup();
+    vi.mocked(listReserves).mockResolvedValue([{ id: "general", name: "General Reserve", is_general: true, archived: false, balance: 0 }]);
+    vi.mocked(createReserveDeposit).mockResolvedValue({ id: "deposit", operation_type: "deposit", date: "2026-09-18", description: "Bonus", note: "", total: 10.25, entries: [], created_at: "", updated_at: "" });
+    mount();
+    await user.click(await screen.findByRole("button", { name: "Add to reserves" }));
+    await user.click(screen.getByRole("button", { name: "Save deposit" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Description is required");
+
+    await user.type(screen.getByLabelText("Description"), "Bonus");
+    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-09-18" } });
+    await user.type(screen.getByLabelText("Amount 1"), "1.001");
+    await user.click(screen.getByRole("button", { name: "Save deposit" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("no more than two decimal places");
+    fireEvent.change(screen.getByLabelText("Amount 1"), { target: { value: "10.25" } });
+    await user.click(screen.getByRole("button", { name: "Save deposit" }));
+    await waitFor(() => expect(createReserveDeposit).toHaveBeenCalledWith({
+      description: "Bonus", date: "2026-09-18", note: "", allocations: [{ reserve_id: "general", amount: 10.25 }],
+    }));
   });
 
   it("offers retryable error and empty states", async () => {

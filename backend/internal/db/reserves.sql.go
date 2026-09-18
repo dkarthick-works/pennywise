@@ -126,6 +126,155 @@ func (q *Queries) GetReserveForUserForUpdate(ctx context.Context, arg GetReserve
 	return i, err
 }
 
+const insertReserveEntry = `-- name: InsertReserveEntry :one
+INSERT INTO reserve_entries (operation_id, reserve_id, direction, amount)
+VALUES ($1, $2, $3, $4)
+RETURNING id, operation_id, reserve_id, direction, amount, created_at
+`
+
+type InsertReserveEntryParams struct {
+	OperationID uuid.UUID      `json:"operation_id"`
+	ReserveID   uuid.UUID      `json:"reserve_id"`
+	Direction   string         `json:"direction"`
+	Amount      pgtype.Numeric `json:"amount"`
+}
+
+func (q *Queries) InsertReserveEntry(ctx context.Context, arg InsertReserveEntryParams) (ReserveEntry, error) {
+	row := q.db.QueryRow(ctx, insertReserveEntry,
+		arg.OperationID,
+		arg.ReserveID,
+		arg.Direction,
+		arg.Amount,
+	)
+	var i ReserveEntry
+	err := row.Scan(
+		&i.ID,
+		&i.OperationID,
+		&i.ReserveID,
+		&i.Direction,
+		&i.Amount,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const insertReserveOperation = `-- name: InsertReserveOperation :one
+INSERT INTO reserve_operations (user_id, operation_type, occurred_on, description, note)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, user_id, operation_type, occurred_on, description, note, created_at, updated_at
+`
+
+type InsertReserveOperationParams struct {
+	UserID        uuid.UUID   `json:"user_id"`
+	OperationType string      `json:"operation_type"`
+	OccurredOn    pgtype.Date `json:"occurred_on"`
+	Description   string      `json:"description"`
+	Note          string      `json:"note"`
+}
+
+func (q *Queries) InsertReserveOperation(ctx context.Context, arg InsertReserveOperationParams) (ReserveOperation, error) {
+	row := q.db.QueryRow(ctx, insertReserveOperation,
+		arg.UserID,
+		arg.OperationType,
+		arg.OccurredOn,
+		arg.Description,
+		arg.Note,
+	)
+	var i ReserveOperation
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.OperationType,
+		&i.OccurredOn,
+		&i.Description,
+		&i.Note,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listDepositOperationHistory = `-- name: ListDepositOperationHistory :many
+SELECT o.id, o.operation_type, o.occurred_on, o.description, o.note, o.created_at, o.updated_at,
+       e.id AS entry_id, e.reserve_id, r.name AS reserve_name, e.direction, e.amount
+FROM reserve_operations o
+JOIN reserve_entries e ON e.operation_id = o.id
+JOIN reserves r ON r.id = e.reserve_id
+WHERE o.user_id = $1
+  AND o.operation_type = 'deposit'
+  AND o.occurred_on >= $2
+  AND o.occurred_on < $3
+  AND (
+    $4::text = ''
+    OR EXISTS (
+      SELECT 1 FROM reserve_entries filtered
+      WHERE filtered.operation_id = o.id
+        AND filtered.reserve_id = $4::uuid
+    )
+  )
+ORDER BY o.occurred_on DESC, o.created_at DESC, o.id DESC, r.name, e.id
+`
+
+type ListDepositOperationHistoryParams struct {
+	UserID    uuid.UUID   `json:"user_id"`
+	FromDate  pgtype.Date `json:"from_date"`
+	ToDate    pgtype.Date `json:"to_date"`
+	ReserveID string      `json:"reserve_id"`
+}
+
+type ListDepositOperationHistoryRow struct {
+	ID            uuid.UUID          `json:"id"`
+	OperationType string             `json:"operation_type"`
+	OccurredOn    pgtype.Date        `json:"occurred_on"`
+	Description   string             `json:"description"`
+	Note          string             `json:"note"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	EntryID       uuid.UUID          `json:"entry_id"`
+	ReserveID     uuid.UUID          `json:"reserve_id"`
+	ReserveName   string             `json:"reserve_name"`
+	Direction     string             `json:"direction"`
+	Amount        pgtype.Numeric     `json:"amount"`
+}
+
+func (q *Queries) ListDepositOperationHistory(ctx context.Context, arg ListDepositOperationHistoryParams) ([]ListDepositOperationHistoryRow, error) {
+	rows, err := q.db.Query(ctx, listDepositOperationHistory,
+		arg.UserID,
+		arg.FromDate,
+		arg.ToDate,
+		arg.ReserveID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDepositOperationHistoryRow
+	for rows.Next() {
+		var i ListDepositOperationHistoryRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OperationType,
+			&i.OccurredOn,
+			&i.Description,
+			&i.Note,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.EntryID,
+			&i.ReserveID,
+			&i.ReserveName,
+			&i.Direction,
+			&i.Amount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReserves = `-- name: ListReserves :many
 SELECT r.id, r.user_id, r.name, r.is_general, r.archived_at, r.created_at, r.updated_at,
        reserve_balance(r.id) AS balance
@@ -169,6 +318,47 @@ func (q *Queries) ListReserves(ctx context.Context, arg ListReservesParams) ([]L
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Balance,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockReservesForDeposit = `-- name: LockReservesForDeposit :many
+SELECT id, user_id, name, is_general, archived_at, created_at, updated_at FROM reserves
+WHERE user_id = $1
+  AND id = ANY($2::uuid[])
+ORDER BY id
+FOR UPDATE
+`
+
+type LockReservesForDepositParams struct {
+	UserID     uuid.UUID   `json:"user_id"`
+	ReserveIds []uuid.UUID `json:"reserve_ids"`
+}
+
+func (q *Queries) LockReservesForDeposit(ctx context.Context, arg LockReservesForDepositParams) ([]Reserve, error) {
+	rows, err := q.db.Query(ctx, lockReservesForDeposit, arg.UserID, arg.ReserveIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Reserve
+	for rows.Next() {
+		var i Reserve
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Name,
+			&i.IsGeneral,
+			&i.ArchivedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

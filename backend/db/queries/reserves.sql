@@ -48,3 +48,40 @@ SELECT EXISTS (
 
 -- name: ReserveBalance :one
 SELECT reserve_balance(sqlc.arg(reserve_id));
+
+-- name: LockReservesForDeposit :many
+SELECT * FROM reserves
+WHERE user_id = sqlc.arg(user_id)
+  AND id = ANY(sqlc.arg(reserve_ids)::uuid[])
+ORDER BY id
+FOR UPDATE;
+
+-- name: InsertReserveOperation :one
+INSERT INTO reserve_operations (user_id, operation_type, occurred_on, description, note)
+VALUES (sqlc.arg(user_id), sqlc.arg(operation_type), sqlc.arg(occurred_on), sqlc.arg(description), sqlc.arg(note))
+RETURNING *;
+
+-- name: InsertReserveEntry :one
+INSERT INTO reserve_entries (operation_id, reserve_id, direction, amount)
+VALUES (sqlc.arg(operation_id), sqlc.arg(reserve_id), sqlc.arg(direction), sqlc.arg(amount))
+RETURNING *;
+
+-- name: ListDepositOperationHistory :many
+SELECT o.id, o.operation_type, o.occurred_on, o.description, o.note, o.created_at, o.updated_at,
+       e.id AS entry_id, e.reserve_id, r.name AS reserve_name, e.direction, e.amount
+FROM reserve_operations o
+JOIN reserve_entries e ON e.operation_id = o.id
+JOIN reserves r ON r.id = e.reserve_id
+WHERE o.user_id = sqlc.arg(user_id)
+  AND o.operation_type = 'deposit'
+  AND o.occurred_on >= sqlc.arg(from_date)
+  AND o.occurred_on < sqlc.arg(to_date)
+  AND (
+    sqlc.arg(reserve_id)::text = ''
+    OR EXISTS (
+      SELECT 1 FROM reserve_entries filtered
+      WHERE filtered.operation_id = o.id
+        AND filtered.reserve_id = sqlc.arg(reserve_id)::uuid
+    )
+  )
+ORDER BY o.occurred_on DESC, o.created_at DESC, o.id DESC, r.name, e.id;

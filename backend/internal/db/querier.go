@@ -57,6 +57,8 @@ type Querier interface {
 	InsertChitTransferParent(ctx context.Context, arg InsertChitTransferParentParams) (uuid.UUID, error)
 	InsertLent(ctx context.Context, arg InsertLentParams) (Lent, error)
 	InsertRepayment(ctx context.Context, arg InsertRepaymentParams) (LentRepayment, error)
+	InsertReserveEntry(ctx context.Context, arg InsertReserveEntryParams) (ReserveEntry, error)
+	InsertReserveOperation(ctx context.Context, arg InsertReserveOperationParams) (ReserveOperation, error)
 	InsertSettlementLink(ctx context.Context, arg InsertSettlementLinkParams) error
 	InsertTemplate(ctx context.Context, arg InsertTemplateParams) (Template, error)
 	InsertTransaction(ctx context.Context, arg InsertTransactionParams) (Transaction, error)
@@ -72,6 +74,7 @@ type Querier interface {
 	// Expense credit rows in a half-open [from, to) date window, for the credit
 	// drill-down. Mirrors SumCreditUsage's filter so totals reconcile.
 	ListCreditTransactionsByDateRange(ctx context.Context, arg ListCreditTransactionsByDateRangeParams) ([]Transaction, error)
+	ListDepositOperationHistory(ctx context.Context, arg ListDepositOperationHistoryParams) ([]ListDepositOperationHistoryRow, error)
 	ListEventItems(ctx context.Context, arg ListEventItemsParams) ([]EventItem, error)
 	ListEvents(ctx context.Context, arg ListEventsParams) ([]ListEventsRow, error)
 	ListGroupTransactionsForHistory(ctx context.Context, arg ListGroupTransactionsForHistoryParams) ([]ListGroupTransactionsForHistoryRow, error)
@@ -102,6 +105,7 @@ type Querier interface {
 	ListUnmappedCategoryTexts(ctx context.Context, userID uuid.UUID) ([]string, error)
 	LockChitForUser(ctx context.Context, arg LockChitForUserParams) (Chit, error)
 	LockEvent(ctx context.Context, arg LockEventParams) (Event, error)
+	LockReservesForDeposit(ctx context.Context, arg LockReservesForDepositParams) ([]Reserve, error)
 	LockUserForReserveCount(ctx context.Context, userID uuid.UUID) (uuid.UUID, error)
 	MarkEventConverted(ctx context.Context, arg MarkEventConvertedParams) (Event, error)
 	MarkMonthSeeded(ctx context.Context, arg MarkMonthSeededParams) (MonthState, error)
