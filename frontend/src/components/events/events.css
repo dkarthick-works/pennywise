@@ -92,6 +92,7 @@
 .event-detail-header, .event-detail-item { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; align-items: end; }
 .event-detail-header { padding: 0 0 8px; color: var(--ink-2); font-size: 12px; font-weight: 700; }
 .event-detail-item { border-top: 1px solid var(--border); padding: 14px 0; }
+.event-detail-header > :nth-child(n + 2), .event-detail-item > :nth-child(n + 2) { text-align: right; }
 .event-detail-item h3 { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
 .event-detail-item p { margin: 4px 0 0; }
 .event-note { white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -114,6 +115,7 @@
   .event-list-item { gap: 14px; }
   .event-form, .event-copy-form { padding: 16px; }
   .event-detail-item { gap: 10px; }
+  .event-detail-item > :nth-child(n + 2) { text-align: left; }
   .event-detail-header { display: none; }
   .event-summary strong { font-size: 22px; }
 }

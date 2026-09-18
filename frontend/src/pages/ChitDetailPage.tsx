@@ -7,7 +7,7 @@ import {
   getChit,
   updateChitInstallment,
 } from "../api/chits";
-import { IconChevL, IconExport, IconPlus } from "../components/ui/Icons";
+import { IconChevL, IconExport, IconPencil, IconPlus, IconTrash } from "../components/ui/Icons";
 import {
   paymentVariance,
   startMonthToMonth,
@@ -295,6 +295,8 @@ export function ChitDetailPage() {
                           type="button"
                           className="btn btn-ghost"
                           style={{ width: "auto", padding: "6px 10px", marginRight: 6 }}
+                          aria-label="Edit installment"
+                          title="Edit installment"
                           onClick={() => {
                             setEditingId(row.id);
                             setEditInst({
@@ -305,19 +307,21 @@ export function ChitDetailPage() {
                             setEditInstErr("");
                           }}
                         >
-                          Edit
+                          <IconPencil size={16} />
                         </button>
                         <button
                           type="button"
                           className="btn btn-ghost"
                           style={{ width: "auto", padding: "6px 10px", color: "var(--neg)" }}
+                          aria-label="Remove installment"
+                          title="Remove installment"
                           onClick={() => {
                             if (window.confirm("Remove this installment?")) {
                               removeInst.mutate(row.id);
                             }
                           }}
                         >
-                          Remove
+                          <IconTrash size={16} />
                         </button>
                       </td>
                     </>

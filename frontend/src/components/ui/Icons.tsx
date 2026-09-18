@@ -71,6 +71,9 @@ export const IconArrowD = (p: IcProps) => (
 export const IconTrash = (p: IcProps) => (
   <Ic {...p}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" /></Ic>
 );
+export const IconPencil = (p: IcProps) => (
+  <Ic {...p}><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z" /><path d="M14.5 6.5l3 3" /></Ic>
+);
 export const IconPlus = (p: IcProps) => (
   <Ic {...p}><path d="M12 5v14M5 12h14" /></Ic>
 );
