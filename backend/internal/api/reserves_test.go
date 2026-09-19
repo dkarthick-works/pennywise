@@ -802,6 +802,50 @@ func TestConversionRejectsPartialAndSpentReverse(t *testing.T) {
 	assertReserveError(t, apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/"+operation.ID+"/convert-to-income", nil), http.StatusConflict, "deposit cannot be converted because an allocation has already been spent")
 }
 
+func TestMoveReserveMoneyToIncomeCreatesProtectedGeneratedIncome(t *testing.T) {
+	srv, pool, token, userID := setupCategoryAPITest(t)
+	defer pool.Close()
+	reserve := createTestReserve(t, srv, token, "Move Reserve")
+	fund := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{"description": "Funding", "date": "2026-09-01", "allocations": []map[string]any{{"reserve_id": reserve.ID, "amount": 20000}}})
+	if fund.Code != http.StatusCreated {
+		t.Fatalf("fund status = %d body = %s", fund.Code, fund.Body.String())
+	}
+	income := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/income-transfers", map[string]any{"reserve_id": reserve.ID, "amount": 15000, "date": "2026-09-18", "description": "From General Reserve", "note": "For spending"})
+	if income.Code != http.StatusCreated {
+		t.Fatalf("income transfer status = %d body = %s", income.Code, income.Body.String())
+	}
+	var operation ReserveOperationDTO
+	if err := json.Unmarshal(income.Body.Bytes(), &operation); err != nil {
+		t.Fatalf("decode operation: %v", err)
+	}
+	if operation.OperationType != "move_to_income" || operation.Total != "15000.00" || operation.Editable || !operation.Deletable {
+		t.Fatalf("operation = %#v", operation)
+	}
+	var generatedID string
+	if err := pool.QueryRow(context.Background(), `SELECT transaction_id FROM reserve_operation_transactions WHERE reserve_operation_id = $1`, operation.ID).Scan(&generatedID); err != nil {
+		t.Fatalf("generated link: %v", err)
+	}
+	var count int
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM transactions WHERE user_id = $1 AND section = 'income' AND amount = 15000`, userID).Scan(&count); err != nil {
+		t.Fatalf("income count: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("generated income count = %d", count)
+	}
+	assertReserveError(t, apiRequest(t, srv, token, http.MethodPatch, "/api/transactions/"+generatedID, map[string]any{"category": "Hacked"}), http.StatusConflict, "generated reserve transactions must be changed through their reserve operation")
+	assertReserveError(t, apiRequest(t, srv, token, http.MethodDelete, "/api/transactions/"+generatedID, nil), http.StatusConflict, "generated reserve transactions must be changed through their reserve operation")
+	deleted := apiRequest(t, srv, token, http.MethodDelete, "/api/reserve-operations/"+operation.ID, nil)
+	if deleted.Code != http.StatusNoContent {
+		t.Fatalf("delete operation status = %d body = %s", deleted.Code, deleted.Body.String())
+	}
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM transactions WHERE id = $1`, generatedID).Scan(&count); err != nil {
+		t.Fatalf("deleted generated count: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("generated transaction remains")
+	}
+}
+
 func createTestReserve(t *testing.T, srv *Server, token, name string) reserveTestDTO {
 	t.Helper()
 	rr := apiRequest(t, srv, token, http.MethodPost, "/api/reserves", map[string]any{"name": name})

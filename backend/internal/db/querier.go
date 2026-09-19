@@ -34,6 +34,7 @@ type Querier interface {
 	DeleteReserve(ctx context.Context, arg DeleteReserveParams) (int64, error)
 	DeleteReserveEntriesForOperation(ctx context.Context, operationID uuid.UUID) error
 	DeleteReserveOperation(ctx context.Context, arg DeleteReserveOperationParams) (int64, error)
+	DeleteReserveOperationTransactions(ctx context.Context, reserveOperationID uuid.UUID) error
 	DeleteSettlementLinks(ctx context.Context, settlementID uuid.UUID) error
 	DeleteTemplatesBySection(ctx context.Context, arg DeleteTemplatesBySectionParams) error
 	DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) error
@@ -46,6 +47,7 @@ type Querier interface {
 	GetCategoryMapping(ctx context.Context, arg GetCategoryMappingParams) (CategoryMapping, error)
 	GetChit(ctx context.Context, arg GetChitParams) (GetChitRow, error)
 	GetEvent(ctx context.Context, arg GetEventParams) (Event, error)
+	GetGeneratedReserveTransaction(ctx context.Context, arg GetGeneratedReserveTransactionParams) (ReserveOperationTransaction, error)
 	GetIncomeTransactionForConversion(ctx context.Context, arg GetIncomeTransactionForConversionParams) (Transaction, error)
 	GetLent(ctx context.Context, arg GetLentParams) (GetLentRow, error)
 	GetMonthState(ctx context.Context, arg GetMonthStateParams) (MonthState, error)
@@ -70,6 +72,7 @@ type Querier interface {
 	InsertRepayment(ctx context.Context, arg InsertRepaymentParams) (LentRepayment, error)
 	InsertReserveEntry(ctx context.Context, arg InsertReserveEntryParams) (ReserveEntry, error)
 	InsertReserveOperation(ctx context.Context, arg InsertReserveOperationParams) (ReserveOperation, error)
+	InsertReserveOperationTransaction(ctx context.Context, arg InsertReserveOperationTransactionParams) error
 	InsertSettlementLink(ctx context.Context, arg InsertSettlementLinkParams) error
 	InsertTemplate(ctx context.Context, arg InsertTemplateParams) (Template, error)
 	InsertTransaction(ctx context.Context, arg InsertTransactionParams) (Transaction, error)
@@ -101,6 +104,7 @@ type Querier interface {
 	ListRepaymentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListRepaymentsForTransferRow, error)
 	ListReserveEntriesForOperation(ctx context.Context, operationID uuid.UUID) ([]ListReserveEntriesForOperationRow, error)
 	ListReserveOperationHistory(ctx context.Context, arg ListReserveOperationHistoryParams) ([]ListReserveOperationHistoryRow, error)
+	ListReserveOperationTransactions(ctx context.Context, arg ListReserveOperationTransactionsParams) ([]ReserveOperationTransaction, error)
 	ListReserves(ctx context.Context, arg ListReservesParams) ([]ListReservesRow, error)
 	// ---- settlement links --------------------------------------------------
 	// All (settlement_id, credit_id) pairs where the SETTLEMENT falls in the month.

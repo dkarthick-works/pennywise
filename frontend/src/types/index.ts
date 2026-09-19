@@ -500,6 +500,14 @@ export interface ReserveTransferInput {
   note: string;
 }
 
+export interface ReserveIncomeTransferInput {
+  reserve_id: string;
+  amount: number;
+  date: string;
+  description: string;
+  note: string;
+}
+
 interface IncomeActivityBase {
   description: string;
   amount: number;

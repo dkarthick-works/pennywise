@@ -1,6 +1,6 @@
 import axios from "axios";
 import client from "./client";
-import type { IncomeActivityItem, Reserve, ReserveAllocationInput, ReserveDepositInput, ReserveInput, ReserveOperation, ReserveSpendingInput, ReserveTransferInput, Transaction } from "../types";
+import type { IncomeActivityItem, Reserve, ReserveAllocationInput, ReserveDepositInput, ReserveIncomeTransferInput, ReserveInput, ReserveOperation, ReserveSpendingInput, ReserveTransferInput, Transaction } from "../types";
 
 export const reserveKeys = {
   all: ["reserves"] as const,
@@ -46,6 +46,9 @@ export const createReserveSpending = (body: ReserveSpendingInput) =>
 
 export const createReserveTransfer = (body: ReserveTransferInput) =>
   client.post<ReserveOperation>("/api/reserve-operations/transfers", body).then((response) => response.data).catch(unwrapReserveError);
+
+export const createReserveIncomeTransfer = (body: ReserveIncomeTransferInput) =>
+  client.post<ReserveOperation>("/api/reserve-operations/income-transfers", body).then((response) => response.data).catch(unwrapReserveError);
 
 export const convertIncomeToReserves = (id: string, allocations: ReserveAllocationInput[]) =>
   client.post<ReserveOperation>(`/api/transactions/${id}/convert-to-reserves`, { allocations }).then((response) => response.data).catch(unwrapReserveError);

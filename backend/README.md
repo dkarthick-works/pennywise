@@ -179,6 +179,7 @@ only ever talks to this origin.
 | DELETE | `/api/reserve-operations/{id}` | delete an eligible standalone deposit or reserve-spend operation |
 | POST   | `/api/reserve-operations/{id}/convert-to-income` | atomically convert a reserve deposit to normal cash income |
 | POST   | `/api/reserve-operations/spending` | atomically withdraw from one active reserve without a normal transaction |
+| POST   | `/api/reserve-operations/income-transfers` | atomically withdraw from a reserve and create protected normal cash income |
 | POST   | `/api/reserve-operations/transfers` | atomically move money between two active reserves |
 | DELETE | `/api/reserve-operations/{id}` | delete a standalone reserve-spend operation |
 | DELETE | `/api/reserve-transfers/{id}` | delete a transfer operation after balance validation |

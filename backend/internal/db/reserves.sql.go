@@ -132,6 +132,15 @@ func (q *Queries) DeleteReserveOperation(ctx context.Context, arg DeleteReserveO
 	return result.RowsAffected(), nil
 }
 
+const deleteReserveOperationTransactions = `-- name: DeleteReserveOperationTransactions :exec
+DELETE FROM reserve_operation_transactions WHERE reserve_operation_id = $1
+`
+
+func (q *Queries) DeleteReserveOperationTransactions(ctx context.Context, reserveOperationID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteReserveOperationTransactions, reserveOperationID)
+	return err
+}
+
 const deleteTransactionForUser = `-- name: DeleteTransactionForUser :execrows
 DELETE FROM transactions WHERE id = $1 AND user_id = $2
 `
@@ -176,6 +185,25 @@ ON CONFLICT (user_id) WHERE is_general DO NOTHING
 func (q *Queries) EnsureGeneralReserve(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, ensureGeneralReserve, userID)
 	return err
+}
+
+const getGeneratedReserveTransaction = `-- name: GetGeneratedReserveTransaction :one
+SELECT rot.reserve_operation_id, rot.transaction_id, rot.role
+FROM reserve_operation_transactions rot
+JOIN reserve_operations o ON o.id = rot.reserve_operation_id
+WHERE rot.transaction_id = $1 AND o.user_id = $2
+`
+
+type GetGeneratedReserveTransactionParams struct {
+	TransactionID uuid.UUID `json:"transaction_id"`
+	UserID        uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetGeneratedReserveTransaction(ctx context.Context, arg GetGeneratedReserveTransactionParams) (ReserveOperationTransaction, error) {
+	row := q.db.QueryRow(ctx, getGeneratedReserveTransaction, arg.TransactionID, arg.UserID)
+	var i ReserveOperationTransaction
+	err := row.Scan(&i.ReserveOperationID, &i.TransactionID, &i.Role)
+	return i, err
 }
 
 const getIncomeTransactionForConversion = `-- name: GetIncomeTransactionForConversion :one
@@ -432,6 +460,22 @@ func (q *Queries) InsertReserveOperation(ctx context.Context, arg InsertReserveO
 	return i, err
 }
 
+const insertReserveOperationTransaction = `-- name: InsertReserveOperationTransaction :exec
+INSERT INTO reserve_operation_transactions (reserve_operation_id, transaction_id, role)
+VALUES ($1, $2, $3)
+`
+
+type InsertReserveOperationTransactionParams struct {
+	ReserveOperationID uuid.UUID `json:"reserve_operation_id"`
+	TransactionID      uuid.UUID `json:"transaction_id"`
+	Role               string    `json:"role"`
+}
+
+func (q *Queries) InsertReserveOperationTransaction(ctx context.Context, arg InsertReserveOperationTransactionParams) error {
+	_, err := q.db.Exec(ctx, insertReserveOperationTransaction, arg.ReserveOperationID, arg.TransactionID, arg.Role)
+	return err
+}
+
 const listDepositOperationHistory = `-- name: ListDepositOperationHistory :many
 SELECT o.id, o.operation_type, o.occurred_on, o.description, o.note, o.created_at, o.updated_at,
        e.id AS entry_id, e.reserve_id, r.name AS reserve_name, COALESCE(r.archived_at IS NOT NULL, false)::boolean AS reserve_archived,
@@ -645,7 +689,7 @@ FROM reserve_operations o
 JOIN reserve_entries e ON e.operation_id = o.id
 JOIN reserves r ON r.id = e.reserve_id
 WHERE o.user_id = $1
-  AND o.operation_type IN ('deposit', 'reserve_spend', 'transfer')
+  AND o.operation_type IN ('deposit', 'reserve_spend', 'transfer', 'move_to_income')
   AND o.occurred_on >= $2
   AND o.occurred_on < $3
   AND (
@@ -713,6 +757,39 @@ func (q *Queries) ListReserveOperationHistory(ctx context.Context, arg ListReser
 			&i.Direction,
 			&i.Amount,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listReserveOperationTransactions = `-- name: ListReserveOperationTransactions :many
+SELECT rot.reserve_operation_id, rot.transaction_id, rot.role
+FROM reserve_operation_transactions rot
+JOIN reserve_operations o ON o.id = rot.reserve_operation_id
+WHERE rot.reserve_operation_id = $1 AND o.user_id = $2
+ORDER BY rot.transaction_id
+`
+
+type ListReserveOperationTransactionsParams struct {
+	ReserveOperationID uuid.UUID `json:"reserve_operation_id"`
+	UserID             uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) ListReserveOperationTransactions(ctx context.Context, arg ListReserveOperationTransactionsParams) ([]ReserveOperationTransaction, error) {
+	rows, err := q.db.Query(ctx, listReserveOperationTransactions, arg.ReserveOperationID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReserveOperationTransaction
+	for rows.Next() {
+		var i ReserveOperationTransaction
+		if err := rows.Scan(&i.ReserveOperationID, &i.TransactionID, &i.Role); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

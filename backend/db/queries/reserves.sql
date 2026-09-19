@@ -140,6 +140,26 @@ DELETE FROM transactions WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id)
 -- name: DeleteAnyReserveOperation :execrows
 DELETE FROM reserve_operations WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id);
 
+-- name: InsertReserveOperationTransaction :exec
+INSERT INTO reserve_operation_transactions (reserve_operation_id, transaction_id, role)
+VALUES (sqlc.arg(reserve_operation_id), sqlc.arg(transaction_id), sqlc.arg(role));
+
+-- name: ListReserveOperationTransactions :many
+SELECT rot.reserve_operation_id, rot.transaction_id, rot.role
+FROM reserve_operation_transactions rot
+JOIN reserve_operations o ON o.id = rot.reserve_operation_id
+WHERE rot.reserve_operation_id = sqlc.arg(reserve_operation_id) AND o.user_id = sqlc.arg(user_id)
+ORDER BY rot.transaction_id;
+
+-- name: GetGeneratedReserveTransaction :one
+SELECT rot.reserve_operation_id, rot.transaction_id, rot.role
+FROM reserve_operation_transactions rot
+JOIN reserve_operations o ON o.id = rot.reserve_operation_id
+WHERE rot.transaction_id = sqlc.arg(transaction_id) AND o.user_id = sqlc.arg(user_id);
+
+-- name: DeleteReserveOperationTransactions :exec
+DELETE FROM reserve_operation_transactions WHERE reserve_operation_id = sqlc.arg(reserve_operation_id);
+
 -- name: DeleteReserveOperation :execrows
 DELETE FROM reserve_operations
 WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND operation_type = 'reserve_spend';
@@ -153,7 +173,7 @@ FROM reserve_operations o
 JOIN reserve_entries e ON e.operation_id = o.id
 JOIN reserves r ON r.id = e.reserve_id
 WHERE o.user_id = sqlc.arg(user_id)
-  AND o.operation_type IN ('deposit', 'reserve_spend', 'transfer')
+  AND o.operation_type IN ('deposit', 'reserve_spend', 'transfer', 'move_to_income')
   AND o.occurred_on >= sqlc.arg(from_date)
   AND o.occurred_on < sqlc.arg(to_date)
   AND (

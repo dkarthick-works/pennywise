@@ -213,7 +213,7 @@ func depositOperationDTOs(rows []db.ListReserveOperationHistoryRow) []ReserveOpe
 				ID: row.ID.String(), OperationType: row.OperationType, Date: dateToString(row.OccurredOn),
 				Description: row.Description, Note: row.Note, Entries: make([]ReserveEntryDTO, 0),
 				CreatedAt: row.CreatedAt.Time.Format(time.RFC3339Nano), UpdatedAt: row.UpdatedAt.Time.Format(time.RFC3339Nano),
-				Editable: (row.OperationType == "deposit" || row.OperationType == "reserve_spend") && row.ActionEligible, Deletable: (row.OperationType == "deposit" || row.OperationType == "reserve_spend" || row.OperationType == "transfer") && row.ActionEligible,
+				Editable: (row.OperationType == "deposit" || row.OperationType == "reserve_spend") && row.ActionEligible, Deletable: (row.OperationType == "deposit" || row.OperationType == "reserve_spend" || row.OperationType == "transfer" || row.OperationType == "move_to_income") && row.ActionEligible,
 			})
 		}
 		if _, exists := actionable[row.ID]; !exists {
@@ -231,7 +231,7 @@ func depositOperationDTOs(rows []db.ListReserveOperationHistoryRow) []ReserveOpe
 	for id, index := range indices {
 		operations[index].Total = centsToJSONNumber(totals[id])
 		operations[index].Editable = (operations[index].OperationType == "deposit" || operations[index].OperationType == "reserve_spend") && actionable[id]
-		operations[index].Deletable = (operations[index].OperationType == "deposit" || operations[index].OperationType == "reserve_spend" || operations[index].OperationType == "transfer") && actionable[id]
+		operations[index].Deletable = (operations[index].OperationType == "deposit" || operations[index].OperationType == "reserve_spend" || operations[index].OperationType == "transfer" || operations[index].OperationType == "move_to_income") && actionable[id]
 	}
 	return operations
 }
@@ -241,7 +241,7 @@ func reserveOperationDTO(operation db.ReserveOperation, total money.Number, entr
 		ID: operation.ID.String(), OperationType: operation.OperationType, Date: dateToString(operation.OccurredOn),
 		Description: operation.Description, Note: operation.Note, Total: total, Entries: entries,
 		CreatedAt: operation.CreatedAt.Time.Format(time.RFC3339Nano), UpdatedAt: operation.UpdatedAt.Time.Format(time.RFC3339Nano),
-		Editable: operation.OperationType == "deposit" || operation.OperationType == "reserve_spend", Deletable: operation.OperationType == "deposit" || operation.OperationType == "reserve_spend" || operation.OperationType == "transfer",
+		Editable: operation.OperationType == "deposit" || operation.OperationType == "reserve_spend", Deletable: operation.OperationType == "deposit" || operation.OperationType == "reserve_spend" || operation.OperationType == "transfer" || operation.OperationType == "move_to_income",
 	}
 }
 
