@@ -605,6 +605,83 @@ func TestArchivedReserveSpendingCannotBeDeleted(t *testing.T) {
 	assertReserveError(t, apiRequest(t, srv, token, http.MethodDelete, "/api/reserve-operations/"+operation.ID, nil), http.StatusConflict, "archived reserve operations cannot be changed")
 }
 
+func TestReserveTransferAndArchivalLifecycle(t *testing.T) {
+	srv, pool, token, userID := setupCategoryAPITest(t)
+	defer pool.Close()
+	general := listTestReserves(t, srv, token, false)[0]
+	from := createTestReserve(t, srv, token, "Ceremony Reserve")
+	to := createTestReserve(t, srv, token, "Loan Reserve")
+	fund := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{
+		"description": "Funding", "date": "2026-09-01", "allocations": []map[string]any{{"reserve_id": from.ID, "amount": 100000}},
+	})
+	if fund.Code != http.StatusCreated {
+		t.Fatalf("fund status = %d body = %s", fund.Code, fund.Body.String())
+	}
+	before := apiRequest(t, srv, token, http.MethodGet, "/api/dashboard/monthly?month=2026-09", nil).Body.String()
+	transfer := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/transfers", map[string]any{
+		"from_reserve_id": from.ID, "to_reserve_id": to.ID, "amount": 20000, "date": "2026-09-18", "note": "Reallocated",
+	})
+	if transfer.Code != http.StatusCreated {
+		t.Fatalf("transfer status = %d body = %s", transfer.Code, transfer.Body.String())
+	}
+	var operation ReserveOperationDTO
+	if err := json.Unmarshal(transfer.Body.Bytes(), &operation); err != nil {
+		t.Fatalf("decode transfer: %v", err)
+	}
+	if operation.OperationType != "transfer" || len(operation.Entries) != 2 || operation.Editable || !operation.Deletable {
+		t.Fatalf("transfer operation = %#v", operation)
+	}
+	balances := listTestReserves(t, srv, token, false)
+	for _, reserve := range balances {
+		if reserve.ID == from.ID && reserve.Balance != 80000 {
+			t.Fatalf("source balance = %v", reserve.Balance)
+		}
+		if reserve.ID == to.ID && reserve.Balance != 20000 {
+			t.Fatalf("destination balance = %v", reserve.Balance)
+		}
+	}
+	after := apiRequest(t, srv, token, http.MethodGet, "/api/dashboard/monthly?month=2026-09", nil).Body.String()
+	if before != after {
+		t.Fatalf("transfer changed dashboard")
+	}
+	var transactions int
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM transactions WHERE user_id = $1`, userID).Scan(&transactions); err != nil {
+		t.Fatalf("count transactions: %v", err)
+	}
+	if transactions != 0 {
+		t.Fatalf("transactions = %d, want 0", transactions)
+	}
+
+	if _, err := pool.Exec(context.Background(), `UPDATE reserves SET archived_at = now() WHERE id = $1`, to.ID); err != nil {
+		t.Fatalf("archive fixture: %v", err)
+	}
+	assertReserveError(t, apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/transfers", map[string]any{
+		"from_reserve_id": from.ID, "to_reserve_id": to.ID, "amount": 1, "date": "2026-09-19",
+	}), http.StatusConflict, "archived reserves cannot receive transfers")
+	assertReserveError(t, apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/transfers", map[string]any{
+		"from_reserve_id": from.ID, "to_reserve_id": from.ID, "amount": 1, "date": "2026-09-19",
+	}), http.StatusBadRequest, "source and destination reserves must differ")
+
+	deleted := apiRequest(t, srv, token, http.MethodDelete, "/api/reserve-operations/"+operation.ID, nil)
+	if deleted.Code != http.StatusConflict {
+		t.Fatalf("delete transfer with archived side status = %d body = %s", deleted.Code, deleted.Body.String())
+	}
+
+	// Empty non-General reserves can be archived and delete; General cannot.
+	empty := createTestReserve(t, srv, token, "Empty Reserve")
+	archive := apiRequest(t, srv, token, http.MethodPost, "/api/reserves/"+empty.ID+"/archive", nil)
+	if archive.Code != http.StatusNoContent {
+		t.Fatalf("archive status = %d body = %s", archive.Code, archive.Body.String())
+	}
+	if got := listTestReserves(t, srv, token, true); len(got) != 4 {
+		t.Fatalf("all reserves = %d, want 4", len(got))
+	}
+	if delete := apiRequest(t, srv, token, http.MethodDelete, "/api/reserves/"+empty.ID, nil); delete.Code != http.StatusConflict {
+		t.Fatalf("delete archived reserve status = %d", delete.Code)
+	}
+	assertReserveError(t, apiRequest(t, srv, token, http.MethodPost, "/api/reserves/"+general.ID+"/archive", nil), http.StatusConflict, "general reserve cannot be archived")
+}
+
 func createTestReserve(t *testing.T, srv *Server, token, name string) reserveTestDTO {
 	t.Helper()
 	rr := apiRequest(t, srv, token, http.MethodPost, "/api/reserves", map[string]any{"name": name})

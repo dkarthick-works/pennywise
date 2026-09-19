@@ -151,9 +151,13 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/reserve-operations", s.handleListReserveOperations)
 		pr.Post("/api/reserve-operations/deposits", s.handleCreateReserveDeposit)
 		pr.Post("/api/reserve-operations/spending", s.handleCreateReserveSpending)
+		pr.Post("/api/reserve-operations/transfers", s.handleCreateReserveTransfer)
 		pr.Get("/api/income-activity", s.handleIncomeActivity)
 		pr.Patch("/api/reserve-operations/{id}", s.handleUpdateReserveSpending)
 		pr.Delete("/api/reserve-operations/{id}", s.handleDeleteReserveSpending)
+		pr.Delete("/api/reserve-transfers/{id}", s.handleDeleteReserveTransfer)
+		pr.Post("/api/reserves/{id}/archive", s.handleArchiveReserve)
+		pr.Delete("/api/reserves/{id}", s.handleDeleteReserve)
 
 		pr.Get("/api/lents", s.handleListLents)
 		pr.Post("/api/lents", s.handleCreateLent)

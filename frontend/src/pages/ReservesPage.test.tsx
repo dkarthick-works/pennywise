@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReservesPage } from "./ReservesPage";
-import { createReserve, createReserveDeposit, createReserveSpending, deleteReserveSpending, listReserveOperations, listReserves, renameReserve, updateReserveSpending } from "../api/reserves";
+import { archiveReserve, createReserve, createReserveDeposit, createReserveSpending, createReserveTransfer, deleteReserveSpending, listReserveOperations, listReserves, renameReserve, updateReserveSpending } from "../api/reserves";
 
 vi.mock("../api/reserves", async (original) => ({
   ...await original<typeof import("../api/reserves")>(),
@@ -13,6 +13,8 @@ vi.mock("../api/reserves", async (original) => ({
   renameReserve: vi.fn(),
   createReserveDeposit: vi.fn(),
   createReserveSpending: vi.fn(),
+  createReserveTransfer: vi.fn(),
+  archiveReserve: vi.fn(),
   updateReserveSpending: vi.fn(),
   deleteReserveSpending: vi.fn(),
   listReserveOperations: vi.fn(),
@@ -31,6 +33,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listReserveOperations).mockResolvedValue([]);
   vi.mocked(createReserveSpending).mockResolvedValue({ id: "spend", operation_type: "reserve_spend", date: "2026-09-18", description: "Loan settlement", note: "", total: 100000, entries: [], created_at: "", updated_at: "", editable: true, deletable: true });
+  vi.mocked(createReserveTransfer).mockResolvedValue({ id: "transfer", operation_type: "transfer", date: "2026-09-18", description: "Transfer between reserves", note: "", total: 100, entries: [], created_at: "", updated_at: "", editable: false, deletable: true });
+  vi.mocked(archiveReserve).mockResolvedValue(undefined);
   vi.mocked(updateReserveSpending).mockResolvedValue({ id: "spend", operation_type: "reserve_spend", date: "2026-09-18", description: "Loan settlement", note: "", total: 100000, entries: [], created_at: "", updated_at: "", editable: true, deletable: true });
 });
 
@@ -175,12 +179,32 @@ describe("Reserves page", () => {
     await waitFor(() => expect(updateReserveSpending).toHaveBeenCalledWith("spend", expect.objectContaining({ reserve_id: "loan", amount: 35000 })));
 
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.click(screen.getAllByRole("button", { name: "Delete" }).at(-1)!);
     await waitFor(() => expect(deleteReserveSpending).toHaveBeenCalledWith("spend"));
   });
 
+  it("transfers between active reserves and archives a zero-balance reserve", async () => {
+    const user = userEvent.setup();
+    const active = [
+      { id: "one", name: "One Reserve", is_general: true, archived: false, balance: 0 },
+      { id: "two", name: "Two Reserve", is_general: false, archived: false, balance: 0 },
+    ];
+    const archived = { id: "old", name: "Old Reserve", is_general: false, archived: true, balance: 0 };
+    vi.mocked(listReserves).mockImplementation((includeArchived = false) => Promise.resolve(includeArchived ? [...active, archived] : active));
+    mount();
+    await user.click(await screen.findByRole("button", { name: "Transfer between reserves" }));
+    await user.type(screen.getByLabelText("Amount"), "100");
+    await user.click(screen.getByRole("button", { name: "Save transfer" }));
+    await waitFor(() => expect(createReserveTransfer).toHaveBeenCalledWith({ from_reserve_id: "one", to_reserve_id: "two", amount: 100, date: expect.any(String), note: "" }));
+    expect(screen.getByText("Archived reserves")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Old Reserve" })).toBeInTheDocument();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await user.click(screen.getByRole("button", { name: "Archive" }));
+    await waitFor(() => expect(archiveReserve).toHaveBeenCalledWith("two"));
+  });
+
   it("offers retryable error and empty states", async () => {
-    vi.mocked(listReserves).mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce([]);
+    vi.mocked(listReserves).mockRejectedValueOnce(new Error("offline")).mockResolvedValue([]);
     mount();
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not load reserves");
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));

@@ -12,6 +12,7 @@ import (
 )
 
 type Querier interface {
+	ArchiveReserve(ctx context.Context, arg ArchiveReserveParams) (int64, error)
 	CategoryTextExistsForUser(ctx context.Context, arg CategoryTextExistsForUserParams) (bool, error)
 	ChitTransferChitPreflight(ctx context.Context, arg ChitTransferChitPreflightParams) (ChitTransferChitPreflightRow, error)
 	ChitTransferPreflight(ctx context.Context, userID uuid.UUID) (ChitTransferPreflightRow, error)
@@ -29,10 +30,12 @@ type Querier interface {
 	DeleteLent(ctx context.Context, arg DeleteLentParams) (int64, error)
 	DeleteMissingEventItems(ctx context.Context, arg DeleteMissingEventItemsParams) error
 	DeleteRepayment(ctx context.Context, arg DeleteRepaymentParams) (int64, error)
+	DeleteReserve(ctx context.Context, arg DeleteReserveParams) (int64, error)
 	DeleteReserveOperation(ctx context.Context, arg DeleteReserveOperationParams) (int64, error)
 	DeleteSettlementLinks(ctx context.Context, settlementID uuid.UUID) error
 	DeleteTemplatesBySection(ctx context.Context, arg DeleteTemplatesBySectionParams) error
 	DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) error
+	DeleteTransferOperation(ctx context.Context, arg DeleteTransferOperationParams) (int64, error)
 	EnsureGeneralReserve(ctx context.Context, userID uuid.UUID) error
 	// Create the default settings row for a user if it does not exist yet.
 	EnsureSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)

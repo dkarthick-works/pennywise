@@ -121,7 +121,7 @@ FROM reserve_operations o
 JOIN reserve_entries e ON e.operation_id = o.id
 JOIN reserves r ON r.id = e.reserve_id
 WHERE o.user_id = sqlc.arg(user_id)
-  AND o.operation_type IN ('deposit', 'reserve_spend')
+  AND o.operation_type IN ('deposit', 'reserve_spend', 'transfer')
   AND o.occurred_on >= sqlc.arg(from_date)
   AND o.occurred_on < sqlc.arg(to_date)
   AND (
@@ -133,6 +133,20 @@ WHERE o.user_id = sqlc.arg(user_id)
     )
   )
 ORDER BY o.occurred_on DESC, o.created_at DESC, o.id DESC, r.name, e.id;
+
+-- name: ArchiveReserve :execrows
+UPDATE reserves
+SET archived_at = now(), updated_at = now()
+WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND NOT is_general AND archived_at IS NULL;
+
+-- name: DeleteReserve :execrows
+DELETE FROM reserves r
+WHERE r.id = sqlc.arg(id) AND r.user_id = sqlc.arg(user_id) AND NOT r.is_general
+  AND NOT EXISTS (SELECT 1 FROM reserve_entries e WHERE e.reserve_id = r.id);
+
+-- name: DeleteTransferOperation :execrows
+DELETE FROM reserve_operations
+WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND operation_type = 'transfer';
 
 -- name: ListIncomeActivityTransactions :many
 SELECT t.id, t.category, t.amount, t.txn_date, t.created_at,

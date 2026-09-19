@@ -12,6 +12,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveReserve = `-- name: ArchiveReserve :execrows
+UPDATE reserves
+SET archived_at = now(), updated_at = now()
+WHERE id = $1 AND user_id = $2 AND NOT is_general AND archived_at IS NULL
+`
+
+type ArchiveReserveParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) ArchiveReserve(ctx context.Context, arg ArchiveReserveParams) (int64, error) {
+	result, err := q.db.Exec(ctx, archiveReserve, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const countActiveReserves = `-- name: CountActiveReserves :one
 SELECT COUNT(*)::bigint FROM reserves
 WHERE user_id = $1 AND archived_at IS NULL
@@ -50,6 +69,25 @@ func (q *Queries) CreateReserve(ctx context.Context, arg CreateReserveParams) (R
 	return i, err
 }
 
+const deleteReserve = `-- name: DeleteReserve :execrows
+DELETE FROM reserves r
+WHERE r.id = $1 AND r.user_id = $2 AND NOT r.is_general
+  AND NOT EXISTS (SELECT 1 FROM reserve_entries e WHERE e.reserve_id = r.id)
+`
+
+type DeleteReserveParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteReserve(ctx context.Context, arg DeleteReserveParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteReserve, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteReserveOperation = `-- name: DeleteReserveOperation :execrows
 DELETE FROM reserve_operations
 WHERE id = $1 AND user_id = $2 AND operation_type = 'reserve_spend'
@@ -62,6 +100,24 @@ type DeleteReserveOperationParams struct {
 
 func (q *Queries) DeleteReserveOperation(ctx context.Context, arg DeleteReserveOperationParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteReserveOperation, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteTransferOperation = `-- name: DeleteTransferOperation :execrows
+DELETE FROM reserve_operations
+WHERE id = $1 AND user_id = $2 AND operation_type = 'transfer'
+`
+
+type DeleteTransferOperationParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteTransferOperation(ctx context.Context, arg DeleteTransferOperationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTransferOperation, arg.ID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
@@ -446,7 +502,7 @@ FROM reserve_operations o
 JOIN reserve_entries e ON e.operation_id = o.id
 JOIN reserves r ON r.id = e.reserve_id
 WHERE o.user_id = $1
-  AND o.operation_type IN ('deposit', 'reserve_spend')
+  AND o.operation_type IN ('deposit', 'reserve_spend', 'transfer')
   AND o.occurred_on >= $2
   AND o.occurred_on < $3
   AND (

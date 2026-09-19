@@ -144,8 +144,13 @@ func (s *Server) handleRenameReserve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	uid := userID(r)
-	if _, err := s.q.GetReserveForUser(r.Context(), db.GetReserveForUserParams{ID: id, UserID: uid}); err != nil {
+	reserve, err := s.q.GetReserveForUser(r.Context(), db.GetReserveForUserParams{ID: id, UserID: uid})
+	if err != nil {
 		writeReserveLookupError(w, err, "could not rename reserve")
+		return
+	}
+	if reserve.ArchivedAt.Valid {
+		writeErr(w, http.StatusConflict, "archived reserves cannot be renamed")
 		return
 	}
 	exists, err := s.q.ReserveNameExists(r.Context(), db.ReserveNameExistsParams{UserID: uid, Name: name, ExcludeID: id})

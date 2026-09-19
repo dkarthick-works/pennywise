@@ -66,7 +66,10 @@ presentation while preserving `counts_as_income` and source/nature discriminatio
 generated funding income is recognized through `reserve_operation_transactions`.
 Reserve-only spending locks its selected reserve before validating its derived
 balance, and uses the same reserve-operation history with editable/deletable
-policy fields. It never inserts a normal transaction.
+policy fields. It never inserts a normal transaction. Transfers lock both
+affected reserves in UUID order, preserve aggregate balances, and remain
+isolated from normal transactions. Archiving requires a zero derived balance
+and preserves entries for history.
 
 ## Layout
 
@@ -172,8 +175,12 @@ only ever talks to this origin.
 | GET    | `/api/reserve-operations?year=YYYY` | list direct reserve deposits with allocation details in reverse chronology |
 | POST   | `/api/reserve-operations/deposits` | atomically create one direct deposit with one or more distinct allocations |
 | POST   | `/api/reserve-operations/spending` | atomically withdraw from one active reserve without a normal transaction |
+| POST   | `/api/reserve-operations/transfers` | atomically move money between two active reserves |
 | PATCH  | `/api/reserve-operations/{id}` | edit a standalone reserve-spend operation |
 | DELETE | `/api/reserve-operations/{id}` | delete a standalone reserve-spend operation |
+| DELETE | `/api/reserve-transfers/{id}` | delete a transfer operation after balance validation |
+| POST   | `/api/reserves/{id}/archive` | archive a zero-balance non-General reserve |
+| DELETE | `/api/reserves/{id}` | delete an empty non-General reserve |
 | GET    | `/api/income-activity?month=YYYY-MM` | discriminated ordinary, From-reserve, and Sent-to-reserves monthly income activity |
 | GET    | `/api/lents?status=open\|settled\|all` | list money lent to others (default `all`) |
 | POST   | `/api/lents` | create a lent |
