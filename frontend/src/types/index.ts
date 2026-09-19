@@ -508,6 +508,15 @@ export interface ReserveIncomeTransferInput {
   note: string;
 }
 
+export interface FundedExpenseInput {
+  reserve_id: string;
+  amount: number;
+  date: string;
+  section: "essential" | "flexible" | "daily";
+  category: string;
+  note: string;
+}
+
 interface IncomeActivityBase {
   description: string;
   amount: number;

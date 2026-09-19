@@ -846,6 +846,51 @@ func TestMoveReserveMoneyToIncomeCreatesProtectedGeneratedIncome(t *testing.T) {
 	}
 }
 
+func TestFundedExpenseCreatesPairedCashTransactionsAndDeletesTogether(t *testing.T) {
+	srv, pool, token, userID := setupCategoryAPITest(t)
+	defer pool.Close()
+	reserve := createTestReserve(t, srv, token, "Car Reserve")
+	fund := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{"description": "Funding", "date": "2026-09-01", "allocations": []map[string]any{{"reserve_id": reserve.ID, "amount": 10000}}})
+	if fund.Code != http.StatusCreated {
+		t.Fatalf("fund status = %d body = %s", fund.Code, fund.Body.String())
+	}
+	expense := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/funded-expenses", map[string]any{"reserve_id": reserve.ID, "amount": 8000, "date": "2026-09-18", "section": "daily", "category": "Tyre replacement", "note": "Rear tyre"})
+	if expense.Code != http.StatusCreated {
+		t.Fatalf("funded expense status = %d body = %s", expense.Code, expense.Body.String())
+	}
+	var operation ReserveOperationDTO
+	if err := json.Unmarshal(expense.Body.Bytes(), &operation); err != nil {
+		t.Fatalf("decode funded expense: %v", err)
+	}
+	if operation.OperationType != "funded_expense" || operation.Total != "8000.00" || operation.Editable || !operation.Deletable {
+		t.Fatalf("operation = %#v", operation)
+	}
+	var count int
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM transactions WHERE user_id = $1`, userID).Scan(&count); err != nil {
+		t.Fatalf("transaction count: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("transactions = %d, want income + expense", count)
+	}
+	var income, expenseAmount float64
+	if err := pool.QueryRow(context.Background(), `SELECT COALESCE(SUM(amount) FILTER (WHERE section = 'income'), 0), COALESCE(SUM(amount) FILTER (WHERE section = 'daily'), 0) FROM transactions WHERE user_id = $1`, userID).Scan(&income, &expenseAmount); err != nil {
+		t.Fatalf("analytics rows: %v", err)
+	}
+	if income != 8000 || expenseAmount != 8000 {
+		t.Fatalf("income/expense = %v/%v", income, expenseAmount)
+	}
+	deleted := apiRequest(t, srv, token, http.MethodDelete, "/api/reserve-operations/"+operation.ID, nil)
+	if deleted.Code != http.StatusNoContent {
+		t.Fatalf("delete funded expense status = %d body = %s", deleted.Code, deleted.Body.String())
+	}
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM transactions WHERE user_id = $1`, userID).Scan(&count); err != nil {
+		t.Fatalf("post-delete count: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("generated transactions remain = %d", count)
+	}
+}
+
 func createTestReserve(t *testing.T, srv *Server, token, name string) reserveTestDTO {
 	t.Helper()
 	rr := apiRequest(t, srv, token, http.MethodPost, "/api/reserves", map[string]any{"name": name})

@@ -255,6 +255,18 @@ func (s *Server) handleDeleteReserveSpending(w http.ResponseWriter, r *http.Requ
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	if operation.OperationType == "funded_expense" {
+		s.deleteFundedExpense(w, r, operation, qtx)
+		if w.Header().Get("Content-Type") == "application/json" {
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			writeErr(w, http.StatusInternalServerError, "could not delete funded expense")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if operation.OperationType != "reserve_spend" {
 		writeErr(w, http.StatusConflict, "operation cannot be deleted independently")
 		return

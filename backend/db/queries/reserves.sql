@@ -173,7 +173,7 @@ FROM reserve_operations o
 JOIN reserve_entries e ON e.operation_id = o.id
 JOIN reserves r ON r.id = e.reserve_id
 WHERE o.user_id = sqlc.arg(user_id)
-  AND o.operation_type IN ('deposit', 'reserve_spend', 'transfer', 'move_to_income')
+  AND o.operation_type IN ('deposit', 'reserve_spend', 'transfer', 'move_to_income', 'funded_expense')
   AND o.occurred_on >= sqlc.arg(from_date)
   AND o.occurred_on < sqlc.arg(to_date)
   AND (
