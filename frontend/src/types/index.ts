@@ -481,3 +481,43 @@ export interface ReserveDepositInput {
   note: string;
   allocations: ReserveAllocationInput[];
 }
+
+interface IncomeActivityBase {
+  description: string;
+  amount: number;
+  date: string;
+  allocations: ReserveEntry[];
+  created_at: string;
+}
+
+export interface NormalIncomeActivityItem extends IncomeActivityBase {
+  source: "normal_transaction";
+  nature: "normal_income";
+  counts_as_income: true;
+  transaction_id: string;
+  reserve_operation_id: null;
+  reserve_name: null;
+}
+
+export interface FromReserveIncomeActivityItem extends IncomeActivityBase {
+  source: "normal_transaction";
+  nature: "from_reserve";
+  counts_as_income: true;
+  transaction_id: string;
+  reserve_operation_id: string;
+  reserve_name: string | null;
+}
+
+export interface SentToReservesActivityItem extends IncomeActivityBase {
+  source: "reserve_deposit";
+  nature: "sent_to_reserves";
+  counts_as_income: false;
+  transaction_id: null;
+  reserve_operation_id: string;
+  reserve_name: null;
+}
+
+export type IncomeActivityItem =
+  | NormalIncomeActivityItem
+  | FromReserveIncomeActivityItem
+  | SentToReservesActivityItem;

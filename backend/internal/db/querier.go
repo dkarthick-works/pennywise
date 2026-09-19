@@ -78,6 +78,7 @@ type Querier interface {
 	ListEventItems(ctx context.Context, arg ListEventItemsParams) ([]EventItem, error)
 	ListEvents(ctx context.Context, arg ListEventsParams) ([]ListEventsRow, error)
 	ListGroupTransactionsForHistory(ctx context.Context, arg ListGroupTransactionsForHistoryParams) ([]ListGroupTransactionsForHistoryRow, error)
+	ListIncomeActivityTransactions(ctx context.Context, arg ListIncomeActivityTransactionsParams) ([]ListIncomeActivityTransactionsRow, error)
 	ListInstallmentsForChit(ctx context.Context, arg ListInstallmentsForChitParams) ([]ChitInstallment, error)
 	ListLents(ctx context.Context, arg ListLentsParams) ([]ListLentsRow, error)
 	ListLentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListLentsForTransferRow, error)

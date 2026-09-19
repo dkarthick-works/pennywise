@@ -6,9 +6,9 @@ import {
   openMonth, getSettings,
   createTxn, updateTxn, deleteTxn,
 } from "../api/ledger";
-import { inr } from "../lib/money";
+import { inr, money2 } from "../lib/money";
 import { budgetColor } from "../lib/money";
-import { monthCode, shiftMonth, MONTH_NAMES, monthLabel, defaultDraftDate } from "../lib/dates";
+import { monthCode, monthKey, shiftMonth, MONTH_NAMES, monthLabel, defaultDraftDate } from "../lib/dates";
 import { settledCreditIds } from "../lib/txns";
 import {
   invalidateMonthCaches,
@@ -28,11 +28,13 @@ import { CopyLastMonthButton } from "../components/record/CopyLastMonthButton";
 import { MonthDropdown } from "../components/record/MonthDropdown";
 import { BudgetAmountInput } from "../components/budget/BudgetAmountInput";
 import { budgetsFromMonthly, useMonthlyBudgetQuery, useSaveMonthlyBudget } from "../hooks/useMonthlyBudget";
+import { createReserveDeposit, getIncomeActivity, listReserves, reserveKeys } from "../api/reserves";
+import { ReserveDepositForm } from "../components/reserves/ReserveDepositForm";
 import {
   IconChevL, IconChevR, IconPlus, IconX, IconCheck, IconLock, IconArrowR, IconDownload,
   IconRecord, IconCreditCard, IconTrend, IconWallet, IconZap, IconDashboard,
 } from "../components/ui/Icons";
-import type { Transaction, Section } from "../types";
+import type { ReserveDepositInput, Transaction, Section } from "../types";
 import { preserveApiRowOrder, sortRowsByDateDesc } from "../lib/recordRowOrder";
 
 // ─── Status legend ────────────────────────────────────────────────────────
@@ -257,6 +259,8 @@ function useRowMutations(month: string, section: Section) {
     mutationFn: ({ id, patch }: { id: string; patch: Partial<Transaction> }) => updateTxn(id, patch),
     onSuccess: (updated, { patch }) => {
       invalidateMonthCaches(qc, month);
+      const destinationMonth = monthKey(updated.date);
+      if (destinationMonth !== month) invalidateMonthCaches(qc, destinationMonth);
       const teachesName =
         Object.prototype.hasOwnProperty.call(patch, "category") ||
         Object.prototype.hasOwnProperty.call(patch, "section");
@@ -276,6 +280,8 @@ function useRowMutations(month: string, section: Section) {
     mutationFn: (t: Omit<Transaction, "id" | "settled">) => createTxn(t),
     onSuccess: (created) => {
       invalidateMonthCaches(qc, month);
+      const createdMonth = monthKey(created.date);
+      if (createdMonth !== month) invalidateMonthCaches(qc, createdMonth);
       invalidateTransactionNameSuggestions(qc, created.section);
     },
   });
@@ -660,11 +666,34 @@ function DailyTile({ rows, section, month, settledSet }: {
 function IncomeTile({ rows, month, onCopyPendingChange }: {
   rows: Transaction[]; month: string; onCopyPendingChange: (pending: boolean) => void;
 }) {
+  const queryClient = useQueryClient();
   const { upd, del, add } = useRowMutations(month, "income");
   const blank = { date: defaultDraftDate(month, rows.map((r) => r.date)), category: "", amount: 0 };
   const [draft, setDraft] = useState(blank);
-
+  const [destination, setDestination] = useState<"normal" | "reserves">("normal");
+  const activity = useQuery({
+    queryKey: reserveKeys.incomeActivity(month),
+    queryFn: ({ signal }) => getIncomeActivity(month, signal),
+    retry: false,
+  });
+  const reserves = useQuery({
+    queryKey: reserveKeys.list(false),
+    queryFn: ({ signal }) => listReserves(false, signal),
+    retry: false,
+  });
+  const deposit = useMutation({
+    mutationFn: (input: ReserveDepositInput) => createReserveDeposit(input),
+    retry: false,
+    onSuccess: async () => {
+      setDestination("normal");
+      await queryClient.invalidateQueries({ queryKey: reserveKeys.all });
+    },
+  });
   const sorted = sortRowsByDateDesc(rows);
+  const activityByTransaction = new Map(
+    (activity.data ?? []).filter((item) => item.transaction_id).map((item) => [item.transaction_id, item]),
+  );
+  const sentToReserves = (activity.data ?? []).filter((item) => item.nature === "sent_to_reserves");
 
   function commit() {
     if (!draft.category.trim() || !draft.amount) return;
@@ -675,79 +704,60 @@ function IncomeTile({ rows, month, onCopyPendingChange }: {
   }
 
   return (
-    <div className="card" style={{ overflow: "visible" }}>
-      <div style={{ overflowX: "auto" }}>
-        <table className="tbl">
-          <thead><tr>
-            <th style={{ width: 158 }}>Date</th>
-            <th style={{ minWidth: 190 }}>Source</th>
-            <th style={{ width: 130 }}>Amount (₹)</th>
-            <th style={{ width: 44 }} />
-          </tr></thead>
-          <tbody>
-            {/* quick-add row */}
-            <tr style={{ background: "oklch(0.955 0.035 155 / 0.4)" }}>
-              <td><DateCell value={draft.date} onChange={(v) => setDraft({ ...draft, date: v })} /></td>
-              <td>
-                <CategoryInput
-                  value={draft.category}
-                  section="income"
-                  placeholder="e.g. Salary, Freelance, Dividend"
-                  onChange={(v) => setDraft({ ...draft, category: v })}
-                  onSubmit={() => commit()}
-                />
-              </td>
-              <td><AmountInput value={draft.amount} onChange={(v) => setDraft({ ...draft, amount: v ?? 0 })} placeholder="0"
-                onEnterCommit={(parsed) => {
-                  if (!draft.category.trim() || !parsed) return;
-                  add.mutate(
-                    { section: "income", category: draft.category.trim(), amount: parsed, date: draft.date || `${month}-01`, kind: "cash" },
-                    { onSuccess: () => setDraft((d) => ({ date: d.date, category: "", amount: 0 })) }
-                  );
-                }}
-              /></td>
-              <td>
-                <button
-                  className="btn btn-primary"
-                  style={{ width: 34, height: 30, padding: 0, borderRadius: 8, background: "var(--pos)" }}
-                  onClick={commit}
-                  aria-label="Add income"
-                >
-                  <IconPlus size={16} />
-                </button>
-              </td>
-            </tr>
+    <div className="income-activity">
+      <div className="seg income-destination" aria-label="Income destination">
+        <button type="button" aria-pressed={destination === "normal"} className={destination === "normal" ? "on" : ""} onClick={() => setDestination("normal")}>Normal income</button>
+        <button type="button" aria-pressed={destination === "reserves"} className={destination === "reserves" ? "on" : ""} onClick={() => setDestination("reserves")}>Send to reserves</button>
+      </div>
 
-            {sorted.map((r) => (
-              <tr key={r.id}>
-                <td><DateCell value={r.date} onChange={(v) => upd.mutate({ id: r.id, patch: { date: v } })} /></td>
-                <td><RowCategoryInput value={r.category} onChange={(v) => upd.mutate({ id: r.id, patch: { category: v } })} /></td>
-                <td><AmountInput value={r.amount} onChange={(v) => upd.mutate({ id: r.id, patch: { amount: v ?? 0 } })} /></td>
-                <td><button className="x-btn" onClick={() => del.mutate(r.id)} aria-label="Remove"><IconX size={15} /></button></td>
-              </tr>
-            ))}
+      {destination === "reserves" ? (
+        <section className="card card-pad income-reserve-form" aria-labelledby="send-reserves-heading">
+          <h2 id="send-reserves-heading" className="card-h">Send to reserves</h2>
+          <p className="muted">This records reserve activity directly and does not create normal income.</p>
+          {reserves.isPending ? <p role="status">Loading reserves…</p> : reserves.isError ? <div role="alert">Could not load reserves.</div> : !reserves.data.length ? <p>No active reserves are available.</p> :
+            <ReserveDepositForm reserves={reserves.data} initialDate={draft.date || `${month}-01`} submitting={deposit.isPending} onCancel={() => setDestination("normal")} onSave={deposit.mutateAsync} />}
+        </section>
+      ) : (
+        <section aria-labelledby="normal-income-heading">
+          <h2 id="normal-income-heading" className="income-group-title">Normal income</h2>
+          <div className="card" style={{ overflow: "visible" }}>
+            <div style={{ overflowX: "auto" }}>
+              <table className="tbl">
+                <thead><tr><th style={{ width: 158 }}>Date</th><th style={{ minWidth: 190 }}>Source</th><th style={{ width: 130 }}>Amount (₹)</th><th style={{ width: 44 }} /></tr></thead>
+                <tbody>
+                  <tr style={{ background: "oklch(0.955 0.035 155 / 0.4)" }}>
+                    <td><DateCell value={draft.date} onChange={(v) => setDraft({ ...draft, date: v })} /></td>
+                    <td><CategoryInput value={draft.category} section="income" placeholder="e.g. Salary, Freelance, Dividend" onChange={(v) => setDraft({ ...draft, category: v })} onSubmit={commit} /></td>
+                    <td><AmountInput value={draft.amount} onChange={(v) => setDraft({ ...draft, amount: v ?? 0 })} placeholder="0" onEnterCommit={(parsed) => {
+                      if (!draft.category.trim() || !parsed) return;
+                      add.mutate({ section: "income", category: draft.category.trim(), amount: parsed, date: draft.date || `${month}-01`, kind: "cash" }, { onSuccess: () => setDraft((d) => ({ date: d.date, category: "", amount: 0 })) });
+                    }} /></td>
+                    <td><button className="btn btn-primary" style={{ width: 34, height: 30, padding: 0, borderRadius: 8, background: "var(--pos)" }} onClick={commit} aria-label="Add income"><IconPlus size={16} /></button></td>
+                  </tr>
+                  {sorted.map((r) => {
+                    const item = activityByTransaction.get(r.id);
+                    return <tr key={r.id}>
+                      <td><DateCell value={r.date} onChange={(v) => upd.mutate({ id: r.id, patch: { date: v } })} /></td>
+                      <td><RowCategoryInput value={r.category} onChange={(v) => upd.mutate({ id: r.id, patch: { category: v } })} />{item?.nature === "from_reserve" && <span className="chip chip-paid">From {item.reserve_name ?? "reserve"}</span>}</td>
+                      <td><AmountInput value={r.amount} onChange={(v) => upd.mutate({ id: r.id, patch: { amount: v ?? 0 } })} /></td>
+                      <td><button className="x-btn" onClick={() => del.mutate(r.id)} aria-label="Remove"><IconX size={15} /></button></td>
+                    </tr>;
+                  })}
+                  {sorted.length === 0 && <tr><td colSpan={4} className="muted" style={{ textAlign: "center", padding: "26px 0", fontSize: 13.5 }}>No income logged yet — add your first above.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 12px", borderTop: "1px solid var(--border-2)" }}><CopyLastMonthButton section="income" month={month} currentTxns={rows} onPendingChange={onCopyPendingChange} /></div>
+          </div>
+        </section>
+      )}
 
-            {sorted.length === 0 && (
-              <tr>
-                <td colSpan={4} className="muted" style={{ textAlign: "center", padding: "26px 0", fontSize: 13.5 }}>
-                  No income logged yet — add your first above.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 12px", borderTop: "1px solid var(--border-2)" }}>
-        <CopyLastMonthButton
-          section="income"
-          month={month}
-          currentTxns={rows}
-          onPendingChange={onCopyPendingChange}
-        />
-      </div>
-      <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border-2)", fontSize: 12, color: "var(--ink-3)" }}>
-        Tip — type at least 2 characters for suggestions, then use <span className="kbd">↑</span> <span className="kbd">↓</span> and <span className="kbd">Enter</span> to choose from past entries.
-      </div>
+      <section className="income-sent-group" aria-labelledby="sent-reserves-heading">
+        <h2 id="sent-reserves-heading" className="income-group-title">Sent to reserves</h2>
+        <p className="muted">These entries are held in reserves. They are shown here for income history but are not included in normal income or Dashboard calculations.</p>
+        {activity.isPending ? <p role="status">Loading income activity…</p> : activity.isError ? <div role="alert"><p>Could not load income activity.</p><button type="button" className="btn btn-soft" onClick={() => void activity.refetch()}>Retry income activity</button></div> : sentToReserves.length === 0 ? <div className="card card-pad"><p>No deposits were sent to reserves this month.</p></div> :
+          <div className="grid">{sentToReserves.map((item) => <article className="card card-pad income-sent-item" key={item.reserve_operation_id}><div className="reserve-card-head"><div><span className="chip chip-paid">Sent to reserves</span><h3>{item.description}</h3><p className="muted">{item.date}</p></div><strong className="num reserve-balance">{money2(item.amount)}</strong></div><ul>{item.allocations.map((allocation) => <li key={allocation.id}>{allocation.reserve_name} · <span className="num">{money2(allocation.amount)}</span></li>)}</ul></article>)}</div>}
+      </section>
     </div>
   );
 }

@@ -275,6 +275,77 @@ func (q *Queries) ListDepositOperationHistory(ctx context.Context, arg ListDepos
 	return items, nil
 }
 
+const listIncomeActivityTransactions = `-- name: ListIncomeActivityTransactions :many
+SELECT t.id, t.category, t.amount, t.txn_date, t.created_at,
+       COALESCE(rot.reserve_operation_id::text, '')::text AS reserve_operation_id,
+       COALESCE(ro.operation_type, '')::text AS reserve_operation_type,
+       COALESCE(source_reserve.name, '')::text AS reserve_name
+FROM transactions t
+LEFT JOIN reserve_operation_transactions rot
+  ON rot.transaction_id = t.id AND rot.role = 'funding_income'
+LEFT JOIN reserve_operations ro ON ro.id = rot.reserve_operation_id
+LEFT JOIN LATERAL (
+  SELECT r.name
+  FROM reserve_entries e
+  JOIN reserves r ON r.id = e.reserve_id
+  WHERE e.operation_id = ro.id AND e.direction = 'withdrawal'
+  ORDER BY e.id
+  LIMIT 1
+) source_reserve ON true
+WHERE t.user_id = $1
+  AND t.section = 'income'
+  AND t.kind = 'cash'
+  AND t.txn_date >= $2
+  AND t.txn_date < $3
+ORDER BY t.txn_date DESC, t.created_at DESC, t.id DESC
+`
+
+type ListIncomeActivityTransactionsParams struct {
+	UserID   uuid.UUID   `json:"user_id"`
+	FromDate pgtype.Date `json:"from_date"`
+	ToDate   pgtype.Date `json:"to_date"`
+}
+
+type ListIncomeActivityTransactionsRow struct {
+	ID                   uuid.UUID          `json:"id"`
+	Category             string             `json:"category"`
+	Amount               pgtype.Numeric     `json:"amount"`
+	TxnDate              pgtype.Date        `json:"txn_date"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	ReserveOperationID   string             `json:"reserve_operation_id"`
+	ReserveOperationType string             `json:"reserve_operation_type"`
+	ReserveName          string             `json:"reserve_name"`
+}
+
+func (q *Queries) ListIncomeActivityTransactions(ctx context.Context, arg ListIncomeActivityTransactionsParams) ([]ListIncomeActivityTransactionsRow, error) {
+	rows, err := q.db.Query(ctx, listIncomeActivityTransactions, arg.UserID, arg.FromDate, arg.ToDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListIncomeActivityTransactionsRow
+	for rows.Next() {
+		var i ListIncomeActivityTransactionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Category,
+			&i.Amount,
+			&i.TxnDate,
+			&i.CreatedAt,
+			&i.ReserveOperationID,
+			&i.ReserveOperationType,
+			&i.ReserveName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReserves = `-- name: ListReserves :many
 SELECT r.id, r.user_id, r.name, r.is_general, r.archived_at, r.created_at, r.updated_at,
        reserve_balance(r.id) AS balance

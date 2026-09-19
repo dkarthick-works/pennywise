@@ -193,6 +193,10 @@ func (s *Server) handleListReserveOperations(w http.ResponseWriter, r *http.Requ
 		writeErr(w, http.StatusInternalServerError, "could not load reserve operations")
 		return
 	}
+	writeJSON(w, http.StatusOK, depositOperationDTOs(rows))
+}
+
+func depositOperationDTOs(rows []db.ListDepositOperationHistoryRow) []ReserveOperationDTO {
 	operations := make([]ReserveOperationDTO, 0)
 	indices := make(map[uuid.UUID]int)
 	totals := make(map[uuid.UUID]*big.Int)
@@ -217,7 +221,7 @@ func (s *Server) handleListReserveOperations(w http.ResponseWriter, r *http.Requ
 	for id, index := range indices {
 		operations[index].Total = centsToJSONNumber(totals[id])
 	}
-	writeJSON(w, http.StatusOK, operations)
+	return operations
 }
 
 func reserveOperationDTO(operation db.ReserveOperation, total money.Number, entries []ReserveEntryDTO) ReserveOperationDTO {

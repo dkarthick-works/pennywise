@@ -85,3 +85,27 @@ WHERE o.user_id = sqlc.arg(user_id)
     )
   )
 ORDER BY o.occurred_on DESC, o.created_at DESC, o.id DESC, r.name, e.id;
+
+-- name: ListIncomeActivityTransactions :many
+SELECT t.id, t.category, t.amount, t.txn_date, t.created_at,
+       COALESCE(rot.reserve_operation_id::text, '')::text AS reserve_operation_id,
+       COALESCE(ro.operation_type, '')::text AS reserve_operation_type,
+       COALESCE(source_reserve.name, '')::text AS reserve_name
+FROM transactions t
+LEFT JOIN reserve_operation_transactions rot
+  ON rot.transaction_id = t.id AND rot.role = 'funding_income'
+LEFT JOIN reserve_operations ro ON ro.id = rot.reserve_operation_id
+LEFT JOIN LATERAL (
+  SELECT r.name
+  FROM reserve_entries e
+  JOIN reserves r ON r.id = e.reserve_id
+  WHERE e.operation_id = ro.id AND e.direction = 'withdrawal'
+  ORDER BY e.id
+  LIMIT 1
+) source_reserve ON true
+WHERE t.user_id = sqlc.arg(user_id)
+  AND t.section = 'income'
+  AND t.kind = 'cash'
+  AND t.txn_date >= sqlc.arg(from_date)
+  AND t.txn_date < sqlc.arg(to_date)
+ORDER BY t.txn_date DESC, t.created_at DESC, t.id DESC;

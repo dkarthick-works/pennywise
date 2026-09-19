@@ -1,11 +1,12 @@
 import axios from "axios";
 import client from "./client";
-import type { Reserve, ReserveDepositInput, ReserveInput, ReserveOperation } from "../types";
+import type { IncomeActivityItem, Reserve, ReserveDepositInput, ReserveInput, ReserveOperation } from "../types";
 
 export const reserveKeys = {
   all: ["reserves"] as const,
   list: (includeArchived = false) => ["reserves", "list", { includeArchived }] as const,
   operations: (year: number, reserveId?: string) => ["reserves", "operations", year, reserveId ?? "all"] as const,
+  incomeActivity: (month: string) => ["reserves", "income-activity", month] as const,
 };
 
 function unwrapReserveError(error: unknown): never {
@@ -29,3 +30,6 @@ export const listReserveOperations = (year: number, reserveId?: string, signal?:
 
 export const createReserveDeposit = (body: ReserveDepositInput) =>
   client.post<ReserveOperation>("/api/reserve-operations/deposits", body).then((response) => response.data).catch(unwrapReserveError);
+
+export const getIncomeActivity = (month: string, signal?: AbortSignal) =>
+  client.get<IncomeActivityItem[]>("/api/income-activity", { params: { month }, signal }).then((response) => response.data);

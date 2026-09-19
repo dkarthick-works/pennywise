@@ -61,6 +61,9 @@ renameable General Reserve. Creating a reserve locks the user row before enforci
 the five-active-reserve limit. Direct deposits create one operation and one
 positive entry per distinct active-reserve allocation in a transaction. They
 never create normal transaction rows, so existing analytics remain unchanged.
+`GET /api/income-activity` merges normal income and reserve deposits for
+presentation while preserving `counts_as_income` and source/nature discrimination;
+generated funding income is recognized through `reserve_operation_transactions`.
 
 ## Layout
 
@@ -165,6 +168,7 @@ only ever talks to this origin.
 | PATCH  | `/api/reserves/{id}` | rename a user-owned reserve, including General |
 | GET    | `/api/reserve-operations?year=YYYY` | list direct reserve deposits with allocation details in reverse chronology |
 | POST   | `/api/reserve-operations/deposits` | atomically create one direct deposit with one or more distinct allocations |
+| GET    | `/api/income-activity?month=YYYY-MM` | discriminated ordinary, From-reserve, and Sent-to-reserves monthly income activity |
 | GET    | `/api/lents?status=open\|settled\|all` | list money lent to others (default `all`) |
 | POST   | `/api/lents` | create a lent |
 | GET    | `/api/lents/export` | download all lents and repayments as a versioned JSON archive |

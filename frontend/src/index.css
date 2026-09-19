@@ -741,3 +741,14 @@ input, button { font-family: inherit; }
 .reserve-history-filters { display: grid; grid-template-columns: auto 100px auto minmax(160px, 1fr); align-items: center; gap: 8px; }
 .reserve-history-filters label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
 @media (max-width: 560px) { .reserve-history-filters { width: 100%; grid-template-columns: auto 1fr; } }
+
+/* ============ INCOME ACTIVITY ============ */
+.income-destination { margin-bottom: 16px; }
+.income-group-title { margin: 14px 0 10px; font-size: 17px; }
+.income-reserve-form { margin-bottom: 18px; }
+.income-reserve-form > .muted { margin: 8px 0 0; }
+.income-sent-group { margin-top: 24px; }
+.income-sent-group > .muted { margin: -2px 0 12px; max-width: 720px; }
+.income-sent-item h3 { margin: 10px 0 2px; }
+.income-sent-item ul { margin: 14px 0 0; padding-left: 20px; color: var(--ink-2); }
+.income-sent-item li + li { margin-top: 5px; }

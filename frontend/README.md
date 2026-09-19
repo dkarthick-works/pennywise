@@ -336,8 +336,12 @@ starts with one renameable General Reserve and can create or rename reserves up 
 a five-active-reserve limit. **Add to reserves** records one direct deposit with
 one or more distinct allocations, previews the allocated total, and keeps the
 activity outside normal income and spending. The page shows reverse-chronological
-deposit history with allocation details. General Reserve management intentionally
-omits archive and delete actions. API wrappers and centralized query keys live in
+deposit history with allocation details. The Record page’s Income section offers
+**Normal income** and **Send to reserves** destinations, groups Sent-to-reserves
+activity separately with allocation details, and excludes it from the received
+income total. Month-scoped query keys prevent prior-month reserve activity from
+appearing while a new month loads. General Reserve management intentionally omits
+archive and delete actions. API wrappers and centralized query keys live in
 `src/api/reserves.ts`.
 
 ## Lent page

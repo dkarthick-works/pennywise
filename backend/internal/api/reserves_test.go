@@ -348,6 +348,90 @@ func TestReserveDepositHistoryIsReverseChronological(t *testing.T) {
 	}
 }
 
+func TestIncomeActivityDiscriminatesNormalGeneratedAndReserveDeposit(t *testing.T) {
+	srv, pool, token, userID := setupCategoryAPITest(t)
+	defer pool.Close()
+	general := listTestReserves(t, srv, token, false)[0]
+
+	insertTxn(t, pool, userID, "income", "Salary", 85000, "2026-09-10", "cash")
+	deposit := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{
+		"description": "RSU vest", "date": "2026-09-18",
+		"allocations": []map[string]any{{"reserve_id": general.ID, "amount": 60000}},
+	})
+	if deposit.Code != http.StatusCreated {
+		t.Fatalf("create reserve deposit status = %d body = %s", deposit.Code, deposit.Body.String())
+	}
+	if _, err := pool.Exec(context.Background(), `
+		WITH operation AS (
+			INSERT INTO reserve_operations (user_id, operation_type, occurred_on, description)
+			VALUES ($1, 'move_to_income', '2026-09-20', 'From General Reserve') RETURNING id
+		), entry AS (
+			INSERT INTO reserve_entries (operation_id, reserve_id, direction, amount)
+			SELECT id, $2, 'withdrawal', 5000 FROM operation
+		), txn AS (
+			INSERT INTO transactions (user_id, section, category, amount, txn_date, kind)
+			VALUES ($1, 'income', 'From General Reserve', 5000, '2026-09-20', 'cash') RETURNING id
+		)
+		INSERT INTO reserve_operation_transactions (reserve_operation_id, transaction_id, role)
+		SELECT operation.id, txn.id, 'funding_income' FROM operation, txn`, userID, general.ID); err != nil {
+		t.Fatalf("insert generated income fixture: %v", err)
+	}
+
+	rr := apiRequest(t, srv, token, http.MethodGet, "/api/income-activity?month=2026-09", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("income activity status = %d body = %s", rr.Code, rr.Body.String())
+	}
+	var items []struct {
+		Source         string  `json:"source"`
+		Nature         string  `json:"nature"`
+		CountsAsIncome bool    `json:"counts_as_income"`
+		Description    string  `json:"description"`
+		Amount         float64 `json:"amount"`
+		Date           string  `json:"date"`
+		Allocations    []any   `json:"allocations"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &items); err != nil {
+		t.Fatalf("decode income activity: %v", err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("income activity = %#v, want 3 items", items)
+	}
+	if items[0].Nature != "from_reserve" || items[0].Source != "normal_transaction" || !items[0].CountsAsIncome || items[0].Amount != 5000 {
+		t.Fatalf("generated activity = %#v", items[0])
+	}
+	if items[1].Nature != "sent_to_reserves" || items[1].Source != "reserve_deposit" || items[1].CountsAsIncome || items[1].Amount != 60000 || len(items[1].Allocations) != 1 {
+		t.Fatalf("reserve deposit activity = %#v", items[1])
+	}
+	if items[2].Nature != "normal_income" || items[2].Source != "normal_transaction" || !items[2].CountsAsIncome || items[2].Amount != 85000 {
+		t.Fatalf("normal activity = %#v", items[2])
+	}
+}
+
+func TestIncomeActivitySameDateOrderingUsesDescendingID(t *testing.T) {
+	srv, pool, token, userID := setupCategoryAPITest(t)
+	defer pool.Close()
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO transactions (id, user_id, section, category, amount, txn_date, kind, created_at)
+		VALUES
+		('00000000-0000-0000-0000-000000000001', $1, 'income', 'First ID', 1, '2026-09-10', 'cash', '2026-09-10T12:00:00Z'),
+		('00000000-0000-0000-0000-000000000002', $1, 'income', 'Second ID', 2, '2026-09-10', 'cash', '2026-09-10T12:00:00Z')`, userID); err != nil {
+		t.Fatalf("insert same-date income: %v", err)
+	}
+	rr := apiRequest(t, srv, token, http.MethodGet, "/api/income-activity?month=2026-09", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("income activity status = %d body = %s", rr.Code, rr.Body.String())
+	}
+	var items []struct {
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &items); err != nil {
+		t.Fatalf("decode activity: %v", err)
+	}
+	if len(items) != 2 || items[0].Description != "Second ID" || items[1].Description != "First ID" {
+		t.Fatalf("same-date activity order = %#v", items)
+	}
+}
+
 func createTestReserve(t *testing.T, srv *Server, token, name string) reserveTestDTO {
 	t.Helper()
 	rr := apiRequest(t, srv, token, http.MethodPost, "/api/reserves", map[string]any{"name": name})
