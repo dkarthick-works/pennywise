@@ -682,6 +682,126 @@ func TestReserveTransferAndArchivalLifecycle(t *testing.T) {
 	assertReserveError(t, apiRequest(t, srv, token, http.MethodPost, "/api/reserves/"+general.ID+"/archive", nil), http.StatusConflict, "general reserve cannot be archived")
 }
 
+func TestDepositMaintenanceReplacesAllocationsAndDeletesAtomically(t *testing.T) {
+	srv, pool, token, _ := setupCategoryAPITest(t)
+	defer pool.Close()
+	first := createTestReserve(t, srv, token, "First Reserve")
+	second := createTestReserve(t, srv, token, "Second Reserve")
+	created := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{
+		"description": "Bonus", "date": "2026-09-01", "note": "old", "allocations": []map[string]any{{"reserve_id": first.ID, "amount": 100}, {"reserve_id": second.ID, "amount": 50}},
+	})
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create deposit status = %d body = %s", created.Code, created.Body.String())
+	}
+	var operation ReserveOperationDTO
+	if err := json.Unmarshal(created.Body.Bytes(), &operation); err != nil {
+		t.Fatalf("decode deposit: %v", err)
+	}
+	updated := apiRequest(t, srv, token, http.MethodPatch, "/api/reserve-operations/"+operation.ID, map[string]any{
+		"description": "Corrected bonus", "date": "2026-09-02", "note": "new", "allocations": []map[string]any{{"reserve_id": first.ID, "amount": 25}},
+	})
+	if updated.Code != http.StatusOK {
+		t.Fatalf("update deposit status = %d body = %s", updated.Code, updated.Body.String())
+	}
+	balances := listTestReserves(t, srv, token, false)
+	for _, reserve := range balances {
+		if reserve.ID == first.ID && reserve.Balance != 25 {
+			t.Fatalf("first balance = %v", reserve.Balance)
+		}
+		if reserve.ID == second.ID && reserve.Balance != 0 {
+			t.Fatalf("second balance = %v", reserve.Balance)
+		}
+	}
+	deleted := apiRequest(t, srv, token, http.MethodDelete, "/api/reserve-operations/"+operation.ID, nil)
+	if deleted.Code != http.StatusNoContent {
+		t.Fatalf("delete deposit status = %d body = %s", deleted.Code, deleted.Body.String())
+	}
+	balances = listTestReserves(t, srv, token, false)
+	for _, reserve := range balances {
+		if reserve.ID == first.ID && reserve.Balance != 0 {
+			t.Fatalf("first after delete = %v", reserve.Balance)
+		}
+	}
+}
+
+func TestIncomeToReserveAndBackConversion(t *testing.T) {
+	srv, pool, token, userID := setupCategoryAPITest(t)
+	defer pool.Close()
+	first := createTestReserve(t, srv, token, "First Reserve")
+	second := createTestReserve(t, srv, token, "Second Reserve")
+	incomeID := insertTxn(t, pool, userID, "income", "RSU vest", 260000, "2026-09-18", "cash")
+	converted := apiRequest(t, srv, token, http.MethodPost, "/api/transactions/"+incomeID.String()+"/convert-to-reserves", map[string]any{
+		"allocations": []map[string]any{{"reserve_id": first.ID, "amount": 100000}, {"reserve_id": second.ID, "amount": 160000}},
+	})
+	if converted.Code != http.StatusCreated {
+		t.Fatalf("convert status = %d body = %s", converted.Code, converted.Body.String())
+	}
+	var operation ReserveOperationDTO
+	if err := json.Unmarshal(converted.Body.Bytes(), &operation); err != nil {
+		t.Fatalf("decode converted operation: %v", err)
+	}
+	if operation.Description != "RSU vest" || operation.Total != "260000.00" {
+		t.Fatalf("converted operation = %#v", operation)
+	}
+	var count int
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM transactions WHERE id = $1`, incomeID).Scan(&count); err != nil {
+		t.Fatalf("source count: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("source income still exists")
+	}
+	back := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/"+operation.ID+"/convert-to-income", nil)
+	if back.Code != http.StatusCreated {
+		t.Fatalf("reverse status = %d body = %s", back.Code, back.Body.String())
+	}
+	var txn TransactionDTO
+	if err := json.Unmarshal(back.Body.Bytes(), &txn); err != nil {
+		t.Fatalf("decode reverse transaction: %v", err)
+	}
+	if txn.Section != "income" || txn.Category != "RSU vest" || txn.Amount != 260000 || txn.Date != "2026-09-18" || txn.Kind != "cash" {
+		t.Fatalf("reverse transaction = %#v", txn)
+	}
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM reserve_operations WHERE id = $1`, operation.ID).Scan(&count); err != nil {
+		t.Fatalf("operation count: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("reserve operation still exists")
+	}
+}
+
+func TestConversionRejectsPartialAndSpentReverse(t *testing.T) {
+	srv, pool, token, userID := setupCategoryAPITest(t)
+	defer pool.Close()
+	reserve := createTestReserve(t, srv, token, "Conversion Reserve")
+	incomeID := insertTxn(t, pool, userID, "income", "Bonus", 1000, "2026-09-18", "cash")
+	assertReserveError(t, apiRequest(t, srv, token, http.MethodPost, "/api/transactions/"+incomeID.String()+"/convert-to-reserves", map[string]any{
+		"allocations": []map[string]any{{"reserve_id": reserve.ID, "amount": 999}},
+	}), http.StatusBadRequest, "allocation total must equal the income amount")
+	var count int
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM transactions WHERE id = $1`, incomeID).Scan(&count); err != nil {
+		t.Fatalf("source count: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("partial conversion removed source")
+	}
+
+	deposit := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{
+		"description": "Spendable", "date": "2026-09-18", "allocations": []map[string]any{{"reserve_id": reserve.ID, "amount": 100}},
+	})
+	if deposit.Code != http.StatusCreated {
+		t.Fatalf("deposit status = %d body = %s", deposit.Code, deposit.Body.String())
+	}
+	var operation ReserveOperationDTO
+	if err := json.Unmarshal(deposit.Body.Bytes(), &operation); err != nil {
+		t.Fatalf("decode deposit: %v", err)
+	}
+	spend := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/spending", map[string]any{"reserve_id": reserve.ID, "amount": 100, "date": "2026-09-19", "description": "Spent"})
+	if spend.Code != http.StatusCreated {
+		t.Fatalf("spend status = %d body = %s", spend.Code, spend.Body.String())
+	}
+	assertReserveError(t, apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/"+operation.ID+"/convert-to-income", nil), http.StatusConflict, "deposit cannot be converted because an allocation has already been spent")
+}
+
 func createTestReserve(t *testing.T, srv *Server, token, name string) reserveTestDTO {
 	t.Helper()
 	rr := apiRequest(t, srv, token, http.MethodPost, "/api/reserves", map[string]any{"name": name})

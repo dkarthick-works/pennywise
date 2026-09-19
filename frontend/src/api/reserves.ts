@@ -1,6 +1,6 @@
 import axios from "axios";
 import client from "./client";
-import type { IncomeActivityItem, Reserve, ReserveDepositInput, ReserveInput, ReserveOperation, ReserveSpendingInput, ReserveTransferInput } from "../types";
+import type { IncomeActivityItem, Reserve, ReserveAllocationInput, ReserveDepositInput, ReserveInput, ReserveOperation, ReserveSpendingInput, ReserveTransferInput, Transaction } from "../types";
 
 export const reserveKeys = {
   all: ["reserves"] as const,
@@ -32,11 +32,23 @@ export const listReserveOperations = (year: number, reserveId?: string, signal?:
 export const createReserveDeposit = (body: ReserveDepositInput) =>
   client.post<ReserveOperation>("/api/reserve-operations/deposits", body).then((response) => response.data).catch(unwrapReserveError);
 
+export const updateReserveDeposit = (id: string, body: ReserveDepositInput) =>
+  client.patch<ReserveOperation>(`/api/reserve-operations/${id}`, body).then((response) => response.data).catch(unwrapReserveError);
+
+export const deleteReserveDeposit = (id: string) =>
+  client.delete(`/api/reserve-operations/${id}`).then(() => undefined).catch(unwrapReserveError);
+
+export const convertReserveDepositToIncome = (id: string) =>
+  client.post<Transaction>(`/api/reserve-operations/${id}/convert-to-income`).then((response) => response.data).catch(unwrapReserveError);
+
 export const createReserveSpending = (body: ReserveSpendingInput) =>
   client.post<ReserveOperation>("/api/reserve-operations/spending", body).then((response) => response.data).catch(unwrapReserveError);
 
 export const createReserveTransfer = (body: ReserveTransferInput) =>
   client.post<ReserveOperation>("/api/reserve-operations/transfers", body).then((response) => response.data).catch(unwrapReserveError);
+
+export const convertIncomeToReserves = (id: string, allocations: ReserveAllocationInput[]) =>
+  client.post<ReserveOperation>(`/api/transactions/${id}/convert-to-reserves`, { allocations }).then((response) => response.data).catch(unwrapReserveError);
 
 export const deleteReserveTransfer = (id: string) =>
   client.delete(`/api/reserve-transfers/${id}`).then(() => undefined).catch(unwrapReserveError);

@@ -341,8 +341,10 @@ can be recorded, edited, or deleted from the history and includes an explanation
 that it never appears in normal spending analytics. Transfers can reallocate money between active reserves, and completed zero-balance reserves can be archived while preserving their history. The Record page’s Income section offers
 **Normal income** and **Send to reserves** destinations, groups Sent-to-reserves
 activity separately with allocation details, and excludes it from the received
-income total. Month-scoped query keys prevent prior-month reserve activity from
-appearing while a new month loads. General Reserve management intentionally omits
+income total. Normal income rows can move their full amount to reserves with an
+analytics-impact confirmation; reserve deposits can be edited, deleted, or moved
+back to normal income when balances allow. Month-scoped query keys prevent
+prior-month reserve activity from appearing while a new month loads. General Reserve management intentionally omits
 archive and delete actions. API wrappers and centralized query keys live in
 `src/api/reserves.ts`.
 

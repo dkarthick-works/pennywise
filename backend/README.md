@@ -142,6 +142,7 @@ only ever talks to this origin.
 | POST   | `/api/transactions` | create (settlement may include `settles[]`) |
 | PATCH  | `/api/transactions/{id}` | partial update; reconciles settlement links |
 | DELETE | `/api/transactions/{id}` | delete |
+| POST   | `/api/transactions/{id}/convert-to-reserves` | convert eligible normal cash income into reserve allocations |
 | GET    | `/api/transactions/export?from=YYYY-MM-DD&to=YYYY-MM-DD` | download CSV (max 6-month range; settlements omitted) |
 | POST   | `/api/transactions/import` | bulk-create from validated rows (max 2000; settlements rejected) |
 | GET    | `/api/transaction-names/suggestions?section=&q=&limit=` | ranked, typo-tolerant transaction-name autocomplete |
@@ -174,9 +175,11 @@ only ever talks to this origin.
 | PATCH  | `/api/reserves/{id}` | rename a user-owned reserve, including General |
 | GET    | `/api/reserve-operations?year=YYYY` | list direct reserve deposits with allocation details in reverse chronology |
 | POST   | `/api/reserve-operations/deposits` | atomically create one direct deposit with one or more distinct allocations |
+| PATCH  | `/api/reserve-operations/{id}` | edit a standalone deposit or reserve-spend operation |
+| DELETE | `/api/reserve-operations/{id}` | delete an eligible standalone deposit or reserve-spend operation |
+| POST   | `/api/reserve-operations/{id}/convert-to-income` | atomically convert a reserve deposit to normal cash income |
 | POST   | `/api/reserve-operations/spending` | atomically withdraw from one active reserve without a normal transaction |
 | POST   | `/api/reserve-operations/transfers` | atomically move money between two active reserves |
-| PATCH  | `/api/reserve-operations/{id}` | edit a standalone reserve-spend operation |
 | DELETE | `/api/reserve-operations/{id}` | delete a standalone reserve-spend operation |
 | DELETE | `/api/reserve-transfers/{id}` | delete a transfer operation after balance validation |
 | POST   | `/api/reserves/{id}/archive` | archive a zero-balance non-General reserve |

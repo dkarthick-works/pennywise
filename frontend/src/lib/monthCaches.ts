@@ -40,6 +40,8 @@ export function invalidateAllTransactionCaches(qc: QueryClient): void {
   qc.invalidateQueries({ queryKey: ["group-spend"] });
   qc.invalidateQueries({ queryKey: ["category-group-txns"] });
   qc.invalidateQueries({ queryKey: ["open-month"] });
+  qc.invalidateQueries({ queryKey: eventKeys.suggestions });
+  invalidateTransactionNameSuggestionSections(qc, ["income"]);
   invalidateCreditCaches(qc);
 }
 

@@ -667,6 +667,7 @@ function IncomeTile({ rows, month, onCopyPendingChange }: {
   rows: Transaction[]; month: string; onCopyPendingChange: (pending: boolean) => void;
 }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { upd, del, add } = useRowMutations(month, "income");
   const blank = { date: defaultDraftDate(month, rows.map((r) => r.date)), category: "", amount: 0 };
   const [draft, setDraft] = useState(blank);
@@ -740,7 +741,7 @@ function IncomeTile({ rows, month, onCopyPendingChange }: {
                       <td><DateCell value={r.date} onChange={(v) => upd.mutate({ id: r.id, patch: { date: v } })} /></td>
                       <td><RowCategoryInput value={r.category} onChange={(v) => upd.mutate({ id: r.id, patch: { category: v } })} />{item?.nature === "from_reserve" && <span className="chip chip-paid">From {item.reserve_name ?? "reserve"}</span>}</td>
                       <td><AmountInput value={r.amount} onChange={(v) => upd.mutate({ id: r.id, patch: { amount: v ?? 0 } })} /></td>
-                      <td><button className="x-btn" onClick={() => del.mutate(r.id)} aria-label="Remove"><IconX size={15} /></button></td>
+                      <td>{activity.isSuccess && (!item || item.nature === "normal_income") && <details className="income-row-menu"><summary aria-label="Income actions">•••</summary><button type="button" onClick={() => { if (window.confirm("Move this full income record to reserves? It will stop counting in normal income and historical Dashboard calculations.")) navigate("/reserves", { state: { convertIncome: r } }); }}>Move to reserves</button></details>}<button className="x-btn" onClick={() => del.mutate(r.id)} aria-label="Remove"><IconX size={15} /></button></td>
                     </tr>;
                   })}
                   {sorted.length === 0 && <tr><td colSpan={4} className="muted" style={{ textAlign: "center", padding: "26px 0", fontSize: 13.5 }}>No income logged yet — add your first above.</td></tr>}

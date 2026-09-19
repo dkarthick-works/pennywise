@@ -23,6 +23,7 @@ type Querier interface {
 	CreateReserve(ctx context.Context, arg CreateReserveParams) (Reserve, error)
 	// Distinct non-settlement daily categories for ghost autocomplete.
 	DailyCategorySuggestions(ctx context.Context, userID uuid.UUID) ([]string, error)
+	DeleteAnyReserveOperation(ctx context.Context, arg DeleteAnyReserveOperationParams) (int64, error)
 	DeleteCategoryGroup(ctx context.Context, arg DeleteCategoryGroupParams) error
 	DeleteCategoryMapping(ctx context.Context, arg DeleteCategoryMappingParams) error
 	DeleteChit(ctx context.Context, arg DeleteChitParams) (int64, error)
@@ -31,10 +32,12 @@ type Querier interface {
 	DeleteMissingEventItems(ctx context.Context, arg DeleteMissingEventItemsParams) error
 	DeleteRepayment(ctx context.Context, arg DeleteRepaymentParams) (int64, error)
 	DeleteReserve(ctx context.Context, arg DeleteReserveParams) (int64, error)
+	DeleteReserveEntriesForOperation(ctx context.Context, operationID uuid.UUID) error
 	DeleteReserveOperation(ctx context.Context, arg DeleteReserveOperationParams) (int64, error)
 	DeleteSettlementLinks(ctx context.Context, settlementID uuid.UUID) error
 	DeleteTemplatesBySection(ctx context.Context, arg DeleteTemplatesBySectionParams) error
 	DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) error
+	DeleteTransactionForUser(ctx context.Context, arg DeleteTransactionForUserParams) (int64, error)
 	DeleteTransferOperation(ctx context.Context, arg DeleteTransferOperationParams) (int64, error)
 	EnsureGeneralReserve(ctx context.Context, userID uuid.UUID) error
 	// Create the default settings row for a user if it does not exist yet.
@@ -43,11 +46,13 @@ type Querier interface {
 	GetCategoryMapping(ctx context.Context, arg GetCategoryMappingParams) (CategoryMapping, error)
 	GetChit(ctx context.Context, arg GetChitParams) (GetChitRow, error)
 	GetEvent(ctx context.Context, arg GetEventParams) (Event, error)
+	GetIncomeTransactionForConversion(ctx context.Context, arg GetIncomeTransactionForConversionParams) (Transaction, error)
 	GetLent(ctx context.Context, arg GetLentParams) (GetLentRow, error)
 	GetMonthState(ctx context.Context, arg GetMonthStateParams) (MonthState, error)
 	GetMonthlyBudget(ctx context.Context, arg GetMonthlyBudgetParams) (MonthlyBudget, error)
 	GetReserveForUser(ctx context.Context, arg GetReserveForUserParams) (GetReserveForUserRow, error)
 	GetReserveForUserForUpdate(ctx context.Context, arg GetReserveForUserForUpdateParams) (Reserve, error)
+	GetReserveOperationForUser(ctx context.Context, arg GetReserveOperationForUserParams) (ReserveOperation, error)
 	GetReserveOperationForUserForUpdate(ctx context.Context, arg GetReserveOperationForUserForUpdateParams) (ReserveOperation, error)
 	GetSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
 	GetTransaction(ctx context.Context, arg GetTransactionParams) (Transaction, error)
@@ -60,6 +65,7 @@ type Querier interface {
 	InsertChitInstallment(ctx context.Context, arg InsertChitInstallmentParams) (ChitInstallment, error)
 	InsertChitTransferInstallment(ctx context.Context, arg InsertChitTransferInstallmentParams) (uuid.UUID, error)
 	InsertChitTransferParent(ctx context.Context, arg InsertChitTransferParentParams) (uuid.UUID, error)
+	InsertIncomeTransaction(ctx context.Context, arg InsertIncomeTransactionParams) (Transaction, error)
 	InsertLent(ctx context.Context, arg InsertLentParams) (Lent, error)
 	InsertRepayment(ctx context.Context, arg InsertRepaymentParams) (LentRepayment, error)
 	InsertReserveEntry(ctx context.Context, arg InsertReserveEntryParams) (ReserveEntry, error)

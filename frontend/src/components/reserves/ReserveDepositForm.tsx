@@ -1,22 +1,24 @@
 import { useState } from "react";
-import type { Reserve, ReserveDepositInput } from "../../types";
+import type { Reserve, ReserveDepositInput, ReserveOperation } from "../../types";
 import { currentDate } from "../../lib/dates";
 import { money2 } from "../../lib/money";
 
 interface AllocationDraft { key: number; reserve_id: string; amount: string }
 
-export function ReserveDepositForm({ reserves, onCancel, onSave, submitting, initialDate = currentDate() }: {
+export function ReserveDepositForm({ reserves, onCancel, onSave, submitting, initialDate = currentDate(), initial, expectedTotal }: {
   reserves: Reserve[];
   onCancel: () => void;
   onSave: (input: ReserveDepositInput) => Promise<unknown>;
   submitting: boolean;
   initialDate?: string;
+  initial?: ReserveOperation;
+  expectedTotal?: number;
 }) {
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState(initialDate);
-  const [note, setNote] = useState("");
-  const [nextKey, setNextKey] = useState(1);
-  const [allocations, setAllocations] = useState<AllocationDraft[]>([{ key: 0, reserve_id: reserves[0]?.id ?? "", amount: "" }]);
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [date, setDate] = useState(initial?.date ?? initialDate);
+  const [note, setNote] = useState(initial?.note ?? "");
+  const [nextKey, setNextKey] = useState(initial?.entries.length ?? 1);
+  const [allocations, setAllocations] = useState<AllocationDraft[]>(() => initial?.entries.length ? initial.entries.map((entry, key) => ({ key, reserve_id: entry.reserve_id, amount: String(entry.amount) })) : [{ key: 0, reserve_id: reserves[0]?.id ?? "", amount: "" }]);
   const [error, setError] = useState("");
   const amountPattern = /^\d+(?:\.\d{1,2})?$/;
   const total = allocations.reduce((sum, allocation) => sum + (amountPattern.test(allocation.amount) ? Number(allocation.amount) : 0), 0);
@@ -37,6 +39,10 @@ export function ReserveDepositForm({ reserves, onCancel, onSave, submitting, ini
     if (new Set(allocations.map((allocation) => allocation.reserve_id)).size !== allocations.length) { setError("Choose each reserve only once"); return; }
     if (allocations.some((allocation) => !amountPattern.test(allocation.amount) || Number(allocation.amount) <= 0 || Number(allocation.amount) > 999999999999.99)) {
       setError("Enter a positive amount with no more than two decimal places for every allocation");
+      return;
+    }
+    if (expectedTotal !== undefined && Math.round(total * 100) !== Math.round(expectedTotal * 100)) {
+      setError("Allocation total must equal the full income amount");
       return;
     }
     setError("");

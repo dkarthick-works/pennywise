@@ -231,6 +231,18 @@ func (s *Server) handleDeleteReserveSpending(w http.ResponseWriter, r *http.Requ
 		writeReserveOperationLookupError(w, err, "could not delete reserve spending")
 		return
 	}
+	if operation.OperationType == "deposit" {
+		s.deleteReserveDeposit(w, r, operation, qtx)
+		if w.Header().Get("Content-Type") == "application/json" {
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			writeErr(w, http.StatusInternalServerError, "could not delete reserve deposit")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if operation.OperationType != "reserve_spend" {
 		writeErr(w, http.StatusConflict, "operation cannot be deleted independently")
 		return

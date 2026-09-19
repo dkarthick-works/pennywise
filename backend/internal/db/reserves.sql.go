@@ -69,6 +69,23 @@ func (q *Queries) CreateReserve(ctx context.Context, arg CreateReserveParams) (R
 	return i, err
 }
 
+const deleteAnyReserveOperation = `-- name: DeleteAnyReserveOperation :execrows
+DELETE FROM reserve_operations WHERE id = $1 AND user_id = $2
+`
+
+type DeleteAnyReserveOperationParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteAnyReserveOperation(ctx context.Context, arg DeleteAnyReserveOperationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAnyReserveOperation, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteReserve = `-- name: DeleteReserve :execrows
 DELETE FROM reserves r
 WHERE r.id = $1 AND r.user_id = $2 AND NOT r.is_general
@@ -88,6 +105,15 @@ func (q *Queries) DeleteReserve(ctx context.Context, arg DeleteReserveParams) (i
 	return result.RowsAffected(), nil
 }
 
+const deleteReserveEntriesForOperation = `-- name: DeleteReserveEntriesForOperation :exec
+DELETE FROM reserve_entries WHERE operation_id = $1
+`
+
+func (q *Queries) DeleteReserveEntriesForOperation(ctx context.Context, operationID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteReserveEntriesForOperation, operationID)
+	return err
+}
+
 const deleteReserveOperation = `-- name: DeleteReserveOperation :execrows
 DELETE FROM reserve_operations
 WHERE id = $1 AND user_id = $2 AND operation_type = 'reserve_spend'
@@ -100,6 +126,23 @@ type DeleteReserveOperationParams struct {
 
 func (q *Queries) DeleteReserveOperation(ctx context.Context, arg DeleteReserveOperationParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteReserveOperation, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteTransactionForUser = `-- name: DeleteTransactionForUser :execrows
+DELETE FROM transactions WHERE id = $1 AND user_id = $2
+`
+
+type DeleteTransactionForUserParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteTransactionForUser(ctx context.Context, arg DeleteTransactionForUserParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTransactionForUser, arg.ID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
@@ -133,6 +176,39 @@ ON CONFLICT (user_id) WHERE is_general DO NOTHING
 func (q *Queries) EnsureGeneralReserve(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, ensureGeneralReserve, userID)
 	return err
+}
+
+const getIncomeTransactionForConversion = `-- name: GetIncomeTransactionForConversion :one
+SELECT t.id, t.user_id, t.section, t.category, t.amount, t.txn_date, t.kind, t.created_at, t.updated_at
+FROM transactions t
+WHERE t.id = $1
+  AND t.user_id = $2
+  AND t.section = 'income'
+  AND t.kind = 'cash'
+  AND NOT EXISTS (SELECT 1 FROM reserve_operation_transactions rot WHERE rot.transaction_id = t.id)
+FOR UPDATE
+`
+
+type GetIncomeTransactionForConversionParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetIncomeTransactionForConversion(ctx context.Context, arg GetIncomeTransactionForConversionParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, getIncomeTransactionForConversion, arg.ID, arg.UserID)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Section,
+		&i.Category,
+		&i.Amount,
+		&i.TxnDate,
+		&i.Kind,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getReserveForUser = `-- name: GetReserveForUser :one
@@ -200,6 +276,32 @@ func (q *Queries) GetReserveForUserForUpdate(ctx context.Context, arg GetReserve
 	return i, err
 }
 
+const getReserveOperationForUser = `-- name: GetReserveOperationForUser :one
+SELECT id, user_id, operation_type, occurred_on, description, note, created_at, updated_at FROM reserve_operations
+WHERE id = $1 AND user_id = $2
+`
+
+type GetReserveOperationForUserParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetReserveOperationForUser(ctx context.Context, arg GetReserveOperationForUserParams) (ReserveOperation, error) {
+	row := q.db.QueryRow(ctx, getReserveOperationForUser, arg.ID, arg.UserID)
+	var i ReserveOperation
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.OperationType,
+		&i.OccurredOn,
+		&i.Description,
+		&i.Note,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getReserveOperationForUserForUpdate = `-- name: GetReserveOperationForUserForUpdate :one
 SELECT id, user_id, operation_type, occurred_on, description, note, created_at, updated_at FROM reserve_operations
 WHERE id = $1 AND user_id = $2
@@ -221,6 +323,41 @@ func (q *Queries) GetReserveOperationForUserForUpdate(ctx context.Context, arg G
 		&i.OccurredOn,
 		&i.Description,
 		&i.Note,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const insertIncomeTransaction = `-- name: InsertIncomeTransaction :one
+INSERT INTO transactions (user_id, section, category, amount, txn_date, kind)
+VALUES ($1, 'income', $2, $3, $4, 'cash')
+RETURNING id, user_id, section, category, amount, txn_date, kind, created_at, updated_at
+`
+
+type InsertIncomeTransactionParams struct {
+	UserID   uuid.UUID      `json:"user_id"`
+	Category string         `json:"category"`
+	Amount   pgtype.Numeric `json:"amount"`
+	TxnDate  pgtype.Date    `json:"txn_date"`
+}
+
+func (q *Queries) InsertIncomeTransaction(ctx context.Context, arg InsertIncomeTransactionParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, insertIncomeTransaction,
+		arg.UserID,
+		arg.Category,
+		arg.Amount,
+		arg.TxnDate,
+	)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Section,
+		&i.Category,
+		&i.Amount,
+		&i.TxnDate,
+		&i.Kind,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -297,7 +434,9 @@ func (q *Queries) InsertReserveOperation(ctx context.Context, arg InsertReserveO
 
 const listDepositOperationHistory = `-- name: ListDepositOperationHistory :many
 SELECT o.id, o.operation_type, o.occurred_on, o.description, o.note, o.created_at, o.updated_at,
-       e.id AS entry_id, e.reserve_id, r.name AS reserve_name, COALESCE(r.archived_at IS NOT NULL, false)::boolean AS reserve_archived, e.direction, e.amount
+       e.id AS entry_id, e.reserve_id, r.name AS reserve_name, COALESCE(r.archived_at IS NOT NULL, false)::boolean AS reserve_archived,
+       NOT EXISTS (SELECT 1 FROM reserve_entries eligible WHERE eligible.operation_id = o.id AND reserve_balance(eligible.reserve_id) < eligible.amount) AS action_eligible,
+       e.direction, e.amount
 FROM reserve_operations o
 JOIN reserve_entries e ON e.operation_id = o.id
 JOIN reserves r ON r.id = e.reserve_id
@@ -335,6 +474,7 @@ type ListDepositOperationHistoryRow struct {
 	ReserveID       uuid.UUID          `json:"reserve_id"`
 	ReserveName     string             `json:"reserve_name"`
 	ReserveArchived bool               `json:"reserve_archived"`
+	ActionEligible  bool               `json:"action_eligible"`
 	Direction       string             `json:"direction"`
 	Amount          pgtype.Numeric     `json:"amount"`
 }
@@ -365,6 +505,7 @@ func (q *Queries) ListDepositOperationHistory(ctx context.Context, arg ListDepos
 			&i.ReserveID,
 			&i.ReserveName,
 			&i.ReserveArchived,
+			&i.ActionEligible,
 			&i.Direction,
 			&i.Amount,
 		); err != nil {
@@ -497,7 +638,9 @@ func (q *Queries) ListReserveEntriesForOperation(ctx context.Context, operationI
 
 const listReserveOperationHistory = `-- name: ListReserveOperationHistory :many
 SELECT o.id, o.operation_type, o.occurred_on, o.description, o.note, o.created_at, o.updated_at,
-       e.id AS entry_id, e.reserve_id, r.name AS reserve_name, COALESCE(r.archived_at IS NOT NULL, false)::boolean AS reserve_archived, e.direction, e.amount
+       e.id AS entry_id, e.reserve_id, r.name AS reserve_name, COALESCE(r.archived_at IS NOT NULL, false)::boolean AS reserve_archived,
+       NOT EXISTS (SELECT 1 FROM reserve_entries eligible WHERE eligible.operation_id = o.id AND reserve_balance(eligible.reserve_id) < eligible.amount) AS action_eligible,
+       e.direction, e.amount
 FROM reserve_operations o
 JOIN reserve_entries e ON e.operation_id = o.id
 JOIN reserves r ON r.id = e.reserve_id
@@ -535,6 +678,7 @@ type ListReserveOperationHistoryRow struct {
 	ReserveID       uuid.UUID          `json:"reserve_id"`
 	ReserveName     string             `json:"reserve_name"`
 	ReserveArchived bool               `json:"reserve_archived"`
+	ActionEligible  bool               `json:"action_eligible"`
 	Direction       string             `json:"direction"`
 	Amount          pgtype.Numeric     `json:"amount"`
 }
@@ -565,6 +709,7 @@ func (q *Queries) ListReserveOperationHistory(ctx context.Context, arg ListReser
 			&i.ReserveID,
 			&i.ReserveName,
 			&i.ReserveArchived,
+			&i.ActionEligible,
 			&i.Direction,
 			&i.Amount,
 		); err != nil {
