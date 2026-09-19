@@ -26,6 +26,16 @@ type IncomeActivityItemDTO struct {
 	sortID             string
 }
 
+func filterDepositHistoryRows(rows []db.ListReserveOperationHistoryRow) []db.ListReserveOperationHistoryRow {
+	filtered := make([]db.ListReserveOperationHistoryRow, 0, len(rows))
+	for _, row := range rows {
+		if row.OperationType == "deposit" {
+			filtered = append(filtered, row)
+		}
+	}
+	return filtered
+}
+
 func (s *Server) handleIncomeActivity(w http.ResponseWriter, r *http.Request) {
 	month := r.URL.Query().Get("month")
 	parsedMonth, err := time.Parse("2006-01", month)
@@ -44,7 +54,7 @@ func (s *Server) handleIncomeActivity(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "could not load income activity")
 		return
 	}
-	depositRows, err := s.q.ListDepositOperationHistory(r.Context(), db.ListDepositOperationHistoryParams{
+	depositRows, err := s.q.ListReserveOperationHistory(r.Context(), db.ListReserveOperationHistoryParams{
 		UserID: uid, FromDate: from, ToDate: to, ReserveID: "",
 	})
 	if err != nil {
@@ -52,6 +62,7 @@ func (s *Server) handleIncomeActivity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	depositRows = filterDepositHistoryRows(depositRows)
 	items := make([]IncomeActivityItemDTO, 0, len(transactionRows)+len(depositRows))
 	for _, row := range transactionRows {
 		transactionID := row.ID.String()

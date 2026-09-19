@@ -48,6 +48,8 @@ type ReserveOperationDTO struct {
 	Entries       []ReserveEntryDTO `json:"entries"`
 	CreatedAt     string            `json:"created_at"`
 	UpdatedAt     string            `json:"updated_at"`
+	Editable      bool              `json:"editable"`
+	Deletable     bool              `json:"deletable"`
 }
 
 type parsedReserveAllocation struct {
@@ -120,7 +122,7 @@ func (s *Server) handleCreateReserveDeposit(w http.ResponseWriter, r *http.Reque
 	}
 	defer tx.Rollback(r.Context())
 	qtx := s.q.WithTx(tx)
-	locked, err := qtx.LockReservesForDeposit(r.Context(), db.LockReservesForDepositParams{UserID: userID(r), ReserveIds: reserveIDs})
+	locked, err := qtx.LockAffectedReserves(r.Context(), db.LockAffectedReservesParams{UserID: userID(r), ReserveIds: reserveIDs})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not create reserve deposit")
 		return
@@ -188,7 +190,7 @@ func (s *Server) handleListReserveOperations(w http.ResponseWriter, r *http.Requ
 	}
 	from := pgtype.Date{Time: time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true}
 	to := pgtype.Date{Time: time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true}
-	rows, err := s.q.ListDepositOperationHistory(r.Context(), db.ListDepositOperationHistoryParams{UserID: userID(r), FromDate: from, ToDate: to, ReserveID: reserveFilter})
+	rows, err := s.q.ListReserveOperationHistory(r.Context(), db.ListReserveOperationHistoryParams{UserID: userID(r), FromDate: from, ToDate: to, ReserveID: reserveFilter})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not load reserve operations")
 		return
@@ -196,7 +198,7 @@ func (s *Server) handleListReserveOperations(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, depositOperationDTOs(rows))
 }
 
-func depositOperationDTOs(rows []db.ListDepositOperationHistoryRow) []ReserveOperationDTO {
+func depositOperationDTOs(rows []db.ListReserveOperationHistoryRow) []ReserveOperationDTO {
 	operations := make([]ReserveOperationDTO, 0)
 	indices := make(map[uuid.UUID]int)
 	totals := make(map[uuid.UUID]*big.Int)
@@ -210,6 +212,7 @@ func depositOperationDTOs(rows []db.ListDepositOperationHistoryRow) []ReserveOpe
 				ID: row.ID.String(), OperationType: row.OperationType, Date: dateToString(row.OccurredOn),
 				Description: row.Description, Note: row.Note, Entries: make([]ReserveEntryDTO, 0),
 				CreatedAt: row.CreatedAt.Time.Format(time.RFC3339Nano), UpdatedAt: row.UpdatedAt.Time.Format(time.RFC3339Nano),
+				Editable: row.OperationType == "reserve_spend" && !row.ReserveArchived, Deletable: row.OperationType == "reserve_spend" && !row.ReserveArchived,
 			})
 		}
 		totals[row.ID].Add(totals[row.ID], numericCents(row.Amount))
@@ -229,6 +232,7 @@ func reserveOperationDTO(operation db.ReserveOperation, total money.Number, entr
 		ID: operation.ID.String(), OperationType: operation.OperationType, Date: dateToString(operation.OccurredOn),
 		Description: operation.Description, Note: operation.Note, Total: total, Entries: entries,
 		CreatedAt: operation.CreatedAt.Time.Format(time.RFC3339Nano), UpdatedAt: operation.UpdatedAt.Time.Format(time.RFC3339Nano),
+		Editable: operation.OperationType == "reserve_spend", Deletable: operation.OperationType == "reserve_spend",
 	}
 }
 

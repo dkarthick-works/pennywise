@@ -29,6 +29,7 @@ type Querier interface {
 	DeleteLent(ctx context.Context, arg DeleteLentParams) (int64, error)
 	DeleteMissingEventItems(ctx context.Context, arg DeleteMissingEventItemsParams) error
 	DeleteRepayment(ctx context.Context, arg DeleteRepaymentParams) (int64, error)
+	DeleteReserveOperation(ctx context.Context, arg DeleteReserveOperationParams) (int64, error)
 	DeleteSettlementLinks(ctx context.Context, settlementID uuid.UUID) error
 	DeleteTemplatesBySection(ctx context.Context, arg DeleteTemplatesBySectionParams) error
 	DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) error
@@ -44,6 +45,7 @@ type Querier interface {
 	GetMonthlyBudget(ctx context.Context, arg GetMonthlyBudgetParams) (MonthlyBudget, error)
 	GetReserveForUser(ctx context.Context, arg GetReserveForUserParams) (GetReserveForUserRow, error)
 	GetReserveForUserForUpdate(ctx context.Context, arg GetReserveForUserForUpdateParams) (Reserve, error)
+	GetReserveOperationForUserForUpdate(ctx context.Context, arg GetReserveOperationForUserForUpdateParams) (ReserveOperation, error)
 	GetSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
 	GetTransaction(ctx context.Context, arg GetTransactionParams) (Transaction, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
@@ -88,6 +90,8 @@ type Querier interface {
 	ListPopularTransactionNameSuggestions(ctx context.Context, arg ListPopularTransactionNameSuggestionsParams) ([]string, error)
 	ListRepaymentsForLent(ctx context.Context, arg ListRepaymentsForLentParams) ([]ListRepaymentsForLentRow, error)
 	ListRepaymentsForTransfer(ctx context.Context, userID uuid.UUID) ([]ListRepaymentsForTransferRow, error)
+	ListReserveEntriesForOperation(ctx context.Context, operationID uuid.UUID) ([]ListReserveEntriesForOperationRow, error)
+	ListReserveOperationHistory(ctx context.Context, arg ListReserveOperationHistoryParams) ([]ListReserveOperationHistoryRow, error)
 	ListReserves(ctx context.Context, arg ListReservesParams) ([]ListReservesRow, error)
 	// ---- settlement links --------------------------------------------------
 	// All (settlement_id, credit_id) pairs where the SETTLEMENT falls in the month.
@@ -104,9 +108,9 @@ type Querier interface {
 	ListTransactionsByMonthSection(ctx context.Context, arg ListTransactionsByMonthSectionParams) ([]Transaction, error)
 	ListTransactionsByYear(ctx context.Context, arg ListTransactionsByYearParams) ([]Transaction, error)
 	ListUnmappedCategoryTexts(ctx context.Context, userID uuid.UUID) ([]string, error)
+	LockAffectedReserves(ctx context.Context, arg LockAffectedReservesParams) ([]Reserve, error)
 	LockChitForUser(ctx context.Context, arg LockChitForUserParams) (Chit, error)
 	LockEvent(ctx context.Context, arg LockEventParams) (Event, error)
-	LockReservesForDeposit(ctx context.Context, arg LockReservesForDepositParams) ([]Reserve, error)
 	LockUserForReserveCount(ctx context.Context, userID uuid.UUID) (uuid.UUID, error)
 	MarkEventConverted(ctx context.Context, arg MarkEventConvertedParams) (Event, error)
 	MarkMonthSeeded(ctx context.Context, arg MarkMonthSeededParams) (MonthState, error)
@@ -149,6 +153,8 @@ type Querier interface {
 	UpdateLent(ctx context.Context, arg UpdateLentParams) (Lent, error)
 	UpdatePreferences(ctx context.Context, arg UpdatePreferencesParams) (UserSetting, error)
 	UpdateRepayment(ctx context.Context, arg UpdateRepaymentParams) (LentRepayment, error)
+	UpdateReserveEntry(ctx context.Context, arg UpdateReserveEntryParams) (ReserveEntry, error)
+	UpdateReserveOperation(ctx context.Context, arg UpdateReserveOperationParams) (ReserveOperation, error)
 	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertMonthClosed(ctx context.Context, arg UpsertMonthClosedParams) (MonthState, error)

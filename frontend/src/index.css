@@ -752,3 +752,6 @@ input, button { font-family: inherit; }
 .income-sent-item h3 { margin: 10px 0 2px; }
 .income-sent-item ul { margin: 14px 0 0; padding-left: 20px; color: var(--ink-2); }
 .income-sent-item li + li { margin-top: 5px; }
+.reserve-spending-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.reserve-spending-fields label { display: block; margin-bottom: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+@media (max-width: 700px) { .reserve-spending-fields { grid-template-columns: 1fr; } }

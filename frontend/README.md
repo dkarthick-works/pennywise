@@ -336,7 +336,9 @@ starts with one renameable General Reserve and can create or rename reserves up 
 a five-active-reserve limit. **Add to reserves** records one direct deposit with
 one or more distinct allocations, previews the allocated total, and keeps the
 activity outside normal income and spending. The page shows reverse-chronological
-deposit history with allocation details. The Record page’s Income section offers
+reserve history with deposit and reserve-spending details. Reserve-only spending
+can be recorded, edited, or deleted from the history and includes an explanation
+that it never appears in normal spending analytics. The Record page’s Income section offers
 **Normal income** and **Send to reserves** destinations, groups Sent-to-reserves
 activity separately with allocation details, and excludes it from the received
 income total. Month-scoped query keys prevent prior-month reserve activity from

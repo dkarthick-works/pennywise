@@ -468,6 +468,8 @@ export interface ReserveOperation {
   entries: ReserveEntry[];
   created_at: string;
   updated_at: string;
+  editable: boolean;
+  deletable: boolean;
 }
 
 export interface ReserveAllocationInput {
@@ -480,6 +482,14 @@ export interface ReserveDepositInput {
   date: string;
   note: string;
   allocations: ReserveAllocationInput[];
+}
+
+export interface ReserveSpendingInput {
+  reserve_id: string;
+  amount: number;
+  date: string;
+  description: string;
+  note: string;
 }
 
 interface IncomeActivityBase {

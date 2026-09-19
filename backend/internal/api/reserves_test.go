@@ -432,6 +432,179 @@ func TestIncomeActivitySameDateOrderingUsesDescendingID(t *testing.T) {
 	}
 }
 
+func TestReserveSpendingCreatesWithdrawalWithoutNormalTransaction(t *testing.T) {
+	srv, pool, token, userID := setupCategoryAPITest(t)
+	defer pool.Close()
+	general := listTestReserves(t, srv, token, false)[0]
+	loan := createTestReserve(t, srv, token, "Loan Reserve")
+	deposit := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{
+		"description": "Loan funding", "date": "2026-09-01", "allocations": []map[string]any{{"reserve_id": loan.ID, "amount": 120000}},
+	})
+	if deposit.Code != http.StatusCreated {
+		t.Fatalf("fund reserve status = %d body = %s", deposit.Code, deposit.Body.String())
+	}
+	before := apiRequest(t, srv, token, http.MethodGet, "/api/dashboard/monthly?month=2026-09", nil).Body.String()
+
+	rr := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/spending", map[string]any{
+		"reserve_id": loan.ID, "amount": 100000, "date": "2026-09-18", "description": "Loan settlement", "note": "Final payment",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("spend status = %d body = %s", rr.Code, rr.Body.String())
+	}
+	var operation ReserveOperationDTO
+	if err := json.Unmarshal(rr.Body.Bytes(), &operation); err != nil {
+		t.Fatalf("decode spending: %v", err)
+	}
+	if operation.OperationType != "reserve_spend" || operation.Total != "100000.00" || len(operation.Entries) != 1 || operation.Entries[0].Direction != "withdrawal" {
+		t.Fatalf("operation = %#v", operation)
+	}
+	balances := listTestReserves(t, srv, token, false)
+	for _, reserve := range balances {
+		if reserve.ID == loan.ID && reserve.Balance != 20000 {
+			t.Fatalf("loan balance = %v, want 20000", reserve.Balance)
+		}
+		if reserve.ID == general.ID && reserve.Balance != 0 {
+			t.Fatalf("general balance = %v, want 0", reserve.Balance)
+		}
+	}
+	var transactionCount int
+	if err := pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM transactions WHERE user_id = $1`, userID).Scan(&transactionCount); err != nil {
+		t.Fatalf("count transactions: %v", err)
+	}
+	if transactionCount != 0 {
+		t.Fatalf("transactions = %d, want 0", transactionCount)
+	}
+	after := apiRequest(t, srv, token, http.MethodGet, "/api/dashboard/monthly?month=2026-09", nil).Body.String()
+	if before != after {
+		t.Fatalf("reserve spending changed dashboard. before=%s after=%s", before, after)
+	}
+}
+
+func TestReserveSpendingRejectsOverdraftPerReserveAndConcurrentWithdrawals(t *testing.T) {
+	srv, pool, token, _ := setupCategoryAPITest(t)
+	defer pool.Close()
+	loan := createTestReserve(t, srv, token, "Loan Reserve")
+	other := createTestReserve(t, srv, token, "Other Reserve")
+	deposit := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{
+		"description": "Loan funding", "date": "2026-09-01", "allocations": []map[string]any{{"reserve_id": loan.ID, "amount": 100000}, {"reserve_id": other.ID, "amount": 100000}},
+	})
+	if deposit.Code != http.StatusCreated {
+		t.Fatalf("fund reserves status = %d body = %s", deposit.Code, deposit.Body.String())
+	}
+	assertReserveError(t, apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/spending", map[string]any{
+		"reserve_id": loan.ID, "amount": 100001, "date": "2026-09-18", "description": "Too much",
+	}), http.StatusConflict, "insufficient balance in Loan Reserve")
+
+	const attempts = 2
+	start := make(chan struct{})
+	results := make(chan int, attempts)
+	for range attempts {
+		go func() {
+			<-start
+			rr := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/spending", map[string]any{
+				"reserve_id": loan.ID, "amount": 60000, "date": "2026-09-19", "description": "Concurrent spend",
+			})
+			results <- rr.Code
+		}()
+	}
+	close(start)
+	statuses := []int{<-results, <-results}
+	if !((statuses[0] == http.StatusCreated && statuses[1] == http.StatusConflict) || (statuses[1] == http.StatusCreated && statuses[0] == http.StatusConflict)) {
+		t.Fatalf("concurrent statuses = %#v, want one created and one conflict", statuses)
+	}
+}
+
+func TestReserveSpendingCanBeEditedAndDeletedAtomically(t *testing.T) {
+	srv, pool, token, _ := setupCategoryAPITest(t)
+	defer pool.Close()
+	loan := createTestReserve(t, srv, token, "Loan Reserve")
+	other := createTestReserve(t, srv, token, "Other Reserve")
+	deposit := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{
+		"description": "Funding", "date": "2026-09-01", "allocations": []map[string]any{{"reserve_id": loan.ID, "amount": 100000}, {"reserve_id": other.ID, "amount": 50000}},
+	})
+	if deposit.Code != http.StatusCreated {
+		t.Fatalf("fund status = %d body = %s", deposit.Code, deposit.Body.String())
+	}
+	created := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/spending", map[string]any{
+		"reserve_id": loan.ID, "amount": 60000, "date": "2026-09-10", "description": "Settlement", "note": "first",
+	})
+	if created.Code != http.StatusCreated {
+		t.Fatalf("spend status = %d body = %s", created.Code, created.Body.String())
+	}
+	var operation ReserveOperationDTO
+	if err := json.Unmarshal(created.Body.Bytes(), &operation); err != nil {
+		t.Fatalf("decode spending: %v", err)
+	}
+	assertReserveError(t, apiRequest(t, srv, token, http.MethodPatch, "/api/reserve-operations/"+operation.ID, map[string]any{
+		"reserve_id": loan.ID, "amount": 200000, "date": "2026-09-11", "description": "Impossible settlement",
+	}), http.StatusConflict, "insufficient balance in Loan Reserve")
+	updated := apiRequest(t, srv, token, http.MethodPatch, "/api/reserve-operations/"+operation.ID, map[string]any{
+		"reserve_id": loan.ID, "amount": 80000, "date": "2026-09-11", "description": "Corrected settlement", "note": "corrected",
+	})
+	if updated.Code != http.StatusOK {
+		t.Fatalf("update status = %d body = %s", updated.Code, updated.Body.String())
+	}
+	balances := listTestReserves(t, srv, token, false)
+	for _, reserve := range balances {
+		if reserve.ID == loan.ID && reserve.Balance != 20000 {
+			t.Fatalf("loan after update = %v, want 20000", reserve.Balance)
+		}
+	}
+	deleted := apiRequest(t, srv, token, http.MethodDelete, "/api/reserve-operations/"+operation.ID, nil)
+	if deleted.Code != http.StatusNoContent {
+		t.Fatalf("delete status = %d body = %s", deleted.Code, deleted.Body.String())
+	}
+	balances = listTestReserves(t, srv, token, false)
+	for _, reserve := range balances {
+		if reserve.ID == loan.ID && reserve.Balance != 100000 {
+			t.Fatalf("loan after delete = %v, want 100000", reserve.Balance)
+		}
+	}
+}
+
+func TestArchivedReserveSpendingCannotBeDeleted(t *testing.T) {
+	srv, pool, token, _ := setupCategoryAPITest(t)
+	defer pool.Close()
+	reserve := createTestReserve(t, srv, token, "Archived Loan")
+	deposit := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{
+		"description": "Funding", "date": "2026-09-01", "allocations": []map[string]any{{"reserve_id": reserve.ID, "amount": 1000}},
+	})
+	if deposit.Code != http.StatusCreated {
+		t.Fatalf("fund status = %d body = %s", deposit.Code, deposit.Body.String())
+	}
+	spend := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/spending", map[string]any{
+		"reserve_id": reserve.ID, "amount": 500, "date": "2026-09-02", "description": "Spend",
+	})
+	if spend.Code != http.StatusCreated {
+		t.Fatalf("spend status = %d body = %s", spend.Code, spend.Body.String())
+	}
+	var operation ReserveOperationDTO
+	if err := json.Unmarshal(spend.Body.Bytes(), &operation); err != nil {
+		t.Fatalf("decode spending: %v", err)
+	}
+	if _, err := pool.Exec(context.Background(), `UPDATE reserves SET archived_at = now() WHERE id = $1`, reserve.ID); err != nil {
+		t.Fatalf("archive fixture: %v", err)
+	}
+	assertReserveError(t, apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/spending", map[string]any{
+		"reserve_id": reserve.ID, "amount": 100, "date": "2026-09-03", "description": "Archived spend",
+	}), http.StatusConflict, "archived reserves cannot receive spending")
+	assertReserveError(t, apiRequest(t, srv, token, http.MethodPatch, "/api/reserve-operations/"+operation.ID, map[string]any{
+		"reserve_id": reserve.ID, "amount": 400, "date": "2026-09-04", "description": "Edited archived spend",
+	}), http.StatusConflict, "archived reserves cannot receive spending")
+	history := apiRequest(t, srv, token, http.MethodGet, "/api/reserve-operations?year=2026", nil)
+	if history.Code != http.StatusOK {
+		t.Fatalf("history status = %d body = %s", history.Code, history.Body.String())
+	}
+	var operations []ReserveOperationDTO
+	if err := json.Unmarshal(history.Body.Bytes(), &operations); err != nil || len(operations) != 2 {
+		t.Fatalf("history = %s err = %v", history.Body.String(), err)
+	}
+	if operations[0].Editable || operations[0].Deletable {
+		t.Fatalf("archived operation policy = %+v, want non-actionable", operations[0])
+	}
+	assertReserveError(t, apiRequest(t, srv, token, http.MethodDelete, "/api/reserve-operations/"+operation.ID, nil), http.StatusConflict, "archived reserve operations cannot be changed")
+}
+
 func createTestReserve(t *testing.T, srv *Server, token, name string) reserveTestDTO {
 	t.Helper()
 	rr := apiRequest(t, srv, token, http.MethodPost, "/api/reserves", map[string]any{"name": name})

@@ -64,6 +64,9 @@ never create normal transaction rows, so existing analytics remain unchanged.
 `GET /api/income-activity` merges normal income and reserve deposits for
 presentation while preserving `counts_as_income` and source/nature discrimination;
 generated funding income is recognized through `reserve_operation_transactions`.
+Reserve-only spending locks its selected reserve before validating its derived
+balance, and uses the same reserve-operation history with editable/deletable
+policy fields. It never inserts a normal transaction.
 
 ## Layout
 
@@ -168,6 +171,9 @@ only ever talks to this origin.
 | PATCH  | `/api/reserves/{id}` | rename a user-owned reserve, including General |
 | GET    | `/api/reserve-operations?year=YYYY` | list direct reserve deposits with allocation details in reverse chronology |
 | POST   | `/api/reserve-operations/deposits` | atomically create one direct deposit with one or more distinct allocations |
+| POST   | `/api/reserve-operations/spending` | atomically withdraw from one active reserve without a normal transaction |
+| PATCH  | `/api/reserve-operations/{id}` | edit a standalone reserve-spend operation |
+| DELETE | `/api/reserve-operations/{id}` | delete a standalone reserve-spend operation |
 | GET    | `/api/income-activity?month=YYYY-MM` | discriminated ordinary, From-reserve, and Sent-to-reserves monthly income activity |
 | GET    | `/api/lents?status=open\|settled\|all` | list money lent to others (default `all`) |
 | POST   | `/api/lents` | create a lent |

@@ -49,7 +49,7 @@ SELECT EXISTS (
 -- name: ReserveBalance :one
 SELECT reserve_balance(sqlc.arg(reserve_id));
 
--- name: LockReservesForDeposit :many
+-- name: LockAffectedReserves :many
 SELECT * FROM reserves
 WHERE user_id = sqlc.arg(user_id)
   AND id = ANY(sqlc.arg(reserve_ids)::uuid[])
@@ -68,12 +68,60 @@ RETURNING *;
 
 -- name: ListDepositOperationHistory :many
 SELECT o.id, o.operation_type, o.occurred_on, o.description, o.note, o.created_at, o.updated_at,
-       e.id AS entry_id, e.reserve_id, r.name AS reserve_name, e.direction, e.amount
+       e.id AS entry_id, e.reserve_id, r.name AS reserve_name, COALESCE(r.archived_at IS NOT NULL, false)::boolean AS reserve_archived, e.direction, e.amount
 FROM reserve_operations o
 JOIN reserve_entries e ON e.operation_id = o.id
 JOIN reserves r ON r.id = e.reserve_id
 WHERE o.user_id = sqlc.arg(user_id)
   AND o.operation_type = 'deposit'
+  AND o.occurred_on >= sqlc.arg(from_date)
+  AND o.occurred_on < sqlc.arg(to_date)
+  AND (
+    sqlc.arg(reserve_id)::text = ''
+    OR EXISTS (
+      SELECT 1 FROM reserve_entries filtered
+      WHERE filtered.operation_id = o.id
+        AND filtered.reserve_id = sqlc.arg(reserve_id)::uuid
+    )
+  )
+ORDER BY o.occurred_on DESC, o.created_at DESC, o.id DESC, r.name, e.id;
+
+-- name: GetReserveOperationForUserForUpdate :one
+SELECT * FROM reserve_operations
+WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id)
+FOR UPDATE;
+
+-- name: ListReserveEntriesForOperation :many
+SELECT e.id, e.operation_id, e.reserve_id, r.name AS reserve_name, e.direction, e.amount, e.created_at
+FROM reserve_entries e
+JOIN reserves r ON r.id = e.reserve_id
+WHERE e.operation_id = sqlc.arg(operation_id)
+ORDER BY e.id;
+
+-- name: UpdateReserveOperation :one
+UPDATE reserve_operations
+SET occurred_on = sqlc.arg(occurred_on), description = sqlc.arg(description), note = sqlc.arg(note), updated_at = now()
+WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id)
+RETURNING *;
+
+-- name: UpdateReserveEntry :one
+UPDATE reserve_entries
+SET reserve_id = sqlc.arg(reserve_id), amount = sqlc.arg(amount)
+WHERE id = sqlc.arg(id) AND operation_id = sqlc.arg(operation_id)
+RETURNING *;
+
+-- name: DeleteReserveOperation :execrows
+DELETE FROM reserve_operations
+WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND operation_type = 'reserve_spend';
+
+-- name: ListReserveOperationHistory :many
+SELECT o.id, o.operation_type, o.occurred_on, o.description, o.note, o.created_at, o.updated_at,
+       e.id AS entry_id, e.reserve_id, r.name AS reserve_name, COALESCE(r.archived_at IS NOT NULL, false)::boolean AS reserve_archived, e.direction, e.amount
+FROM reserve_operations o
+JOIN reserve_entries e ON e.operation_id = o.id
+JOIN reserves r ON r.id = e.reserve_id
+WHERE o.user_id = sqlc.arg(user_id)
+  AND o.operation_type IN ('deposit', 'reserve_spend')
   AND o.occurred_on >= sqlc.arg(from_date)
   AND o.occurred_on < sqlc.arg(to_date)
   AND (

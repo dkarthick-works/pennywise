@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReservesPage } from "./ReservesPage";
-import { createReserve, createReserveDeposit, listReserveOperations, listReserves, renameReserve } from "../api/reserves";
+import { createReserve, createReserveDeposit, createReserveSpending, deleteReserveSpending, listReserveOperations, listReserves, renameReserve, updateReserveSpending } from "../api/reserves";
 
 vi.mock("../api/reserves", async (original) => ({
   ...await original<typeof import("../api/reserves")>(),
@@ -12,6 +12,9 @@ vi.mock("../api/reserves", async (original) => ({
   createReserve: vi.fn(),
   renameReserve: vi.fn(),
   createReserveDeposit: vi.fn(),
+  createReserveSpending: vi.fn(),
+  updateReserveSpending: vi.fn(),
+  deleteReserveSpending: vi.fn(),
   listReserveOperations: vi.fn(),
 }));
 
@@ -27,6 +30,8 @@ function mount() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listReserveOperations).mockResolvedValue([]);
+  vi.mocked(createReserveSpending).mockResolvedValue({ id: "spend", operation_type: "reserve_spend", date: "2026-09-18", description: "Loan settlement", note: "", total: 100000, entries: [], created_at: "", updated_at: "", editable: true, deletable: true });
+  vi.mocked(updateReserveSpending).mockResolvedValue({ id: "spend", operation_type: "reserve_spend", date: "2026-09-18", description: "Loan settlement", note: "", total: 100000, entries: [], created_at: "", updated_at: "", editable: true, deletable: true });
 });
 
 describe("Reserves page", () => {
@@ -90,12 +95,12 @@ describe("Reserves page", () => {
           { id: "e1", reserve_id: "ceremony", reserve_name: "Ceremony Reserve", direction: "deposit", amount: 100000 },
           { id: "e2", reserve_id: "loan", reserve_name: "Loan Reserve", direction: "deposit", amount: 100000 },
           { id: "e3", reserve_id: "general", reserve_name: "General Reserve", direction: "deposit", amount: 60000 },
-        ], created_at: "2026-09-18T12:00:00Z", updated_at: "2026-09-18T12:00:00Z",
+        ], created_at: "2026-09-18T12:00:00Z", updated_at: "2026-09-18T12:00:00Z", editable: false, deletable: false,
       },
-      { id: "older", operation_type: "deposit", date: "2026-01-01", description: "Older bonus", note: "", total: 10, entries: [], created_at: "2026-01-01T12:00:00Z", updated_at: "2026-01-01T12:00:00Z" },
+      { id: "older", operation_type: "deposit", date: "2026-01-01", description: "Older bonus", note: "", total: 10, entries: [], created_at: "2026-01-01T12:00:00Z", updated_at: "2026-01-01T12:00:00Z", editable: false, deletable: false },
     ]);
     vi.mocked(createReserveDeposit).mockResolvedValue({
-      id: "created", operation_type: "deposit", date: "2026-09-18", description: "RSU vest", note: "", total: 260000, entries: [], created_at: "", updated_at: "",
+      id: "created", operation_type: "deposit", date: "2026-09-18", description: "RSU vest", note: "", total: 260000, entries: [], created_at: "", updated_at: "", editable: false, deletable: false,
     });
     mount();
 
@@ -130,7 +135,7 @@ describe("Reserves page", () => {
   it("validates and submits a single exact allocation", async () => {
     const user = userEvent.setup();
     vi.mocked(listReserves).mockResolvedValue([{ id: "general", name: "General Reserve", is_general: true, archived: false, balance: 0 }]);
-    vi.mocked(createReserveDeposit).mockResolvedValue({ id: "deposit", operation_type: "deposit", date: "2026-09-18", description: "Bonus", note: "", total: 10.25, entries: [], created_at: "", updated_at: "" });
+    vi.mocked(createReserveDeposit).mockResolvedValue({ id: "deposit", operation_type: "deposit", date: "2026-09-18", description: "Bonus", note: "", total: 10.25, entries: [], created_at: "", updated_at: "", editable: false, deletable: false });
     mount();
     await user.click(await screen.findByRole("button", { name: "Add to reserves" }));
     await user.click(screen.getByRole("button", { name: "Save deposit" }));
@@ -146,6 +151,32 @@ describe("Reserves page", () => {
     await waitFor(() => expect(createReserveDeposit).toHaveBeenCalledWith({
       description: "Bonus", date: "2026-09-18", note: "", allocations: [{ reserve_id: "general", amount: 10.25 }],
     }));
+  });
+
+  it("records, edits, and deletes reserve-only spending without normal analytics copy", async () => {
+    const user = userEvent.setup();
+    vi.mocked(listReserves).mockResolvedValue([{ id: "loan", name: "Loan Reserve", is_general: false, archived: false, balance: 100000 }]);
+    vi.mocked(listReserveOperations).mockResolvedValue([{
+      id: "spend", operation_type: "reserve_spend", date: "2026-09-18", description: "Loan settlement", note: "Final payment", total: 40000,
+      entries: [{ id: "entry", reserve_id: "loan", reserve_name: "Loan Reserve", direction: "withdrawal", amount: 40000 }], created_at: "2026-09-18T10:00:00Z", updated_at: "2026-09-18T10:00:00Z", editable: true, deletable: true,
+    }]);
+    mount();
+    await user.click(await screen.findByRole("button", { name: "Record reserve spending" }));
+    expect(screen.getByText(/will not appear in normal spending analytics/i)).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Amount"), "100000");
+    await user.type(screen.getByLabelText("Description"), "Loan settlement");
+    await user.click(screen.getByRole("button", { name: "Save spending" }));
+    await waitFor(() => expect(createReserveSpending).toHaveBeenCalledWith({ reserve_id: "loan", amount: 100000, date: expect.any(String), description: "Loan settlement", note: "" }));
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.clear(screen.getByLabelText("Amount"));
+    await user.type(screen.getByLabelText("Amount"), "35000");
+    await user.click(screen.getByRole("button", { name: "Save spending" }));
+    await waitFor(() => expect(updateReserveSpending).toHaveBeenCalledWith("spend", expect.objectContaining({ reserve_id: "loan", amount: 35000 })));
+
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(deleteReserveSpending).toHaveBeenCalledWith("spend"));
   });
 
   it("offers retryable error and empty states", async () => {
