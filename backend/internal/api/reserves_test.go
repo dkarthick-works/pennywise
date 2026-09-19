@@ -862,7 +862,7 @@ func TestFundedExpenseCreatesPairedCashTransactionsAndDeletesTogether(t *testing
 	if err := json.Unmarshal(expense.Body.Bytes(), &operation); err != nil {
 		t.Fatalf("decode funded expense: %v", err)
 	}
-	if operation.OperationType != "funded_expense" || operation.Total != "8000.00" || operation.Editable || !operation.Deletable {
+	if operation.OperationType != "funded_expense" || operation.Total != "8000" || operation.Editable || !operation.Deletable {
 		t.Fatalf("operation = %#v", operation)
 	}
 	var count int
@@ -889,6 +889,30 @@ func TestFundedExpenseCreatesPairedCashTransactionsAndDeletesTogether(t *testing
 	if count != 0 {
 		t.Fatalf("generated transactions remain = %d", count)
 	}
+}
+
+func TestReserveOperationOwnershipDoesNotLeakResources(t *testing.T) {
+	srv, pool, token, _ := setupCategoryAPITest(t)
+	defer pool.Close()
+	reserve := createTestReserve(t, srv, token, "Private Reserve")
+	deposit := apiRequest(t, srv, token, http.MethodPost, "/api/reserve-operations/deposits", map[string]any{"description": "Private", "date": "2026-09-01", "allocations": []map[string]any{{"reserve_id": reserve.ID, "amount": 1000}}})
+	if deposit.Code != http.StatusCreated {
+		t.Fatalf("deposit status = %d body = %s", deposit.Code, deposit.Body.String())
+	}
+	var operation ReserveOperationDTO
+	if err := json.Unmarshal(deposit.Body.Bytes(), &operation); err != nil {
+		t.Fatalf("decode operation: %v", err)
+	}
+	otherID := uuid.New()
+	if err := srv.provisionUser(context.Background(), auth.Identity{UserID: otherID, Email: "operation-other@example.com"}); err != nil {
+		t.Fatalf("provision other user: %v", err)
+	}
+	otherToken := signedTestToken(t, otherID)
+	if listed := apiRequest(t, srv, otherToken, http.MethodGet, "/api/reserve-operations?year=2026", nil); listed.Code != http.StatusOK || listed.Body.String() != "[]\n" {
+		t.Fatalf("other user history = %d %s", listed.Code, listed.Body.String())
+	}
+	assertReserveError(t, apiRequest(t, srv, otherToken, http.MethodPatch, "/api/reserve-operations/"+operation.ID, map[string]any{"description": "Stolen", "date": "2026-09-02", "allocations": []map[string]any{{"reserve_id": reserve.ID, "amount": 1000}}}), http.StatusNotFound, "reserve operation not found")
+	assertReserveError(t, apiRequest(t, srv, otherToken, http.MethodDelete, "/api/reserve-operations/"+operation.ID, nil), http.StatusNotFound, "reserve operation not found")
 }
 
 func createTestReserve(t *testing.T, srv *Server, token, name string) reserveTestDTO {

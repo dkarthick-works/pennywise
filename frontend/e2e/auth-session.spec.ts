@@ -86,7 +86,7 @@ test("logout suppresses a late API-triggered refresh", async ({ context }) => {
   await expect(page.getByText(/No events yet/)).toBeVisible();
   rejectEventRequests = true;
   // A normal API request returning 401, rather than visibility, starts refresh.
-  await page.getByLabel("Status", { exact: true }).selectOption("planned");
+  await page.getByRole("tab", { name: "Planned", exact: true }).click();
   await refreshStarted;
 
   await page.getByRole("button", { name: "Profile", exact: true }).click();
