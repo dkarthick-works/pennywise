@@ -78,7 +78,7 @@ describe("ChitDetailPage", () => {
     renderDetail();
     expect(await screen.findByText("Office Chit A")).toBeInTheDocument();
     expect(screen.getByText("Total personally paid")).toBeInTheDocument();
-    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Installments paid" })).toHaveAttribute("aria-valuenow", "50");
     expect(screen.getByText(/do not affect expenses/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Expected installment$/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Save installment/i })).not.toBeInTheDocument();

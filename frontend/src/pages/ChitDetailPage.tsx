@@ -107,6 +107,10 @@ export function ChitDetailPage() {
     );
   }
 
+  const progressPct = chit.total_installments > 0
+    ? Math.min(100, Math.round((chit.installment_count / chit.total_installments) * 100))
+    : 0;
+
   return (
     <div className="content fade-in">
       <button
@@ -163,40 +167,27 @@ export function ChitDetailPage() {
         </p>
       )}
 
-      <div
-        className="card card-pad"
-        style={{
-          marginBottom: 18,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-          gap: 16,
-        }}
-      >
-        <div>
+      <div className="card card-pad chit-stats">
+        <div className="chit-stat">
           <div className="stat-lbl">Chit value</div>
-          <div className="num" style={{ fontSize: 22, fontWeight: 800 }}>{inr(chit.chit_value)}</div>
+          <div className="num">{inr(chit.chit_value)}</div>
         </div>
-        <div>
+        <div className="chit-stat">
           <div className="stat-lbl">Expected installment</div>
-          <div className="num" style={{ fontSize: 22, fontWeight: 800 }}>{inr(chit.expected_monthly)}</div>
+          <div className="num">{inr(chit.expected_monthly)}</div>
         </div>
-        <div>
+        <div className="chit-stat">
           <div className="stat-lbl">Total personally paid</div>
-          <div className="num" style={{ fontSize: 22, fontWeight: 800 }}>{inr(chit.total_paid)}</div>
+          <div className="num">{inr(chit.total_paid)}</div>
         </div>
-        <div>
+        <div className="chit-stat">
           <div className="stat-lbl">Progress</div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>
-            {chit.installment_count} / {chit.total_installments}
-          </div>
+          <div className="num">{chit.installment_count} <small>/ {chit.total_installments}</small></div>
+          <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPct} aria-label="Installments paid"><i style={{ width: `${progressPct}%`, background: completed ? "var(--pos)" : "var(--accent)" }} /></div>
         </div>
-        <div>
-          <div className="stat-lbl">Organizer</div>
-          <div style={{ fontWeight: 600 }}>{chit.organizer}</div>
-        </div>
-        <div>
-          <div className="stat-lbl">Start month</div>
-          <div style={{ fontWeight: 600 }}>{startMonthToMonth(chit.start_month)}</div>
+        <div className="chit-stats-meta">
+          <div>Organizer<strong>{chit.organizer}</strong></div>
+          <div>Start month<strong>{startMonthToMonth(chit.start_month)}</strong></div>
         </div>
       </div>
 
