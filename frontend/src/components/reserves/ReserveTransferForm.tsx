@@ -3,14 +3,16 @@ import type { Reserve, ReserveTransferInput } from "../../types";
 import { currentDate } from "../../lib/dates";
 import { money2 } from "../../lib/money";
 
-export function ReserveTransferForm({ reserves, onCancel, onSave, submitting }: {
+export function ReserveTransferForm({ reserves, initialFromReserveId, onCancel, onSave, submitting }: {
   reserves: Reserve[];
+  initialFromReserveId?: string;
   onCancel: () => void;
   onSave: (input: ReserveTransferInput) => Promise<unknown>;
   submitting: boolean;
 }) {
-  const [from, setFrom] = useState(reserves[0]?.id ?? "");
-  const [to, setTo] = useState(reserves[1]?.id ?? "");
+  const initialFrom = reserves.find((reserve) => reserve.id === initialFromReserveId) ?? reserves[0];
+  const [from, setFrom] = useState(initialFrom?.id ?? "");
+  const [to, setTo] = useState(reserves.find((reserve) => reserve.id !== initialFrom?.id)?.id ?? "");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(currentDate());
   const [note, setNote] = useState("");
@@ -27,7 +29,6 @@ export function ReserveTransferForm({ reserves, onCancel, onSave, submitting }: 
   }
 
   return <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-    <p className="muted">Move money between reserves without changing normal income or spending.</p>
     <div className="reserve-spending-fields">
       <div><label htmlFor="transfer-from">From reserve</label><select id="transfer-from" className="input" value={from} onChange={(event) => setFrom(event.target.value)}>{reserves.map((reserve) => <option key={reserve.id} value={reserve.id}>{reserve.name}</option>)}</select></div>
       <div><label htmlFor="transfer-to">To reserve</label><select id="transfer-to" className="input" value={to} onChange={(event) => setTo(event.target.value)}>{reserves.map((reserve) => <option key={reserve.id} value={reserve.id}>{reserve.name}</option>)}</select></div>

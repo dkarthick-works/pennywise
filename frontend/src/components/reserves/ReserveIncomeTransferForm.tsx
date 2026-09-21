@@ -3,11 +3,12 @@ import type { Reserve, ReserveIncomeTransferInput } from "../../types";
 import { currentDate } from "../../lib/dates";
 import { money2 } from "../../lib/money";
 
-export function ReserveIncomeTransferForm({ reserves, onCancel, onSave, submitting }: { reserves: Reserve[]; onCancel: () => void; onSave: (input: ReserveIncomeTransferInput) => Promise<unknown>; submitting: boolean }) {
-  const [reserveId, setReserveId] = useState(reserves[0]?.id ?? "");
+export function ReserveIncomeTransferForm({ reserves, initialReserveId, onCancel, onSave, submitting }: { reserves: Reserve[]; initialReserveId?: string; onCancel: () => void; onSave: (input: ReserveIncomeTransferInput) => Promise<unknown>; submitting: boolean }) {
+  const initialReserve = reserves.find((reserve) => reserve.id === initialReserveId) ?? reserves[0];
+  const [reserveId, setReserveId] = useState(initialReserve?.id ?? "");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(currentDate());
-  const [description, setDescription] = useState(() => reserves[0] ? `From ${reserves[0].name}` : "");
+  const [description, setDescription] = useState(() => initialReserve ? `From ${initialReserve.name}` : "");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const amountPattern = /^\d+(?:\.\d{1,2})?$/;
@@ -21,7 +22,6 @@ export function ReserveIncomeTransferForm({ reserves, onCancel, onSave, submitti
     catch (reason) { setError(reason instanceof Error ? reason.message : "Could not move reserve money to income"); }
   }
   return <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-    <p className="muted">This creates normal income and affects income calculations.</p>
     <div className="reserve-spending-fields">
       <div><label htmlFor="income-transfer-reserve">Reserve</label><select id="income-transfer-reserve" className="input" value={reserveId} onChange={(event) => { const id = event.target.value; setReserveId(id); const reserve = reserves.find((item) => item.id === id); if (reserve) setDescription(`From ${reserve.name}`); }}>{reserves.map((reserve) => <option key={reserve.id} value={reserve.id}>{reserve.name}</option>)}</select></div>
       <div><label htmlFor="income-transfer-amount">Amount</label><input id="income-transfer-amount" className="input" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} /></div>

@@ -32,7 +32,6 @@ export function ReserveSpendingForm({ reserves, initial, onCancel, onSave, submi
   }
 
   return <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-    <p className="muted">This changes only the reserve balance and will not appear in normal spending analytics.</p>
     <div className="reserve-spending-fields">
       <div><label htmlFor="spending-reserve">Reserve</label><select id="spending-reserve" className="input" value={reserveId} onChange={(event) => setReserveId(event.target.value)}>{reserves.map((reserve) => <option key={reserve.id} value={reserve.id}>{reserve.name}</option>)}</select></div>
       <div><label htmlFor="spending-amount">Amount</label><input id="spending-amount" className="input" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} /></div>

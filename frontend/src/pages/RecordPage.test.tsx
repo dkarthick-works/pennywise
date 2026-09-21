@@ -189,7 +189,7 @@ describe("RecordPage income activity", () => {
     await user.click(await screen.findByRole("button", { name: "Send to reserves" }));
     await user.type(screen.getByLabelText("Description"), "Bonus");
     fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-08-20" } });
-    await user.type(screen.getByLabelText("Amount 1"), "1000");
+    await user.type(screen.getByLabelText("Amount"), "1000");
     await user.click(screen.getByRole("button", { name: "Save deposit" }));
 
     await waitFor(() => expect(mocks.createReserveDeposit).toHaveBeenCalledWith({ description: "Bonus", date: "2026-08-20", note: "", allocations: [{ reserve_id: "general", amount: 1000 }] }));
