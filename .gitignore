@@ -9,6 +9,7 @@
 .CLAUDE.md
 .claude_history
 .claude_history.json
+.impeccable/*
 Ledger PRD (standalone).html
 /devlog.md
 /.scratch/
@@ -26,6 +27,7 @@ roadmap/2026-08-12-three-month-product-roadmap.md
 .cursor/plans/*
 
 frontend/app-story/*
+frontend/.impeccable/*
 backend/graphify-out/
 frontend/FIGMA_DESIGN_SYSTEM.md
 /frontend/graphify-out
@@ -43,3 +45,4 @@ frontend/.impeccable/surfaces/frontend-src-pages-reservespage-tsx.md
 frontend/PRODUCT.md
 roadmap/2026-09-18-savings-feature-plan.md
 roadmap/2026-09-21-reserves-frontend-ledger-workspace-plan.md
+PRODUCT.md
