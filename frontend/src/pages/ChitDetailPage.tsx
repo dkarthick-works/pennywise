@@ -96,23 +96,25 @@ export function ChitDetailPage() {
       <div className="content fade-in">
         <button
           type="button"
-          className="btn btn-soft"
-          style={{ padding: "6px 12px", marginBottom: 16 }}
+          className="btn btn-soft chit-back"
           onClick={() => navigate("/chits")}
         >
           <IconChevL size={15} /> All chits
         </button>
-        <p style={{ color: "var(--neg)", fontSize: 13, marginTop: 16 }}>Could not load this chit.</p>
+        <p className="err-msg" style={{ marginTop: 16 }}>Could not load this chit.</p>
       </div>
     );
   }
+
+  const progressPct = chit.total_installments > 0
+    ? Math.min(100, Math.round((chit.installment_count / chit.total_installments) * 100))
+    : 0;
 
   return (
     <div className="content fade-in">
       <button
         type="button"
-        className="btn btn-soft"
-        style={{ padding: "6px 12px", marginBottom: 16 }}
+        className="btn btn-soft chit-back"
         onClick={() => navigate("/chits")}
       >
         <IconChevL size={15} /> All chits
@@ -125,37 +127,34 @@ export function ChitDetailPage() {
             Installments are tracked separately and do not affect expenses, dashboard totals, insights, or transaction CSV exports.
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <StatusChip status={chit.status} />
+        <StatusChip status={chit.status} />
+      </div>
+      <div className="chit-actions">
+        {!completed && (
           <button
             type="button"
-            className="btn btn-soft"
-            style={{ width: "auto", padding: "10px 14px", display: "inline-flex", alignItems: "center", gap: 6 }}
-            onClick={() => exportChitMut.mutate()}
-            disabled={exportChitMut.isPending}
+            className="btn btn-primary"
+            onClick={() => navigate(`/chits/${id}/installments/new`)}
+            aria-label="Add installment"
           >
-            <IconExport size={15} /> {exportChitMut.isPending ? "Exporting..." : "Export JSON"}
+            <IconPlus size={16} /> Add installment
           </button>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            style={{ width: "auto", padding: "10px 14px" }}
-            onClick={() => navigate(`/chits/${id}/edit`)}
-          >
-            Edit chit
-          </button>
-          {!completed && (
-            <button
-              type="button"
-              className="btn btn-primary"
-              style={{ width: "auto", padding: "10px 14px", display: "inline-flex", alignItems: "center", gap: 6 }}
-              onClick={() => navigate(`/chits/${id}/installments/new`)}
-              aria-label="Add installment"
-            >
-              <IconPlus size={16} /> Add installment
-            </button>
-          )}
-        </div>
+        )}
+        <button
+          type="button"
+          className="btn btn-soft"
+          onClick={() => exportChitMut.mutate()}
+          disabled={exportChitMut.isPending}
+        >
+          <IconExport size={15} /> {exportChitMut.isPending ? "Exporting..." : "Export JSON"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => navigate(`/chits/${id}/edit`)}
+        >
+          Edit chit
+        </button>
       </div>
       {exportChitMut.isError && (
         <p className="err-msg" style={{ marginTop: -8, marginBottom: 14 }}>
@@ -163,40 +162,27 @@ export function ChitDetailPage() {
         </p>
       )}
 
-      <div
-        className="card card-pad"
-        style={{
-          marginBottom: 18,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-          gap: 16,
-        }}
-      >
-        <div>
+      <div className="card card-pad chit-stats">
+        <div className="chit-stat">
           <div className="stat-lbl">Chit value</div>
-          <div className="num" style={{ fontSize: 22, fontWeight: 800 }}>{inr(chit.chit_value)}</div>
+          <div className="num">{inr(chit.chit_value)}</div>
         </div>
-        <div>
+        <div className="chit-stat">
           <div className="stat-lbl">Expected installment</div>
-          <div className="num" style={{ fontSize: 22, fontWeight: 800 }}>{inr(chit.expected_monthly)}</div>
+          <div className="num">{inr(chit.expected_monthly)}</div>
         </div>
-        <div>
+        <div className="chit-stat">
           <div className="stat-lbl">Total personally paid</div>
-          <div className="num" style={{ fontSize: 22, fontWeight: 800 }}>{inr(chit.total_paid)}</div>
+          <div className="num">{inr(chit.total_paid)}</div>
         </div>
-        <div>
+        <div className="chit-stat">
           <div className="stat-lbl">Progress</div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>
-            {chit.installment_count} / {chit.total_installments}
-          </div>
+          <div className="num">{chit.installment_count} <small>/ {chit.total_installments}</small></div>
+          <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPct} aria-label="Installments paid"><i style={{ width: `${progressPct}%`, background: completed ? "var(--pos)" : "var(--accent)" }} /></div>
         </div>
-        <div>
-          <div className="stat-lbl">Organizer</div>
-          <div style={{ fontWeight: 600 }}>{chit.organizer}</div>
-        </div>
-        <div>
-          <div className="stat-lbl">Start month</div>
-          <div style={{ fontWeight: 600 }}>{startMonthToMonth(chit.start_month)}</div>
+        <div className="chit-stats-meta">
+          <div>Organizer<strong>{chit.organizer}</strong></div>
+          <div>Start month<strong>{startMonthToMonth(chit.start_month)}</strong></div>
         </div>
       </div>
 
@@ -206,10 +192,10 @@ export function ChitDetailPage() {
         </p>
       )}
 
-      <div className="card" style={{ overflow: "hidden" }}>
-        <div style={{ fontWeight: 700, fontSize: 14, padding: "14px 12px 0" }}>Installments</div>
+      <div className="card chit-inst-card">
+        <div className="chit-inst-head">Installments</div>
         {(chit.installments?.length ?? 0) === 0 ? (
-          <p className="muted" style={{ margin: 0, padding: 18, fontSize: 13 }}>
+          <p className="muted chit-inst-empty">
             No installments recorded yet.
           </p>
         ) : (
@@ -218,8 +204,8 @@ export function ChitDetailPage() {
             <thead>
               <tr>
                 <th>Paid on</th>
-                <th style={{ textAlign: "right" }}>Amount</th>
-                <th style={{ textAlign: "right" }}>Payment variance</th>
+                <th>Amount</th>
+                <th>Payment variance</th>
                 <th>Note</th>
                 <th />
               </tr>
@@ -247,7 +233,7 @@ export function ChitDetailPage() {
                           onChange={(e) => setEditInst({ ...editInst, amount: parseFloat(e.target.value) || 0 })}
                         />
                       </td>
-                      <td className="muted" style={{ textAlign: "right" }}>—</td>
+                      <td className="muted">—</td>
                       <td>
                         <input
                           className="input"
@@ -256,11 +242,10 @@ export function ChitDetailPage() {
                         />
                         {editInstErr && <p className="err-msg">{editInstErr}</p>}
                       </td>
-                      <td style={{ whiteSpace: "nowrap" }}>
+                      <td className="inst-actions">
                         <button
                           type="button"
                           className="btn btn-primary"
-                          style={{ width: "auto", padding: "6px 10px", marginRight: 6 }}
                           onClick={() => {
                             const err = validateInstallmentForm(editInst);
                             if (err) {
@@ -275,7 +260,6 @@ export function ChitDetailPage() {
                         <button
                           type="button"
                           className="btn btn-ghost"
-                          style={{ width: "auto", padding: "6px 10px" }}
                           onClick={() => setEditingId(null)}
                         >
                           Cancel
@@ -285,16 +269,15 @@ export function ChitDetailPage() {
                   ) : (
                     <>
                       <td>{prettyDate(row.paid_on)}</td>
-                      <td className="num" style={{ textAlign: "right" }}>{inr(row.amount)}</td>
-                      <td className="num" style={{ textAlign: "right" }}>
+                      <td className="num">{inr(row.amount)}</td>
+                      <td className="num">
                         {inr(paymentVariance(chit.expected_monthly, row.amount))}
                       </td>
                       <td className="muted">{row.note || "—"}</td>
-                      <td style={{ whiteSpace: "nowrap" }}>
+                      <td className="inst-actions">
                         <button
                           type="button"
                           className="btn btn-ghost"
-                          style={{ width: "auto", padding: "6px 10px", marginRight: 6 }}
                           aria-label="Edit installment"
                           title="Edit installment"
                           onClick={() => {
@@ -311,8 +294,7 @@ export function ChitDetailPage() {
                         </button>
                         <button
                           type="button"
-                          className="btn btn-ghost"
-                          style={{ width: "auto", padding: "6px 10px", color: "var(--neg)" }}
+                          className="btn btn-ghost inst-del"
                           aria-label="Remove installment"
                           title="Remove installment"
                           onClick={() => {
