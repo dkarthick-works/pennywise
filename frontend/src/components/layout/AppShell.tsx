@@ -63,7 +63,6 @@ export function AppShell({ children }: Props) {
           >
             <NAV_CTA.Icon size={17} /> {NAV_CTA.label}
           </button>
-          <hr className="nav-divider" />
           {NAV_MAIN.map(({ path, label, Icon }) => (
             <button
               key={path}
@@ -73,8 +72,7 @@ export function AppShell({ children }: Props) {
               <Icon /> {label}
             </button>
           ))}
-          <hr className="nav-divider" />
-          <div className="nav-label" style={{ marginTop: 10 }}>Tools</div>
+          <div className="nav-label">Tools</div>
           {NAV_TOOLS.map(({ path, label, Icon }) => (
             <button
               key={path}
@@ -88,19 +86,9 @@ export function AppShell({ children }: Props) {
 
         <div className="side-user" onClick={() => go("/profile")}>
           <div className="avatar">{userInitials}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              className="nm"
-              style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-            >
-              {profile?.display_name || profile?.email.split("@")[0] || "—"}
-            </div>
-            <div
-              className="em"
-              style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-            >
-              {profile?.email || ""}
-            </div>
+          <div className="side-user-text">
+            <div className="nm">{profile?.display_name || profile?.email.split("@")[0] || "—"}</div>
+            <div className="em">{profile?.email || ""}</div>
           </div>
         </div>
       </aside>
