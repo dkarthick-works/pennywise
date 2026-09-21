@@ -24,9 +24,9 @@ export function EventsPage() {
     <div className="page-head"><div><h1 className="page-title">Events</h1><p className="page-sub">Plan costs and track what your events actually cost.</p></div><Link className="btn btn-primary" to="/events/new" state={returnState}>+ Create event</Link></div>
     <p className="event-accounting muted">{eventAccountingNote}</p>
     {location.state?.eventNotice === "This event was already unavailable." && <p role="status">This event was already unavailable.</p>}
-    <div id="events-filter" className="seg event-filter" role="tablist" aria-label="Status">
-      <button type="button" role="tab" aria-selected={!status} className={!status ? "on" : ""} onClick={() => setParams({})}>All events</button>
-      {eventStatuses.map(s => <button type="button" role="tab" key={s} aria-selected={status === s} className={status === s ? "on" : ""} onClick={() => setParams({ status: s })}>{eventStatusLabel[s]}</button>)}
+    <div id="events-filter" className="event-filter" role="tablist" aria-label="Status">
+      <button type="button" role="tab" aria-selected={!status} className={!status ? "on f-all" : "f-all"} onClick={() => setParams({})}>All events</button>
+      {eventStatuses.map(s => <button type="button" role="tab" key={s} aria-selected={status === s} className={status === s ? `on f-${s}` : `f-${s}`} onClick={() => setParams({ status: s })}>{eventStatusLabel[s]}</button>)}
     </div>
     {query.isPending ? <p>Loading events…</p> : query.isError ? <div role="alert"><p>Could not load events.</p><button className="btn btn-soft" onClick={() => void query.refetch()}>Retry</button></div> : !query.data.events.length ? <div className="card card-pad"><p>{status ? "No events with this status." : "No events yet. Create a plan and add your estimates whenever you are ready."}</p>{status ? <button className="btn btn-soft" onClick={() => setParams({})}>Clear filter</button> : <Link to="/events/new" state={returnState}>Create your first event</Link>}</div> : <>
       <div className="event-list" role="list">{query.data.events.map(e => <EventListCard key={e.id} event={e} returnState={returnState} />)}</div>

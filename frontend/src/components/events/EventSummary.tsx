@@ -9,6 +9,12 @@ export const eventAccountingNote = "Event costs are tracked separately and do no
 export function EventStatusChip({ status }: { status: EventStatus }) {
   return <span className={`chip event-status-${status}`}>{status === "completed" && <IconCheck size={12} />}<span>{eventStatusLabel[status]}</span></span>;
 }
+export function EventBudgetBar({ expected, actual }: { expected: number; actual: number }) {
+  const snap = eventBudgetSnapshot(expected, actual);
+  return <div className="event-list-used">
+    <div className="event-list-bar-wrap"><div className="event-list-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={snap.usedPct ?? 0} aria-label="Spent versus budget"><span style={{ width: `${snap.barPct}%`, background: snap.remaining < 0 ? "var(--neg)" : "var(--accent)" }} /><i className="event-list-bar-limit" aria-hidden="true" /></div>{snap.usedPct == null ? <span className="event-list-bar-value muted">—</span> : <strong className="event-list-bar-value">{snap.usedPct}% used</strong>}</div>
+  </div>;
+}
 export function EventSummary({ summary, saved = false }: { summary: EventSummaryDTO; saved?: boolean }) {
   return <section className="card card-pad event-summary" aria-label={saved ? "Last saved totals" : "Event totals"}>
     {saved && <p className="muted event-span">Last saved totals · totals update after Save.</p>}
@@ -16,6 +22,7 @@ export function EventSummary({ summary, saved = false }: { summary: EventSummary
       {!summary.budget_complete && <p className="muted">{summary.item_count === 0 ? "No items yet" : `Estimate incomplete · ${summary.missing_expected_count} missing`}</p>}</div>
     <div><div className="stat-lbl">{summary.actuals_complete ? "Actual incurred so far" : "Recorded actual total"}</div><strong className="num">{money2(summary.actual_total)}</strong>
       {!summary.actuals_complete && <p className="muted">{summary.item_count === 0 ? "No costs entered" : `Actuals incomplete · ${summary.missing_actual_count} missing`}</p>}</div>
+    {summary.expected_total > 0 && <div className="event-span"><EventBudgetBar expected={summary.expected_total} actual={summary.actual_total} /></div>}
   </section>;
 }
 export function EventListCard({ event, returnState }: { event: PlannedEvent; returnState: { eventsReturn: string } }) {
@@ -37,9 +44,7 @@ export function EventListCard({ event, returnState }: { event: PlannedEvent; ret
       <div className="event-list-metric event-list-metric-actual"><span className="stat-lbl" title="Total cost incurred so far">{event.summary.actuals_complete ? "Actual incurred" : "Recorded actual"}</span><div className="num">{money2(event.summary.actual_total)}</div>{!event.summary.actuals_complete && <small className="muted">{event.summary.item_count ? `Actuals incomplete · ${event.summary.missing_actual_count} missing` : "No costs entered"}</small>}</div>
       <div className={`event-list-metric event-list-metric-variance${event.summary.expected_total > 0 && snap.remaining > 0 ? " event-list-positive" : event.summary.expected_total > 0 && snap.remaining < 0 ? " event-list-negative" : ""}`}><span className="stat-lbl">{varianceLabel}</span><div className="num">{event.summary.expected_total <= 0 ? "—" : money2(Math.abs(snap.remaining))}</div>{varianceNote && <small className="event-list-variance-note"><strong>{varianceNote}</strong></small>}</div>
     </div>
-    <div className="event-list-used">
-      <div className="event-list-bar-wrap"><div className="event-list-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={snap.usedPct ?? 0} aria-label="Spent versus budget"><span style={{ width: `${snap.barPct}%`, background: snap.remaining < 0 ? "var(--neg)" : "var(--accent)" }} /><i className="event-list-bar-limit" aria-hidden="true" /></div>{snap.usedPct == null ? <span className="event-list-bar-value muted">—</span> : <strong className="event-list-bar-value">{snap.usedPct}% used</strong>}</div>
-    </div>
-    <div className="event-list-foot"><IconSparkles size={16} /><div><strong>Free money</strong><span>{event.suggestions_enabled ? "Shown when it fits your free money" : "Hidden from free-money suggestions"}</span></div><span className={`event-list-suggestion-state${event.suggestions_enabled ? " is-on" : ""}`}>{event.suggestions_enabled ? "On" : "Off"}</span></div>
+    <EventBudgetBar expected={event.summary.expected_total} actual={event.summary.actual_total} />
+    <div className="event-list-foot"><IconSparkles size={16} /><div><strong>Free money</strong><span>{event.suggestions_enabled ? "Shown when it fits your free money" : "Hidden from free-money suggestions"}</span></div><span className={`suggestion-state${event.suggestions_enabled ? " is-on" : ""}`}>{event.suggestions_enabled ? "On" : "Off"}</span></div>
   </article>;
 }
