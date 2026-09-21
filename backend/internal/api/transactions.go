@@ -212,6 +212,10 @@ func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		writeErr(w, http.StatusBadRequest, "invalid id")
 		return
 	}
+	if _, err := s.q.GetGeneratedReserveTransaction(r.Context(), db.GetGeneratedReserveTransactionParams{TransactionID: id, UserID: userID(r)}); err == nil {
+		writeErr(w, http.StatusConflict, "generated reserve transactions must be changed through their reserve operation")
+		return
+	}
 	var patch txnPatchInput
 	if err := readJSON(r, &patch); err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
@@ -322,6 +326,10 @@ func (s *Server) handleDeleteTransaction(w http.ResponseWriter, r *http.Request)
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if _, err := s.q.GetGeneratedReserveTransaction(r.Context(), db.GetGeneratedReserveTransactionParams{TransactionID: id, UserID: userID(r)}); err == nil {
+		writeErr(w, http.StatusConflict, "generated reserve transactions must be changed through their reserve operation")
 		return
 	}
 	if err := s.q.DeleteTransaction(r.Context(), db.DeleteTransactionParams{ID: id, UserID: userID(r)}); err != nil {

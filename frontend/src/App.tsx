@@ -18,6 +18,7 @@ import { CategoriesPage } from "./pages/CategoriesPage";
 import { ImportExportPage } from "./pages/ImportExportPage";
 import { LentsPage } from "./pages/LentsPage";
 import { LentDetailPage } from "./pages/LentDetailPage";
+import { ReservesPage } from "./pages/ReservesPage";
 import { ChitsPage } from "./pages/ChitsPage";
 import { ChitCreatePage } from "./pages/ChitCreatePage";
 import { ChitDetailPage } from "./pages/ChitDetailPage";
@@ -79,6 +80,7 @@ export default function App() {
                 <Route path="/dashboard/cash-flow" element={<CashFlowTransactionsPage month={month} setMonth={setMonth} />} />
                 <Route path="/record"    element={<RecordPage month={month} setMonth={setMonth} />} />
                 <Route path="/record/entry" element={<RecordEntryPage month={month} setMonth={setMonth} />} />
+                <Route path="/reserves"  element={<ReservesPage />} />
                 <Route path="/lents"     element={<LentsPage />} />
                 <Route path="/lents/:id" element={<LentDetailPage />} />
                 <Route path="/chits"     element={<ChitsPage />} />

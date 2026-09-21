@@ -140,8 +140,9 @@ async function coordinatedRefresh(): Promise<string> {
 
   return locks.request(REFRESH_LOCK, async () => {
     // A lock holder in another context broadcasts its token before releasing.
-    // Yield once so the BroadcastChannel task can update this context.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Give the refresh holder enough time to finish and deliver the token before
+    // deciding that this context must refresh independently.
+    await new Promise((resolve) => setTimeout(resolve, 100));
     const remoteToken = getToken();
     if (remoteToken && lastRemoteTokenAt >= startedAt) return remoteToken;
     return requestRefresh();

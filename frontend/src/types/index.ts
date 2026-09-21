@@ -426,3 +426,133 @@ export interface ChitInstallmentInput {
   amount: number;
   note: string;
 }
+
+// ─── Reserves (isolated allocation ledger) ────────────────────────────────
+
+export interface Reserve {
+  id: string;
+  name: string;
+  is_general: boolean;
+  archived: boolean;
+  balance: number;
+}
+
+export interface ReserveInput {
+  name: string;
+}
+
+export type ReserveOperationType =
+  | "deposit"
+  | "reserve_spend"
+  | "move_to_income"
+  | "funded_expense"
+  | "transfer";
+
+export type ReserveEntryDirection = "deposit" | "withdrawal";
+
+export interface ReserveEntry {
+  id: string;
+  reserve_id: string;
+  reserve_name: string;
+  direction: ReserveEntryDirection;
+  amount: number;
+}
+
+export interface ReserveOperation {
+  id: string;
+  operation_type: ReserveOperationType;
+  date: string;
+  description: string;
+  note: string;
+  total: number;
+  entries: ReserveEntry[];
+  created_at: string;
+  updated_at: string;
+  editable: boolean;
+  deletable: boolean;
+}
+
+export interface ReserveAllocationInput {
+  reserve_id: string;
+  amount: number;
+}
+
+export interface ReserveDepositInput {
+  description: string;
+  date: string;
+  note: string;
+  allocations: ReserveAllocationInput[];
+}
+
+export interface ReserveSpendingInput {
+  reserve_id: string;
+  amount: number;
+  date: string;
+  description: string;
+  note: string;
+}
+
+export interface ReserveTransferInput {
+  from_reserve_id: string;
+  to_reserve_id: string;
+  amount: number;
+  date: string;
+  note: string;
+}
+
+export interface ReserveIncomeTransferInput {
+  reserve_id: string;
+  amount: number;
+  date: string;
+  description: string;
+  note: string;
+}
+
+export interface FundedExpenseInput {
+  reserve_id: string;
+  amount: number;
+  date: string;
+  section: "essential" | "flexible" | "daily";
+  category: string;
+  note: string;
+}
+
+interface IncomeActivityBase {
+  description: string;
+  amount: number;
+  date: string;
+  allocations: ReserveEntry[];
+  created_at: string;
+}
+
+export interface NormalIncomeActivityItem extends IncomeActivityBase {
+  source: "normal_transaction";
+  nature: "normal_income";
+  counts_as_income: true;
+  transaction_id: string;
+  reserve_operation_id: null;
+  reserve_name: null;
+}
+
+export interface FromReserveIncomeActivityItem extends IncomeActivityBase {
+  source: "normal_transaction";
+  nature: "from_reserve";
+  counts_as_income: true;
+  transaction_id: string;
+  reserve_operation_id: string;
+  reserve_name: string | null;
+}
+
+export interface SentToReservesActivityItem extends IncomeActivityBase {
+  source: "reserve_deposit";
+  nature: "sent_to_reserves";
+  counts_as_income: false;
+  transaction_id: null;
+  reserve_operation_id: string;
+  reserve_name: null;
+}
+
+export type IncomeActivityItem =
+  | NormalIncomeActivityItem
+  | FromReserveIncomeActivityItem
+  | SentToReservesActivityItem;

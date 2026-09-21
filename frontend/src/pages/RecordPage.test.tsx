@@ -1,15 +1,22 @@
+import { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useSearchParams } from "react-router-dom";
 import { RecordPage } from "./RecordPage";
-import type { MonthlyBudget, OpenMonthResponse, Settings } from "../types";
+import type { IncomeActivityItem, MonthlyBudget, OpenMonthResponse, Settings } from "../types";
+import { reserveKeys } from "../api/reserves";
 
 const mocks = {
   openMonth: vi.fn(),
   getSettings: vi.fn(),
   getMonthlyBudget: vi.fn(),
   putMonthlyBudget: vi.fn(),
+  createTxn: vi.fn(),
+  getIncomeActivity: vi.fn(),
+  listReserves: vi.fn(),
+  createReserveDeposit: vi.fn(),
 };
 
 vi.mock("../api/ledger", async () => {
@@ -20,6 +27,17 @@ vi.mock("../api/ledger", async () => {
     getSettings: () => mocks.getSettings(),
     getMonthlyBudget: (month: string) => mocks.getMonthlyBudget(month),
     putMonthlyBudget: (month: string, budgets: unknown) => mocks.putMonthlyBudget(month, budgets),
+    createTxn: (body: unknown) => mocks.createTxn(body),
+  };
+});
+
+vi.mock("../api/reserves", async () => {
+  const actual = await vi.importActual<typeof import("../api/reserves")>("../api/reserves");
+  return {
+    ...actual,
+    getIncomeActivity: (month: string, signal?: AbortSignal) => mocks.getIncomeActivity(month, signal),
+    listReserves: (includeArchived?: boolean, signal?: AbortSignal) => mocks.listReserves(includeArchived, signal),
+    createReserveDeposit: (body: unknown) => mocks.createReserveDeposit(body),
   };
 });
 
@@ -65,6 +83,16 @@ function renderRecord(month = "2026-08") {
   return { qc, setMonth, ...utils };
 }
 
+function StatefulRecord() {
+  const [month, setMonth] = useState("2026-08");
+  return <RecordPage month={month} setMonth={setMonth} />;
+}
+
+function renderStatefulRecord() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(<QueryClientProvider client={qc}><MemoryRouter><StatefulRecord /></MemoryRouter></QueryClientProvider>);
+}
+
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   mocks.openMonth.mockResolvedValue(openMonthPayload());
@@ -73,6 +101,10 @@ beforeEach(() => {
   mocks.putMonthlyBudget.mockImplementation((month: string, budgets: { essential: number; flexible: number; daily: number }) =>
     Promise.resolve({ month, essential: budgets.essential, flexible: budgets.flexible, daily: budgets.daily })
   );
+  mocks.getIncomeActivity.mockResolvedValue([]);
+  mocks.listReserves.mockResolvedValue([{ id: "general", name: "General Reserve", is_general: true, archived: false, balance: 0 }]);
+  mocks.createReserveDeposit.mockResolvedValue({ id: "deposit", operation_type: "deposit", date: "2026-08-18", description: "RSU vest", note: "", total: 60000, entries: [], created_at: "", updated_at: "" });
+  mocks.createTxn.mockResolvedValue({ id: "income", section: "income", category: "Freelance", amount: 2000, date: "2026-09-01", kind: "cash" });
 });
 
 describe("RecordPage overview", () => {
@@ -102,6 +134,84 @@ describe("RecordPage overview", () => {
     fireEvent.click(await screen.findByText("Daily / Running"));
     expect(await screen.findByText("Loading budget…")).toBeInTheDocument();
     expect(screen.queryByLabelText("Daily / Running section budget")).not.toBeInTheDocument();
+  });
+});
+
+describe("RecordPage income activity", () => {
+  const normalIncome = { id: "salary", section: "income" as const, category: "Salary", amount: 85000, date: "2026-08-10", kind: "cash" as const };
+  const generatedIncome = { id: "from-reserve", section: "income" as const, category: "From General Reserve", amount: 5000, date: "2026-08-20", kind: "cash" as const };
+  const activity: IncomeActivityItem[] = [
+    { source: "normal_transaction", nature: "from_reserve", counts_as_income: true, transaction_id: "from-reserve", reserve_operation_id: "move", description: "From General Reserve", amount: 5000, date: "2026-08-20", reserve_name: "General Reserve", allocations: [], created_at: "2026-08-20T10:00:00Z" },
+    { source: "normal_transaction", nature: "normal_income", counts_as_income: true, transaction_id: "salary", reserve_operation_id: null, description: "Salary", amount: 85000, date: "2026-08-10", reserve_name: null, allocations: [], created_at: "2026-08-10T10:00:00Z" },
+    { source: "reserve_deposit", nature: "sent_to_reserves", counts_as_income: false, transaction_id: null, reserve_operation_id: "deposit", description: "RSU vest", amount: 60000, date: "2026-08-18", reserve_name: null, allocations: [{ id: "entry", reserve_id: "general", reserve_name: "General Reserve", direction: "deposit", amount: 60000 }], created_at: "2026-08-18T10:00:00Z" },
+  ];
+
+  it("separates normal income from sent-to-reserves activity", async () => {
+    mocks.openMonth.mockResolvedValue({ ...openMonthPayload(), transactions: [normalIncome, generatedIncome] });
+    mocks.getIncomeActivity.mockResolvedValue(activity);
+    renderRecord();
+    fireEvent.click(await screen.findByText("Income"));
+
+    expect(await screen.findByRole("button", { name: "Normal income" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Send to reserves" })).toBeInTheDocument();
+    expect(screen.getByText("Received this month").nextElementSibling).toHaveTextContent("₹90,000");
+    expect(await screen.findByText("From General Reserve", { selector: ".chip" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sent to reserves" })).toBeInTheDocument();
+    expect(screen.getByText(/not included in normal income or Dashboard calculations/i)).toBeInTheDocument();
+    expect(await screen.findByText((_, element) => element?.tagName === "LI" && element.textContent === "General Reserve · ₹60,000")).toBeInTheDocument();
+  });
+
+  it("retains normal transaction creation when Normal income is selected", async () => {
+    const user = userEvent.setup();
+    mocks.openMonth.mockResolvedValue({ ...openMonthPayload(), transactions: [normalIncome] });
+    const { qc } = renderRecord();
+    qc.setQueryData(reserveKeys.incomeActivity("2026-08"), activity);
+    const invalidate = vi.spyOn(qc, "invalidateQueries");
+    fireEvent.click(await screen.findByText("Income"));
+    await user.type(await screen.findByPlaceholderText("e.g. Salary, Freelance, Dividend"), "Freelance");
+    await user.type(screen.getByPlaceholderText("0"), "2000");
+    await user.click(screen.getByRole("button", { name: "Add income" }));
+    await waitFor(() => expect(mocks.createTxn).toHaveBeenCalledWith({ section: "income", category: "Freelance", amount: 2000, date: "2026-08-10", kind: "cash" }));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: reserveKeys.incomeActivity("2026-08") });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: reserveKeys.incomeActivity("2026-09") });
+  });
+
+  it("sends income directly to reserves without creating a normal transaction", async () => {
+    const user = userEvent.setup();
+    mocks.openMonth.mockResolvedValue({ ...openMonthPayload(), transactions: [normalIncome] });
+    mocks.getIncomeActivity.mockResolvedValue(activity);
+    const { qc } = renderRecord();
+    qc.setQueryData(reserveKeys.list(false), [{ id: "general", name: "General Reserve", is_general: true, archived: false, balance: 0 }]);
+    qc.setQueryData(reserveKeys.operations(2026), []);
+    qc.setQueryData(reserveKeys.incomeActivity("2026-08"), activity);
+    const invalidate = vi.spyOn(qc, "invalidateQueries");
+    fireEvent.click(await screen.findByText("Income"));
+    await user.click(await screen.findByRole("button", { name: "Send to reserves" }));
+    await user.type(screen.getByLabelText("Description"), "Bonus");
+    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2026-08-20" } });
+    await user.type(screen.getByLabelText("Amount"), "1000");
+    await user.click(screen.getByRole("button", { name: "Save deposit" }));
+
+    await waitFor(() => expect(mocks.createReserveDeposit).toHaveBeenCalledWith({ description: "Bonus", date: "2026-08-20", note: "", allocations: [{ reserve_id: "general", amount: 1000 }] }));
+    expect(mocks.createTxn).not.toHaveBeenCalled();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: reserveKeys.all });
+  });
+
+  it("does not show prior-month reserve activity while the next month loads", async () => {
+    let resolveSeptember!: (items: IncomeActivityItem[]) => void;
+    mocks.openMonth.mockImplementation((month: string) => Promise.resolve({ ...openMonthPayload(), month, transactions: [normalIncome] }));
+    mocks.getIncomeActivity.mockImplementation((month: string) => month === "2026-08"
+      ? Promise.resolve(activity)
+      : new Promise<IncomeActivityItem[]>((resolve) => { resolveSeptember = resolve; }));
+    renderStatefulRecord();
+    fireEvent.click(await screen.findByText("Income"));
+    expect(await screen.findByRole("heading", { name: "RSU vest" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next month" }));
+    fireEvent.click(await screen.findByText("Income"));
+    expect(screen.queryByRole("heading", { name: "RSU vest" })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading income activity");
+    resolveSeptember([]);
+    expect(await screen.findByText("No deposits were sent to reserves this month.")).toBeInTheDocument();
   });
 });
 

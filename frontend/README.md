@@ -26,6 +26,7 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/dashboard` | Dashboard | Month/year charts, hero cards, category-group spend |
 | `/dashboard/credits?month=&view=calendar\|billing` | Credit transactions | Drill-down from the Credit Card Usage hero card; month + view carried in the URL |
 | `/dashboard/groups/:groupId` | Category group | Drill-down from a category-group spend card |
+| `/reserves?reserve=&year=` | Reserves | Ledger workspace with reserve navigation, selected-reserve actions, and year-filtered activity |
 | `/lents` | Lent | Track money lent to others (open/settled filter, create form) |
 | `/lents/:id` | Lent detail | Edit/delete lent, record and manage repayments |
 | `/chits` | Chit funds | List chit schemes with active/completed status |
@@ -326,6 +327,35 @@ autosave):
 - **Credit spending threshold** — `PUT /api/settings/credit-spending-threshold`
   with a positive rupee amount (up to two decimals) or `null` to disable. The
   dashboard CC Usage card reads the saved value from `GET /api/settings`.
+
+## Reserves page
+
+Nav item: **Reserves** (`/reserves`). The page is a ledger workspace: active
+reserves stay in a desktop sidebar while the selected reserve's balance,
+contextual actions, small orientation metrics, and reverse-chronological activity
+fill the detail pane. `reserve` and `year` query parameters preserve selection on
+refresh; narrow screens replace the sidebar with a labeled reserve selector.
+Actions open focused dialogs rather than stacking forms above the history. **Move
+out** explicitly distinguishes reserve-only spending, moving money to normal
+income, and creating a normal cash expense from a reserve.
+
+Balances are derived from entries in a ledger isolated from normal transactions.
+Every user starts with one renameable General Reserve and can create or rename
+reserves up to a five-active-reserve limit. **Add money** records one direct
+deposit with one or more distinct allocations, previews the allocated total, and
+keeps the activity outside normal income and spending. Reserve-only spending can
+be recorded, edited, or deleted from the selected reserve's activity and includes
+an explanation that it never appears in normal spending analytics. Transfers can
+reallocate money between active reserves, and completed zero-balance reserves can
+be archived while preserving their history. The Record page’s Income section offers
+**Normal income** and **Send to reserves** destinations, groups Sent-to-reserves
+activity separately with allocation details, and excludes it from the received
+income total. Normal income rows can move their full amount to reserves with an
+analytics-impact confirmation; reserve deposits can be edited, deleted, or moved
+back to normal income when balances allow. Month-scoped query keys prevent
+prior-month reserve activity from appearing while a new month loads. General Reserve management intentionally omits
+archive and delete actions. API wrappers and centralized query keys live in
+`src/api/reserves.ts`.
 
 ## Lent page
 

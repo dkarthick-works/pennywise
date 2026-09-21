@@ -5,6 +5,7 @@ import {
   transactionNameSuggestionKeys,
 } from "./transactionNameSuggestions";
 import { creditUsageKeys, groupSpendHistoryKeys } from "../api/ledger";
+import { reserveKeys } from "../api/reserves";
 import type { TransactionNameSuggestionSection } from "../types";
 
 // Credit usage crosses month boundaries: a transaction in one calendar month
@@ -23,6 +24,7 @@ export function invalidateMonthCaches(qc: QueryClient, month: string): void {
   qc.invalidateQueries({ queryKey: ["dashboard", "monthly", month] });
   qc.invalidateQueries({ queryKey: ["group-spend", month] });
   qc.invalidateQueries({ queryKey: groupSpendHistoryKeys.all });
+  qc.invalidateQueries({ queryKey: reserveKeys.incomeActivity(month) });
   invalidateCreditCaches(qc);
 }
 
@@ -38,6 +40,8 @@ export function invalidateAllTransactionCaches(qc: QueryClient): void {
   qc.invalidateQueries({ queryKey: ["group-spend"] });
   qc.invalidateQueries({ queryKey: ["category-group-txns"] });
   qc.invalidateQueries({ queryKey: ["open-month"] });
+  qc.invalidateQueries({ queryKey: eventKeys.suggestions });
+  invalidateTransactionNameSuggestionSections(qc, ["income"]);
   invalidateCreditCaches(qc);
 }
 

@@ -58,15 +58,15 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 1000 }, { name: 
     await page.getByRole("link", { name: "+ Create event", exact: true }).click();
     await page.getByLabel("Event name", { exact: true }).fill("Vehicle service");
     await expect(page.getByRole("checkbox")).toBeChecked();
-    await page.getByRole("button", { name: "+ Add item", exact: true }).click();
-    await page.getByLabel("Item name", { exact: true }).fill("Service bill");
-    await page.getByLabel("Expected cost", { exact: true }).fill("8000.25");
+    await page.getByRole("button", { name: "Add row", exact: true }).click();
+    await page.getByLabel("Item 1 name", { exact: true }).fill("Service bill");
+    await page.getByLabel("Item 1 expected cost", { exact: true }).fill("8000.25");
     await page.getByRole("button", { name: "Create event", exact: true }).click();
     await expect(page).toHaveURL(/\/events\/event-1$/);
     await expect(page.getByRole("button", { name: "Complete event", exact: true })).toBeDisabled();
     await expect(page.getByText("Not entered", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Edit event", exact: true }).click();
-    await page.getByLabel("Actual incurred so far", { exact: true }).fill("0");
+    await page.getByLabel("Item 1 actual incurred cost", { exact: true }).fill("0");
     await page.getByRole("button", { name: "Save event", exact: true }).click();
     await expect(page).toHaveURL(/\/events\/event-1$/);
     await page.getByRole("button", { name: "Complete event", exact: true }).click();
@@ -77,7 +77,7 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 1000 }, { name: 
     await page.getByRole("button", { name: "Create copy", exact: true }).click();
     await expect(page).toHaveURL(/\/events\/event-2\/edit$/);
     await expect(page.getByLabel("Event name", { exact: true })).toHaveValue("Vehicle service (copy)");
-    await expect(page.getByLabel("Actual incurred so far", { exact: true })).toHaveValue("");
+    await expect(page.getByLabel("Item 1 actual incurred cost", { exact: true })).toHaveValue("");
     await expect(page.getByLabel("Status", { exact: true })).toHaveValue("planned");
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(page).toHaveURL(/\/events\/event-2$/);

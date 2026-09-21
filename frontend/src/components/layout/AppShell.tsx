@@ -3,12 +3,13 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { initials } from "../../lib/txns";
 import {
-  IconDashboard, IconLent, IconChit, IconEvents, IconInsights, IconCategories, IconExport, IconSettings, IconProfile, IconMenu, IconPlus,
+  IconDashboard, IconReserves, IconLent, IconChit, IconEvents, IconInsights, IconCategories, IconExport, IconSettings, IconProfile, IconMenu, IconPlus,
 } from "../ui/Icons";
 
 const NAV_CTA = { path: "/record", label: "Record Expense", Icon: IconPlus };
 const NAV_MAIN = [
   { path: "/dashboard",  label: "Dashboard",      Icon: IconDashboard },
+  { path: "/reserves",   label: "Reserves",       Icon: IconReserves },
   { path: "/lents",      label: "Lent",            Icon: IconLent },
   { path: "/chits",      label: "Chit funds",      Icon: IconChit },
   { path: "/events",     label: "Events",          Icon: IconEvents },
