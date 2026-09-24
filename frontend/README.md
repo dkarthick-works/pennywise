@@ -64,7 +64,9 @@ are kept in the URL; links back from detail retain that list context.
   are labelled Last saved totals and update on Save, not while typing.
 - Planned/In progress/Completed/Cancelled transitions are explicit. Complete uses
   the backend's `can_complete`; an event needs items and actual costs for every item.
-  All states remain editable. No variance calculations, allocations, or payments.
+  All states remain editable. List cards show expected vs actual totals, under/over
+  budget variance, a spent-versus-budget progress bar, and whether free-money
+  suggestions are enabled — display only, not allocations or payments.
 - Full PUT saves preserve item IDs and the loaded version. Background refetches do
   not overwrite an edit draft. A 409 conflict keeps the draft and requires explicit
   discard/reload rather than automatic merging or blind retries.
@@ -75,6 +77,14 @@ are kept in the URL; links back from detail retain that list context.
   Delete sends a quoted `If-Match` version and soft-deletes after confirmation. No
   restore/Undo is offered. Create/copy requests do not automatically retry after a
   network failure; users are warned to check the list before retrying.
+- **Convert to Transaction** (completed events only) posts
+  `POST /api/events/{id}/convert-transaction` with date and Essential/Flexible/Daily
+  section. It creates one cash row for the summed actual costs (category = event name).
+  The detail page shows **Added to Transactions**; the list shows an **In transactions**
+  chip. Conversion is disabled when the actual total exceeds the ledger maximum.
+  Deleting a converted event opens a dialog: keep the transaction or delete both
+  (`delete_transaction` query). If the linked transaction is removed from Record,
+  the association clears and conversion can be run again.
 
 Cash Flow Transactions includes current-month event suggestions below its totals.
 The browser sends its IANA timezone (UTC fallback); the backend remains authoritative
@@ -84,8 +94,10 @@ Historical/future views hide the section. Pagination is server-side and failures
 contained within the suggestions section.
 
 `src/api/events.ts` preserves HTTP status for 404/409 handling. `useEvents` centralizes
-mutations and cache updates. Event writes refresh only Events/suggestions; transaction
-and budget changes also invalidate suggestions (never the reverse financial effect).
+mutations and cache updates. Most event writes refresh only Events/suggestions.
+**Convert** also invalidates the target month's transaction caches; **delete** with
+`deleteTransaction: true` invalidates all transaction caches. Transaction and budget
+changes invalidate suggestions (never the reverse ledger effect from ordinary event edits).
 Styles are scoped in `components/events/events.css`. The responsive list uses a shared
 card grid at desktop and mobile sizes so there are no duplicate accessible entries.
 
