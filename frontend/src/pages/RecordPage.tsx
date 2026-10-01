@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, Fragment } from "react";
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import type { ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -288,6 +288,80 @@ function useRowMutations(month: string, section: Section) {
   return { upd, del, add };
 }
 
+// ─── Draft row — blank line for Essential / Subscriptions ─────────────────
+// The API rejects an empty category, so "Add" opens a local draft line and the
+// row is only created once a name is entered (blur / Enter).
+
+function DraftRow({ section, month, placeholder, add, onClose }: {
+  section: Section;
+  month: string;
+  placeholder: string;
+  add: ReturnType<typeof useRowMutations>["add"];
+  onClose: () => void;
+}) {
+  const [date, setDate] = useState(`${month}-01`);
+  const [amount, setAmount] = useState<number | null>(null);
+  const [name, setName] = useState("");
+  const submitted = useRef(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const [amountKey, setAmountKey] = useState(0);
+
+  // `amt` is passed on Enter: the amount input reports its parsed value in the
+  // same tick, before `amount` state has updated.
+  function submit(v: string, amt: number | null = amount) {
+    const category = v.trim();
+    if (!category || submitted.current) return;
+    submitted.current = true;
+    add.mutate(
+      { section, category, amount: amt ?? 0, date, kind: "cash" },
+      {
+        // Stay open with a fresh line so entries can be added back to back.
+        onSuccess: () => {
+          setName("");
+          setAmount(null);
+          setAmountKey((k) => k + 1); // remount so the amount input's local text clears
+          submitted.current = false;
+          requestAnimationFrame(() => {
+            // The old amount input reports its value once more as it unmounts; clear that too.
+            setAmount(null);
+            nameRef.current?.focus();
+          });
+        },
+        onError: () => { submitted.current = false; },
+      }
+    );
+  }
+
+  return (
+    <tr>
+      <td><DateCell value={date} onChange={setDate} /></td>
+      <td>
+        <input
+          className="cell-input"
+          ref={nameRef}
+          autoFocus
+          value={name}
+          placeholder={placeholder}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={(e) => {
+            // Moving to the amount/date cell keeps the draft open.
+            const next = e.relatedTarget as HTMLElement | null;
+            if (next && e.currentTarget.closest("tr")?.contains(next)) return;
+            submit(name);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit(e.currentTarget.value);
+            if (e.key === "Escape") onClose();
+          }}
+        />
+      </td>
+      <td><AmountInput key={amountKey} value={amount} onChange={(v) => setAmount(v)} onEnterCommit={(parsed) => submit(name, parsed)} /></td>
+      <td className="muted" style={{ fontSize: 12.5 }}>{add.isPending ? "Saving…" : "Enter a name to save"}</td>
+      <td><button className="x-btn" onClick={onClose} aria-label="Discard"><IconX size={15} /></button></td>
+    </tr>
+  );
+}
+
 // ─── Essential tile ───────────────────────────────────────────────────────
 
 function EssentialTile({ rows, section, month, settledSet, templates, onCopyPendingChange }: {
@@ -296,6 +370,7 @@ function EssentialTile({ rows, section, month, settledSet, templates, onCopyPend
 }) {
   const qc = useQueryClient();
   const { upd, del, add } = useRowMutations(month, section);
+  const [drafting, setDrafting] = useState(false);
   const [statusFilter, setStatusFilter] = useState<Set<StatusDisplay>>(new Set());
   const statusOptions = useMemo(() => availableStatuses(rows, settledSet), [rows, settledSet]);
   const ordered = useMemo(() => preserveApiRowOrder(rows), [rows]);
@@ -346,7 +421,8 @@ function EssentialTile({ rows, section, month, settledSet, templates, onCopyPend
                 <td><button className="x-btn" onClick={() => del.mutate(r.id)} aria-label="Remove"><IconX size={15} /></button></td>
               </tr>
             ))}
-            {visible.length === 0 && (
+            {drafting && <DraftRow section={section} month={month} placeholder="e.g. Rent" add={add} onClose={() => setDrafting(false)} />}
+            {visible.length === 0 && !drafting && (
               <tr>
                 <td colSpan={5} className="muted" style={{ textAlign: "center", padding: "26px 0", fontSize: 13.5 }}>
                   {rows.length === 0
@@ -359,7 +435,7 @@ function EssentialTile({ rows, section, month, settledSet, templates, onCopyPend
         </table>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 12px", borderTop: "1px solid var(--border-2)" }}>
-        <button className="btn btn-soft" onClick={() => add.mutate({ section, category: "", amount: 0, date: `${month}-01`, kind: "cash" })}>
+        <button className="btn btn-soft" onClick={() => setDrafting(true)} disabled={drafting}>
           <IconPlus size={15} /> Add row
         </button>
         {templates.length > 0 && (
@@ -398,6 +474,7 @@ function FlexibleTile({ rows, section, month, settledSet, templates, onCopyPendi
 }) {
   const qc = useQueryClient();
   const { upd, del, add } = useRowMutations(month, section);
+  const [drafting, setDrafting] = useState(false);
   const [statusFilter, setStatusFilter] = useState<Set<StatusDisplay>>(new Set());
   const statusOptions = useMemo(() => availableStatuses(rows, settledSet), [rows, settledSet]);
   const ordered = useMemo(() => preserveApiRowOrder(rows), [rows]);
@@ -447,7 +524,8 @@ function FlexibleTile({ rows, section, month, settledSet, templates, onCopyPendi
                 <td><button className="x-btn" onClick={() => del.mutate(r.id)} aria-label="Remove"><IconX size={15} /></button></td>
               </tr>
             ))}
-            {visible.length === 0 && (
+            {drafting && <DraftRow section={section} month={month} placeholder="e.g. Netflix" add={add} onClose={() => setDrafting(false)} />}
+            {visible.length === 0 && !drafting && (
               <tr>
                 <td colSpan={5} className="muted" style={{ textAlign: "center", padding: "26px 0", fontSize: 13.5 }}>
                   {rows.length === 0
@@ -460,7 +538,7 @@ function FlexibleTile({ rows, section, month, settledSet, templates, onCopyPendi
         </table>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 12px", borderTop: "1px solid var(--border-2)" }}>
-        <button className="btn btn-soft" onClick={() => add.mutate({ section, category: "", amount: 0, date: `${month}-01`, kind: "cash" })}>
+        <button className="btn btn-soft" onClick={() => setDrafting(true)} disabled={drafting}>
           <IconPlus size={15} /> Add subscription
         </button>
         {templates.length > 0 && (
@@ -546,6 +624,14 @@ function DailyTile({ rows, section, month, settledSet }: {
   const statusOptions = useMemo(() => availableStatuses(rows, settledSet), [rows, settledSet]);
   const blank = { date: defaultDraftDate(month, rows.map((r) => r.date)), category: "", amount: 0 };
   const [draft, setDraft] = useState(blank);
+  const categoryCellRef = useRef<HTMLTableCellElement>(null);
+  const [amountKey, setAmountKey] = useState(0);
+  // After a save, put the cursor back on the name field for rapid entry.
+  const resetDraft = () => {
+    setDraft((d) => ({ date: d.date, category: "", amount: 0 }));
+    setAmountKey((k) => k + 1); // remount the amount input so its local text clears
+    requestAnimationFrame(() => categoryCellRef.current?.querySelector("input")?.focus());
+  };
 
   const sorted = useMemo(() => sortRowsByDateDesc(rows), [rows]);
   const visible = useMemo(
@@ -566,7 +652,7 @@ function DailyTile({ rows, section, month, settledSet }: {
     if (!draft.category.trim() || !draft.amount) return;
     add.mutate(
       { section, category: draft.category.trim(), amount: draft.amount, date: draft.date || `${month}-01`, kind: "cash" },
-      { onSuccess: () => setDraft((d) => ({ date: d.date, category: "", amount: 0 })) }
+      { onSuccess: resetDraft }
     );
   }
 
@@ -584,22 +670,22 @@ function DailyTile({ rows, section, month, settledSet }: {
           <tbody>
             {/* quick-add row */}
             <tr style={{ background: "var(--accent-soft)" }}>
-              <td><DateCell value={draft.date} onChange={(v) => setDraft({ ...draft, date: v })} /></td>
-              <td>
+              <td><DateCell value={draft.date} onChange={(v) => setDraft((d) => ({ ...d, date: v }))} /></td>
+              <td ref={categoryCellRef}>
                 <CategoryInput
                   value={draft.category}
                   section="daily"
                   placeholder="Type to add — e.g. Groceries"
-                  onChange={(v) => setDraft({ ...draft, category: v })}
+                  onChange={(v) => setDraft((d) => ({ ...d, category: v }))}
                   onSubmit={() => commit()}
                 />
               </td>
-              <td><AmountInput value={draft.amount} onChange={(v) => setDraft({ ...draft, amount: v ?? 0 })} placeholder="0"
+              <td><AmountInput key={amountKey} value={draft.amount} onChange={(v) => setDraft((d) => ({ ...d, amount: v ?? 0 }))} placeholder="0"
                 onEnterCommit={(parsed) => {
                   if (!draft.category.trim() || !parsed) return;
                   add.mutate(
                     { section, category: draft.category.trim(), amount: parsed, date: draft.date || `${month}-01`, kind: "cash" },
-                    { onSuccess: () => setDraft((d) => ({ date: d.date, category: "", amount: 0 })) }
+                    { onSuccess: resetDraft }
                   );
                 }}
               /></td>
@@ -696,11 +782,20 @@ function IncomeTile({ rows, month, onCopyPendingChange }: {
   );
   const sentToReserves = (activity.data ?? []).filter((item) => item.nature === "sent_to_reserves");
 
+  const sourceCellRef = useRef<HTMLTableCellElement>(null);
+  const [amountKey, setAmountKey] = useState(0);
+  // After a save, put the cursor back on the source field for rapid entry.
+  const resetDraft = () => {
+    setDraft((d) => ({ date: d.date, category: "", amount: 0 }));
+    setAmountKey((k) => k + 1); // remount the amount input so its local text clears
+    requestAnimationFrame(() => sourceCellRef.current?.querySelector("input")?.focus());
+  };
+
   function commit() {
     if (!draft.category.trim() || !draft.amount) return;
     add.mutate(
       { section: "income", category: draft.category.trim(), amount: draft.amount, date: draft.date || `${month}-01`, kind: "cash" },
-      { onSuccess: () => setDraft((d) => ({ date: d.date, category: "", amount: 0 })) }
+      { onSuccess: resetDraft }
     );
   }
 
@@ -727,11 +822,11 @@ function IncomeTile({ rows, month, onCopyPendingChange }: {
                 <thead><tr><th style={{ width: 158 }}>Date</th><th style={{ minWidth: 190 }}>Source</th><th style={{ width: 130 }}>Amount (₹)</th><th style={{ width: 44 }} /></tr></thead>
                 <tbody>
                   <tr style={{ background: "oklch(0.955 0.035 155 / 0.4)" }}>
-                    <td><DateCell value={draft.date} onChange={(v) => setDraft({ ...draft, date: v })} /></td>
-                    <td><CategoryInput value={draft.category} section="income" placeholder="e.g. Salary, Freelance, Dividend" onChange={(v) => setDraft({ ...draft, category: v })} onSubmit={commit} /></td>
-                    <td><AmountInput value={draft.amount} onChange={(v) => setDraft({ ...draft, amount: v ?? 0 })} placeholder="0" onEnterCommit={(parsed) => {
+                    <td><DateCell value={draft.date} onChange={(v) => setDraft((d) => ({ ...d, date: v }))} /></td>
+                    <td ref={sourceCellRef}><CategoryInput value={draft.category} section="income" placeholder="e.g. Salary, Freelance, Dividend" onChange={(v) => setDraft((d) => ({ ...d, category: v }))} onSubmit={commit} /></td>
+                    <td><AmountInput key={amountKey} value={draft.amount} onChange={(v) => setDraft((d) => ({ ...d, amount: v ?? 0 }))} placeholder="0" onEnterCommit={(parsed) => {
                       if (!draft.category.trim() || !parsed) return;
-                      add.mutate({ section: "income", category: draft.category.trim(), amount: parsed, date: draft.date || `${month}-01`, kind: "cash" }, { onSuccess: () => setDraft((d) => ({ date: d.date, category: "", amount: 0 })) });
+                      add.mutate({ section: "income", category: draft.category.trim(), amount: parsed, date: draft.date || `${month}-01`, kind: "cash" }, { onSuccess: resetDraft });
                     }} /></td>
                     <td><button className="btn btn-primary" style={{ width: 34, height: 30, padding: 0, borderRadius: 8, background: "var(--pos)" }} onClick={commit} aria-label="Add income"><IconPlus size={16} /></button></td>
                   </tr>
