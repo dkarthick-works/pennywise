@@ -59,6 +59,7 @@ export function RecordEntryPage({
 
   const dateTouchedRef = useRef(false);
   const nameFocusRef = useRef<HTMLDivElement>(null);
+  const [amountKey, setAmountKey] = useState(0);
   const sectionRef = useRef(section);
   sectionRef.current = section;
 
@@ -143,8 +144,11 @@ export function RecordEntryPage({
       rememberCreated(created);
       setCategory("");
       setAmount(0);
+      setAmountKey((k) => k + 1); // remount so the amount input's local text clears
       setFormErr("");
       requestAnimationFrame(() => {
+        // The old amount input reports its value once more as it unmounts; clear that too.
+        setAmount(0);
         nameFocusRef.current?.querySelector("input")?.focus();
       });
     },
@@ -408,6 +412,7 @@ export function RecordEntryPage({
                 </td>
                 <td>
                   <AmountInput
+                    key={amountKey}
                     value={amount}
                     onChange={(n) => setAmount(n ?? 0)}
                     placeholder="0"
