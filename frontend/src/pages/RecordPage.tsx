@@ -638,6 +638,19 @@ function DailyTile({ rows, section, month, settledSet }: {
     () => sorted.filter((r) => matchesStatusFilter(r, statusFilter, settledSet)),
     [sorted, statusFilter, settledSet]
   );
+  // Spend per day, same rule as the tile's "Incurred" (settlements clear earlier
+  // credits, so they aren't new spend and are tallied separately). Uses all rows
+  // so the status filter doesn't change a day's figures.
+  const dayTotals = useMemo(() => {
+    const totals = new Map<string, { spent: number; settled: number }>();
+    for (const r of rows) {
+      const t = totals.get(r.date) ?? { spent: 0, settled: 0 };
+      if (r.kind === "settlement") t.settled += r.amount;
+      else t.spent += r.amount;
+      totals.set(r.date, t);
+    }
+    return totals;
+  }, [rows]);
   const dateGroups = useMemo(() => {
     const groups: { date: string; rows: Transaction[] }[] = [];
     for (const r of visible) {
@@ -705,12 +718,25 @@ function DailyTile({ rows, section, month, settledSet }: {
             {dateGroups.map((group) => (
               <Fragment key={group.date}>
                 <tr className="date-group-hdr">
-                  <td colSpan={5}>
+                  <td colSpan={2}>
                     <span style={{ fontWeight: 600, fontSize: 13 }}>{dailyGroupLabel(group.date)}</span>
                     <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>
                       {group.rows.length} {group.rows.length === 1 ? "entry" : "entries"}
                     </span>
+                    {(dayTotals.get(group.date)?.settled ?? 0) > 0 && (
+                      <span
+                        className="muted"
+                        style={{ fontSize: 12, marginLeft: 8 }}
+                        title="Credits settled this day. Not included in the day's total spent."
+                      >
+                        · settled {money2(dayTotals.get(group.date)!.settled)}
+                      </span>
+                    )}
                   </td>
+                  <td className="num" style={{ textAlign: "right", paddingRight: 20, fontWeight: 600, fontSize: 13 }} title="Total spent this day">
+                    {money2(dayTotals.get(group.date)?.spent ?? 0)}
+                  </td>
+                  <td colSpan={2} />
                 </tr>
                 {group.rows.map((r) => (
                   <DailyRow
