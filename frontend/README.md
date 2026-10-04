@@ -222,13 +222,37 @@ The **Daily** tile sorts rows by date descending (then by id), then inserts
 date header rows (`date-group-hdr`) whenever the date changes. Each header shows
 the formatted date and entry count. The quick-add row stays pinned at the top.
 
-### Quick-add defaults
+### Adding Essential / Flexible rows
+
+**Add row** (Essential) and **Add subscription** (Flexible) open a local
+**draft row** (`DraftRow` in `RecordPage.tsx`). The API rejects an empty
+`category`, so the client does not post a blank line up front.
+
+| Action | Behavior |
+|--------|----------|
+| Save | Non-empty name on blur (leaving the row), **Enter** in the name field, or **Enter** in the amount field (uses the parsed amount for that tick) |
+| Keep editing | Blur from the name into the date or amount cell in the same row leaves the draft open |
+| Discard | **Escape** or the row **×** closes the draft without saving |
+
+After a successful save the draft **stays open** with a cleared name and amount
+so back-to-back entries do not require clicking **Add** again. While a draft is
+open, the footer button is disabled.
+
+### Quick-add defaults and post-save focus
 
 On **Daily** and **Income** tiles, the quick-add date defaults to the **latest
 date already in that table** (`defaultDraftDate` in `src/lib/dates.ts`), not
 today's calendar day. When the table is empty it falls back to today within the
 selected month. After each add the draft date is preserved so back-filling a run
 of same-day entries does not reset to today.
+
+After any successful add on **Daily**, **Income**, Essential/Flexible draft
+rows, or **Quick add** (`/record/entry`), the amount field clears, the amount
+input **remounts** (`amountKey`) so a late blur cannot restore the previous
+value, and focus returns to the name/category field for rapid entry.
+
+Table **date** cells use `input[type="date"].cell-input` styling that hides the
+native calendar icon; clicking the field still opens the date picker.
 
 ### Transaction-name autocomplete
 
