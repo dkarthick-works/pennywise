@@ -73,8 +73,10 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
   ([frontend/README.md § Dashboard page](frontend/README.md),
   [backend/README.md § Group spend history](backend/README.md))
 - **Record page** — default landing route; per-section status filter; daily rows grouped by date;
-  transaction-name autocomplete on Daily/Income quick-add; **Copy last month** on Income/Essential/Flexible;
-  **Quick add** cross-section entry at `/record/entry`; **Dashboard** shortcut on the tile grid
+  Essential/Flexible **Add row** via local draft (no empty-category API post); post-save focus back to
+  name with cleared amount on Daily/Income/Quick add; transaction-name autocomplete on Daily/Income
+  quick-add; **Copy last month** on Income/Essential/Flexible; **Quick add** cross-section entry at
+  `/record/entry`; **Dashboard** shortcut on the tile grid
   ([frontend/README.md § Record page](frontend/README.md))
 - **Dashboard daily spend chart** — Daily-section incurred spend by calendar day with month total and
   average-per-day header (client-side rollups)
