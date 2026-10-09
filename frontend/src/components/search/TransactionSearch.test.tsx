@@ -39,7 +39,7 @@ describe("transaction search", () => {
     expect(search).not.toHaveBeenCalled();
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(search).toHaveBeenCalledTimes(1);
-    expect(search).toHaveBeenCalledWith("coffee", expect.any(AbortSignal));
+    expect(search).toHaveBeenCalledWith("coffee", expect.any(AbortSignal), undefined);
   });
 
   it("debounces returning to the previous query and whitespace-only edits", async () => {
@@ -113,5 +113,49 @@ describe("transaction search", () => {
     search.mockResolvedValue({ ...result, has_more: true, next_cursor: "next" });
     fireEvent.change(setup(), { target: { value: "coffee" } });
     expect(await screen.findByText("Showing first 1 match")).toBeInTheDocument();
+  });
+
+  it("appends the next cursor page and removes the control at the end", async () => {
+    search.mockResolvedValueOnce({ ...result, has_more: true, next_cursor: "signed-next" });
+    let resolvePage: ((value: TransactionSearchResponse) => void) | undefined;
+    search.mockImplementationOnce(() => new Promise((resolve) => { resolvePage = resolve; }));
+    fireEvent.change(setup(), { target: { value: "coffee" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    expect(search).toHaveBeenLastCalledWith("coffee", expect.any(AbortSignal), "signed-next");
+    expect(await screen.findByRole("button", { name: "Loading more…" })).toBeDisabled();
+    expect(screen.getByText("Coffee Shop")).toBeInTheDocument();
+    await act(async () => { resolvePage?.({ ...result, items: [{ ...coffee, id: "second", category: "Coffee Stand" }] }); });
+    expect(await screen.findByText("Coffee Stand")).toBeInTheDocument();
+    expect(screen.getByText("2 matches")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("retains loaded rows and retries a failed next page with the same cursor", async () => {
+    search.mockResolvedValueOnce({ ...result, has_more: true, next_cursor: "signed-next" });
+    search.mockRejectedValueOnce(new Error("offline"));
+    search.mockResolvedValueOnce({ ...result, items: [{ ...coffee, id: "second", category: "Coffee Stand" }] });
+    fireEvent.change(setup(), { target: { value: "coffee" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load more transactions");
+    expect(screen.getByText("Coffee Shop")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry loading more" }));
+    expect(await screen.findByText("Coffee Stand")).toBeInTheDocument();
+    expect(search.mock.calls[1][2]).toBe("signed-next");
+    expect(search.mock.calls[2][2]).toBe("signed-next");
+  });
+
+  it("cancels pagination and starts without a cursor when the search changes", async () => {
+    search.mockResolvedValueOnce({ ...result, has_more: true, next_cursor: "signed-next" });
+    search.mockImplementationOnce(() => new Promise(() => {}));
+    search.mockResolvedValueOnce({ ...result, items: [{ ...coffee, id: "rent", category: "Rent" }] });
+    const input = setup();
+    fireEvent.change(input, { target: { value: "coffee" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    const signal = search.mock.calls[1][1];
+    fireEvent.change(input, { target: { value: "rent" } });
+    expect(signal?.aborted).toBe(true);
+    expect(await screen.findByText("Rent")).toBeInTheDocument();
+    expect(search).toHaveBeenLastCalledWith("rent", expect.any(AbortSignal), undefined);
+    expect(screen.queryByText("Coffee Shop")).not.toBeInTheDocument();
   });
 });

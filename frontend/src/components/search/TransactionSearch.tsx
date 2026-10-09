@@ -1,26 +1,28 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { searchTransactions } from "../../api/ledger";
 import { IconSearch, IconX } from "../ui/Icons";
 import { TransactionListTable } from "../dashboard/TransactionListTable";
 
 function SearchResults({ query }: { query: string }) {
-  const { data, isPending, isError, refetch } = useQuery({
+  const { data, isPending, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage, isFetchNextPageError } = useInfiniteQuery({
     queryKey: ["transaction-search", query],
-    queryFn: ({ signal }) => searchTransactions(query, signal),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ signal, pageParam }) => searchTransactions(query, signal, pageParam),
+    getNextPageParam: (page) => page.has_more ? page.next_cursor ?? undefined : undefined,
     retry: false,
     gcTime: 0,
   });
 
   if (isPending) return <p role="status" className="muted" style={{ margin: "16px 0 0" }}>Searching transactions…</p>;
-  if (isError) return (
+  if (isError && !data) return (
     <div style={{ marginTop: 16 }}>
       <p role="alert" style={{ color: "var(--neg)", margin: "0 0 10px" }}>Could not search transactions. Please try again.</p>
       <button type="button" className="btn btn-soft" onClick={() => refetch()}>Retry search</button>
     </div>
   );
 
-  const rows = data?.items ?? [];
+  const rows = data?.pages.flatMap((page) => page.items) ?? [];
   if (rows.length === 0) return <p role="status" className="muted" style={{ margin: "16px 0 0" }}>No matching transactions.</p>;
 
   return (
@@ -28,10 +30,18 @@ function SearchResults({ query }: { query: string }) {
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
         <h3 className="card-h" style={{ margin: 0 }}>Search results</h3>
         <span role="status" className="muted" style={{ fontSize: 12 }}>
-          {data?.has_more ? `Showing first ${rows.length} ${rows.length === 1 ? "match" : "matches"}` : `${rows.length} ${rows.length === 1 ? "match" : "matches"}`}
+          {hasNextPage ? `Showing first ${rows.length} ${rows.length === 1 ? "match" : "matches"}` : `${rows.length} ${rows.length === 1 ? "match" : "matches"}`}
         </span>
       </div>
       <TransactionListTable rows={rows} showYear />
+      {hasNextPage && (
+        <div style={{ marginTop: 16 }}>
+          {isFetchNextPageError && <p role="alert" style={{ color: "var(--neg)", margin: "0 0 10px" }}>Could not load more transactions. Please try again.</p>}
+          <button type="button" className="btn btn-soft" disabled={isFetchingNextPage} onClick={() => fetchNextPage()}>
+            {isFetchingNextPage ? "Loading more…" : isFetchNextPageError ? "Retry loading more" : "Load more"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
