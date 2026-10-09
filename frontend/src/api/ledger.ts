@@ -303,11 +303,11 @@ export const createCategoryMapping = (body: {
 export const deleteCategoryMapping = (id: string) =>
   client.delete(`/api/category-mappings/${id}`);
 
-// Dashboard search spans all months; cancellation prevents stale requests.
-export const searchTransactions = (q: string, signal?: AbortSignal) =>
+// Search spans all months; cancellation prevents stale requests.
+export const searchTransactions = (q: string, signal?: AbortSignal, cursor?: string) =>
   client
     .get<TransactionSearchResponse>("/api/transactions/search", {
-      params: { q, limit: 20 },
+      params: { q, limit: 20, cursor },
       signal,
     })
     .then((r) => r.data);
