@@ -183,7 +183,7 @@ export function CategoryInput({
       setDebouncedQuery(trimmedQuery);
       setActiveIndex(-1);
       setActiveItemsKey("");
-    }, 200);
+    }, 100);
     return () => window.clearTimeout(timer);
   }, [dismissed, focused, queryIsValid, trimmedQuery, typedSinceFocus]);
 
