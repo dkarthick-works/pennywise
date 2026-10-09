@@ -254,15 +254,16 @@ type Template struct {
 }
 
 type Transaction struct {
-	ID        uuid.UUID          `json:"id"`
-	UserID    uuid.UUID          `json:"user_id"`
-	Section   Section            `json:"section"`
-	Category  string             `json:"category"`
-	Amount    pgtype.Numeric     `json:"amount"`
-	TxnDate   pgtype.Date        `json:"txn_date"`
-	Kind      TxnKind            `json:"kind"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	ID             uuid.UUID          `json:"id"`
+	UserID         uuid.UUID          `json:"user_id"`
+	Section        Section            `json:"section"`
+	Category       string             `json:"category"`
+	Amount         pgtype.Numeric     `json:"amount"`
+	TxnDate        pgtype.Date        `json:"txn_date"`
+	Kind           TxnKind            `json:"kind"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	NormalizedName *string            `json:"normalized_name"`
 }
 
 type TransactionNameSuggestion struct {

@@ -87,9 +87,10 @@ function ReserveDialog({ title, description, effect = "house", onClose, children
 }) {
   const closeRef = useRef(onClose);
   const dialogRef = useRef<HTMLElement | null>(null);
-  const openedAt = useRef(Date.now());
+  const openedAt = useRef(0);
   closeRef.current = onClose;
   useEffect(() => {
+    openedAt.current = Date.now();
     const focusableSelector = "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
     const initial = dialogRef.current?.querySelector<HTMLElement>(`.reserve-dialog-body [autofocus], .reserve-dialog-body ${focusableSelector}`);
     initial?.focus();

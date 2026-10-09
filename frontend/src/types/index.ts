@@ -14,6 +14,12 @@ export interface Transaction {
   settled?: boolean;  // credit rows: cleared by a settlement
 }
 
+export interface TransactionSearchResponse {
+  items: Transaction[];
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
 export interface ImportRowPayload {
   date: string;
   section: Section;

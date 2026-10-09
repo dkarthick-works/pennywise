@@ -899,3 +899,6 @@ input[type="date"].cell-input::-webkit-calendar-picker-indicator {
 .reserve-operation-menu[open] summary, .income-row-menu[open] summary { color: var(--accent-ink); }
 .reserve-operation-menu .reserve-actions, .income-row-menu button { position: absolute; right: 0; z-index: 2; min-width: max-content; padding: 8px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); box-shadow: var(--sh-md); }
 .income-row-menu button { border: 0; position: absolute; top: 28px; }
+
+/* Transaction search has a keyboard-accessible clear button. */
+#transaction-search::-webkit-search-cancel-button { display: none; }

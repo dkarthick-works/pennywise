@@ -5,6 +5,7 @@ import { AppShell } from "./components/layout/AppShell";
 import { AuthPage }      from "./pages/AuthPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { TransactionSearchPage } from "./pages/TransactionSearchPage";
 import { CategoryGroupPage } from "./pages/CategoryGroupPage";
 import { CategoryGroupComparisonPage } from "./pages/CategoryGroupComparisonPage";
 import { CreditTransactionsPage } from "./pages/CreditTransactionsPage";
@@ -73,6 +74,7 @@ export default function App() {
           <RequireAuth>
             <AppShell>
               <Routes>
+                <Route path="/transactions/search" element={<TransactionSearchPage />} />
                 <Route path="/dashboard" element={<DashboardPage month={month} setMonth={setMonth} />} />
                 <Route path="/dashboard/groups/:groupId" element={<CategoryGroupPage month={month} />} />
                 <Route path="/dashboard/groups/:groupId/compare" element={<CategoryGroupComparisonPage month={month} />} />

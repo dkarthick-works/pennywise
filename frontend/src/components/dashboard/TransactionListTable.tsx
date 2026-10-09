@@ -18,9 +18,11 @@ const KIND_META: Record<TxnKind, { label: string; className?: string }> = {
 export function TransactionListTable({
   rows,
   showKind = true,
+  showYear = false,
 }: {
   rows: Transaction[];
   showKind?: boolean;
+  showYear?: boolean;
 }) {
   return (
     <div style={{ overflowX: "auto" }}>
@@ -40,7 +42,7 @@ export function TransactionListTable({
             const kind = KIND_META[t.kind];
             return (
               <tr key={t.id}>
-                <td className="num" style={{ whiteSpace: "nowrap" }}>{prettyDate(t.date)}</td>
+                <td className="num" style={{ whiteSpace: "nowrap" }}>{prettyDate(t.date)}{showYear ? ` ${t.date.slice(0, 4)}` : ""}</td>
                 <td style={{ fontWeight: 600 }}>{t.category}</td>
                 <td>
                   <span

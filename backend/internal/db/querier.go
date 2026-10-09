@@ -137,6 +137,7 @@ type Querier interface {
 	SaveEventItem(ctx context.Context, arg SaveEventItemParams) error
 	SearchShortTransactionNameSuggestions(ctx context.Context, arg SearchShortTransactionNameSuggestionsParams) ([]string, error)
 	SearchTransactionNameSuggestions(ctx context.Context, arg SearchTransactionNameSuggestionsParams) ([]string, error)
+	SearchTransactions(ctx context.Context, arg SearchTransactionsParams) ([]SearchTransactionsRow, error)
 	// Credit ids (in this month) that some settlement references — for "Settled" chips.
 	SettledCreditIdsByMonth(ctx context.Context, arg SettledCreditIdsByMonthParams) ([]uuid.UUID, error)
 	SoftDeleteEvent(ctx context.Context, arg SoftDeleteEventParams) error

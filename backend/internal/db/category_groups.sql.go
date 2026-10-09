@@ -432,7 +432,7 @@ func (q *Queries) ListTransactionCategoryTexts(ctx context.Context, arg ListTran
 }
 
 const listTransactionsByGroupForMonth = `-- name: ListTransactionsByGroupForMonth :many
-SELECT t.id, t.user_id, t.section, t.category, t.amount, t.txn_date, t.kind, t.created_at, t.updated_at
+SELECT t.id, t.user_id, t.section, t.category, t.amount, t.txn_date, t.kind, t.created_at, t.updated_at, t.normalized_name
 FROM transactions t
 WHERE t.user_id = $1
   AND t.txn_date >= $2
@@ -477,6 +477,7 @@ func (q *Queries) ListTransactionsByGroupForMonth(ctx context.Context, arg ListT
 			&i.Kind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.NormalizedName,
 		); err != nil {
 			return nil, err
 		}

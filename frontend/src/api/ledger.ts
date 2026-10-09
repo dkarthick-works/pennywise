@@ -6,6 +6,7 @@ import client from "./client";
 import { parseContentDisposition } from "../lib/export";
 import type {
   Transaction,
+  TransactionSearchResponse,
   Settings,
   Budgets,
   MonthlyBudget,
@@ -301,3 +302,12 @@ export const createCategoryMapping = (body: {
 
 export const deleteCategoryMapping = (id: string) =>
   client.delete(`/api/category-mappings/${id}`);
+
+// Dashboard search spans all months; cancellation prevents stale requests.
+export const searchTransactions = (q: string, signal?: AbortSignal) =>
+  client
+    .get<TransactionSearchResponse>("/api/transactions/search", {
+      params: { q, limit: 20 },
+      signal,
+    })
+    .then((r) => r.data);
