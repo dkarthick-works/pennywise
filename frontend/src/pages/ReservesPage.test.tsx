@@ -66,6 +66,33 @@ describe("Reserves page", () => {
     await waitFor(() => expect(listReserveOperations).toHaveBeenCalledWith(2025, "general", expect.any(AbortSignal)));
   });
 
+  it("ignores backdrop clicks for the first 400 ms after opening", async () => {
+    vi.mocked(listReserves).mockResolvedValue([
+      { id: "general", name: "General Reserve", is_general: true, archived: false, balance: 60000 },
+    ]);
+    mount();
+    const addMoney = await screen.findByRole("button", { name: "Add money" });
+    let now = 1000;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      fireEvent.click(addMoney);
+      const dialog = screen.getByRole("dialog", { name: "Add money to reserves" });
+      const backdrop = dialog.parentElement!;
+      fireEvent.click(backdrop);
+      expect(dialog).toBeInTheDocument();
+      now += 399;
+      fireEvent.click(backdrop);
+      expect(dialog).toBeInTheDocument();
+      now += 1;
+      fireEvent.click(dialog);
+      expect(dialog).toBeInTheDocument();
+      fireEvent.click(backdrop);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it("opens focused operation dialogs prefilled from the selected reserve", async () => {
     const user = userEvent.setup();
     vi.mocked(listReserves).mockResolvedValue([
