@@ -461,3 +461,15 @@ describe("Dashboard section budgets", () => {
     expect(mocks.getMonthlyBudget).not.toHaveBeenCalled();
   });
 });
+
+
+describe("Dashboard analytics layout", () => {
+  it("keeps the daily spend graph immediately after the three monthly cards", async () => {
+    mocks.getCreditUsage.mockResolvedValue(unconfigured);
+    renderDashboard();
+    const card = await creditCard();
+    const heroCards = card.parentElement;
+    expect(heroCards?.nextElementSibling).toBe(screen.getByTestId("daily-spend-by-day"));
+    expect(screen.queryByRole("searchbox", { name: "Search transactions" })).not.toBeInTheDocument();
+  });
+});

@@ -219,3 +219,7 @@ export const IconGithub = ({ size = 18, ...p }: IcProps) => (
     />
   </svg>
 );
+
+export const IconSearch = (p: IcProps) => (
+  <Ic {...p}><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></Ic>
+);

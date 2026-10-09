@@ -1016,3 +1016,62 @@ serves and handles the entire reset form there — the browser never comes back
 to Pennywise for that step, so no token ever reaches this backend or its
 logs. Note: per Goauth's own integration guide, it has no rate limiting on
 forgot/reset-password; that's Goauth's operational concern, not this repo's.
+
+## Universal transaction search
+
+`GET /api/transactions/search` searches the authenticated user's transaction names
+(`category`) across all months, including settlements. Requires the usual bearer token.
+
+```bash
+curl --get 'http://localhost:8080/api/transactions/search' \
+  --header "Authorization: Bearer $TOKEN" \
+  --data-urlencode 'q=swigy' \
+  --data-urlencode 'limit=20'
+```
+
+Parameters:
+
+| Parameter | Meaning |
+| --- | --- |
+| `q` | Required; 1–100 characters after trimming |
+| `section` | Optional: essential, flexible, daily, income |
+| `kind` | Optional: cash, credit, settlement |
+| `from`, `to` | Optional inclusive YYYY-MM-DD date bounds |
+| `min_amount`, `max_amount` | Optional inclusive decimal bounds, up to two decimal places |
+| `limit` | Page size, default 20, maximum 100 |
+| `cursor` | Opaque `next_cursor` from the previous page |
+| `sort` | `relevance` (default), `date_desc` (newest first), or `date_asc` (oldest first) |
+
+Response: `{ "items": [TransactionDTO], "next_cursor": "...", "has_more": true }`.
+An empty or final page has `next_cursor: null` and `has_more: false`.
+Keep the same search, filters and sort order when using a cursor; page size may change.
+Invalid input or a mismatched/tampered cursor returns 400.
+
+Migration 0015 adds a stored generated `normalized_name` column and GIN trigram
+and user/name prefix indexes. It normalizes existing rows and future renames
+automatically; original display names remain unchanged. Server startup applies it.
+Adding the stored column rewrites the table and ordinary index creation takes
+locks; schedule deployment appropriately for a large production database.
+
+Names and input use identical lowercase/whitespace normalization. One or two
+characters use literal prefix matching; three or more combine literal substring
+matching and trigram similarity (threshold 0.3), including fuzzy matches immediately.
+`%`, `_`, and `!` in input remain literal. Ordering is exact, prefix, substring,
+fuzzy; then similarity (rounded to millionths), date DESC, ID DESC. Settlement
+metadata is populated across months. Date sorting orders all matching transactions
+by transaction date and ID in the selected direction, regardless of match tier.
+For example: `/api/transactions/search?q=coffee&sort=date_desc&limit=20`.
+Results use private/no-store caching.
+
+Cursors are signed and bound to the user and search/filter values, with keyset
+pagination across every ranking field. They do not freeze the dataset: concurrent
+edits can move rows between pages; restart the search after editing transactions.
+Changing the signing secret invalidates outstanding cursors. Broad searches still
+score/sort candidates, so cursor pagination does not eliminate that work.
+
+Focused integration checks (use a disposable database; tests truncate user data):
+
+```bash
+PENNYWISE_TEST_DATABASE_URL='postgres://.../test_db?sslmode=disable' \
+  go test ./internal/api -run '^TestTransactionSearch' -count=1
+```

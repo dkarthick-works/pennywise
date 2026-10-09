@@ -64,7 +64,7 @@ func (q *Queries) DeleteTransaction(ctx context.Context, arg DeleteTransactionPa
 }
 
 const getTransaction = `-- name: GetTransaction :one
-SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at FROM transactions
+SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at, normalized_name FROM transactions
 WHERE id = $1 AND user_id = $2
 `
 
@@ -86,6 +86,7 @@ func (q *Queries) GetTransaction(ctx context.Context, arg GetTransactionParams) 
 		&i.Kind,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.NormalizedName,
 	)
 	return i, err
 }
@@ -136,7 +137,7 @@ func (q *Queries) InsertSettlementLink(ctx context.Context, arg InsertSettlement
 const insertTransaction = `-- name: InsertTransaction :one
 INSERT INTO transactions (user_id, section, category, amount, txn_date, kind)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, user_id, section, category, amount, txn_date, kind, created_at, updated_at
+RETURNING id, user_id, section, category, amount, txn_date, kind, created_at, updated_at, normalized_name
 `
 
 type InsertTransactionParams struct {
@@ -168,12 +169,13 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 		&i.Kind,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.NormalizedName,
 	)
 	return i, err
 }
 
 const listCreditTransactionsByDateRange = `-- name: ListCreditTransactionsByDateRange :many
-SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at FROM transactions
+SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at, normalized_name FROM transactions
 WHERE user_id = $1
   AND txn_date >= $2
   AND txn_date <  $3
@@ -209,6 +211,7 @@ func (q *Queries) ListCreditTransactionsByDateRange(ctx context.Context, arg Lis
 			&i.Kind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.NormalizedName,
 		); err != nil {
 			return nil, err
 		}
@@ -312,7 +315,7 @@ func (q *Queries) ListSettlementLinksByYear(ctx context.Context, arg ListSettlem
 }
 
 const listTransactionsByDateRange = `-- name: ListTransactionsByDateRange :many
-SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at FROM transactions
+SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at, normalized_name FROM transactions
 WHERE user_id = $1
   AND txn_date >= $2
   AND txn_date <= $3
@@ -345,6 +348,7 @@ func (q *Queries) ListTransactionsByDateRange(ctx context.Context, arg ListTrans
 			&i.Kind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.NormalizedName,
 		); err != nil {
 			return nil, err
 		}
@@ -357,7 +361,7 @@ func (q *Queries) ListTransactionsByDateRange(ctx context.Context, arg ListTrans
 }
 
 const listTransactionsByMonth = `-- name: ListTransactionsByMonth :many
-SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at FROM transactions
+SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at, normalized_name FROM transactions
 WHERE user_id = $1 AND to_char(txn_date, 'YYYY-MM') = $2::text
 ORDER BY txn_date, created_at
 `
@@ -386,6 +390,7 @@ func (q *Queries) ListTransactionsByMonth(ctx context.Context, arg ListTransacti
 			&i.Kind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.NormalizedName,
 		); err != nil {
 			return nil, err
 		}
@@ -398,7 +403,7 @@ func (q *Queries) ListTransactionsByMonth(ctx context.Context, arg ListTransacti
 }
 
 const listTransactionsByMonthRecent = `-- name: ListTransactionsByMonthRecent :many
-SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at FROM transactions
+SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at, normalized_name FROM transactions
 WHERE user_id = $1 AND to_char(txn_date, 'YYYY-MM') = $2::text
 ORDER BY updated_at DESC, txn_date DESC, id DESC
 `
@@ -428,6 +433,7 @@ func (q *Queries) ListTransactionsByMonthRecent(ctx context.Context, arg ListTra
 			&i.Kind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.NormalizedName,
 		); err != nil {
 			return nil, err
 		}
@@ -440,7 +446,7 @@ func (q *Queries) ListTransactionsByMonthRecent(ctx context.Context, arg ListTra
 }
 
 const listTransactionsByMonthSection = `-- name: ListTransactionsByMonthSection :many
-SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at FROM transactions
+SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at, normalized_name FROM transactions
 WHERE user_id = $1
   AND to_char(txn_date, 'YYYY-MM') = $3::text
   AND section = $2
@@ -472,6 +478,7 @@ func (q *Queries) ListTransactionsByMonthSection(ctx context.Context, arg ListTr
 			&i.Kind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.NormalizedName,
 		); err != nil {
 			return nil, err
 		}
@@ -484,7 +491,7 @@ func (q *Queries) ListTransactionsByMonthSection(ctx context.Context, arg ListTr
 }
 
 const listTransactionsByYear = `-- name: ListTransactionsByYear :many
-SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at FROM transactions
+SELECT id, user_id, section, category, amount, txn_date, kind, created_at, updated_at, normalized_name FROM transactions
 WHERE user_id = $1 AND to_char(txn_date, 'YYYY') = $2::text
 ORDER BY txn_date, created_at
 `
@@ -513,6 +520,7 @@ func (q *Queries) ListTransactionsByYear(ctx context.Context, arg ListTransactio
 			&i.Kind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.NormalizedName,
 		); err != nil {
 			return nil, err
 		}
@@ -525,7 +533,7 @@ func (q *Queries) ListTransactionsByYear(ctx context.Context, arg ListTransactio
 }
 
 const openCreditsForSection = `-- name: OpenCreditsForSection :many
-SELECT t.id, t.user_id, t.section, t.category, t.amount, t.txn_date, t.kind, t.created_at, t.updated_at FROM transactions t
+SELECT t.id, t.user_id, t.section, t.category, t.amount, t.txn_date, t.kind, t.created_at, t.updated_at, t.normalized_name FROM transactions t
 WHERE t.user_id = $1
   AND t.section = $2
   AND t.kind = 'credit'
@@ -565,6 +573,7 @@ func (q *Queries) OpenCreditsForSection(ctx context.Context, arg OpenCreditsForS
 			&i.Kind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.NormalizedName,
 		); err != nil {
 			return nil, err
 		}
@@ -765,7 +774,7 @@ SET section    = $3,
     kind       = $7,
     updated_at = now()
 WHERE id = $1 AND user_id = $2
-RETURNING id, user_id, section, category, amount, txn_date, kind, created_at, updated_at
+RETURNING id, user_id, section, category, amount, txn_date, kind, created_at, updated_at, normalized_name
 `
 
 type UpdateTransactionParams struct {
@@ -799,6 +808,7 @@ func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionPa
 		&i.Kind,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.NormalizedName,
 	)
 	return i, err
 }

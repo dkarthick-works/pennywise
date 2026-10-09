@@ -207,7 +207,7 @@ func (q *Queries) GetGeneratedReserveTransaction(ctx context.Context, arg GetGen
 }
 
 const getIncomeTransactionForConversion = `-- name: GetIncomeTransactionForConversion :one
-SELECT t.id, t.user_id, t.section, t.category, t.amount, t.txn_date, t.kind, t.created_at, t.updated_at
+SELECT t.id, t.user_id, t.section, t.category, t.amount, t.txn_date, t.kind, t.created_at, t.updated_at, t.normalized_name
 FROM transactions t
 WHERE t.id = $1
   AND t.user_id = $2
@@ -235,6 +235,7 @@ func (q *Queries) GetIncomeTransactionForConversion(ctx context.Context, arg Get
 		&i.Kind,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.NormalizedName,
 	)
 	return i, err
 }
@@ -360,7 +361,7 @@ func (q *Queries) GetReserveOperationForUserForUpdate(ctx context.Context, arg G
 const insertIncomeTransaction = `-- name: InsertIncomeTransaction :one
 INSERT INTO transactions (user_id, section, category, amount, txn_date, kind)
 VALUES ($1, 'income', $2, $3, $4, 'cash')
-RETURNING id, user_id, section, category, amount, txn_date, kind, created_at, updated_at
+RETURNING id, user_id, section, category, amount, txn_date, kind, created_at, updated_at, normalized_name
 `
 
 type InsertIncomeTransactionParams struct {
@@ -388,6 +389,7 @@ func (q *Queries) InsertIncomeTransaction(ctx context.Context, arg InsertIncomeT
 		&i.Kind,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.NormalizedName,
 	)
 	return i, err
 }

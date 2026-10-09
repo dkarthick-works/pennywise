@@ -103,6 +103,7 @@ func (s *Server) Router() http.Handler {
 		pr.Put("/api/templates/{section}", s.handlePutTemplates)
 
 		pr.Get("/api/transactions", s.handleListTransactions)
+		pr.Get("/api/transactions/search", s.handleSearchTransactions)
 		pr.Get("/api/transactions/export", s.handleExportTransactions)
 		pr.Post("/api/transactions/import", s.handleImportTransactions)
 		pr.Post("/api/transactions/parse", s.handleParseTransactions)
