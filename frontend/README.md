@@ -24,6 +24,7 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/record` | Record & Expense | **Default landing page** after login (`/` redirects here) |
 | `/record/entry` | Quick add | Manual cross-section entry plus AI language parsing; section/kind cycle chips, sticky date, visit session log |
 | `/dashboard` | Dashboard | Month/year charts, hero cards, category-group spend |
+| `/transactions/search` | Search | Fuzzy name search across all months; cursor-paginated results |
 | `/dashboard/credits?month=&view=calendar\|billing` | Credit transactions | Drill-down from the Credit Card Usage hero card; month + view carried in the URL |
 | `/dashboard/groups/:groupId` | Category group | Drill-down from a category-group spend card |
 | `/reserves?reserve=&year=` | Reserves | Ledger workspace with reserve navigation, selected-reserve actions, and year-filtered activity |
@@ -220,7 +221,13 @@ does not change API queries.
 
 The **Daily** tile sorts rows by date descending (then by id), then inserts
 date header rows (`date-group-hdr`) whenever the date changes. Each header shows
-the formatted date and entry count. The quick-add row stays pinned at the top.
+the formatted date, entry count, and that day's **total spent** (right-aligned).
+Totals use the same incurred rule as the tile summary: every row except
+`settlement` counts toward spent; settlement amounts are excluded from spent and,
+when present for that day, shown separately as a muted `· settled ₹…` note (with
+a tooltip). Figures are computed from **all** rows loaded for the month, so the
+Status filter changes which rows appear under a header but does not change the
+header totals. The quick-add row stays pinned at the top.
 
 ### Adding Essential / Flexible rows
 
@@ -259,7 +266,7 @@ native calendar icon; clicking the field still opens the date picker.
 **Daily** and **Income** quick-add rows (and Daily row edits) use
 `CategoryInput` with ranked suggestions from
 `GET /api/transaction-names/suggestions`. Type at least **2 characters** to
-fetch; use ↑/↓ and Enter to pick. Queries are debounced (200 ms) and scoped
+fetch; use ↑/↓ and Enter to pick. Queries are debounced (100 ms) and scoped
 per section. Suggestions learn from past category labels via database triggers
 and survive renames/deletes of the source transaction.
 
@@ -329,6 +336,29 @@ supported. Preview readiness is computed client-side in
 Parse failures surface API errors (422 when nothing parseable, 503 when parsing
 is disabled, 429 on rate limits). Backend OpenRouter configuration is required
 — see [backend/README.md § AI transaction previews](../backend/README.md).
+
+## Transaction search
+
+Nav item: **Search** (`/transactions/search`), directly below **Dashboard** in
+the shell. The page is independent of the global month selector.
+
+Type a transaction name (the Record **category** field) to search across **all
+months**, including settlements. Input is trimmed, capped at **100 characters**,
+and debounced (**100 ms**) before calling
+`GET /api/transactions/search` (`searchTransactions` in `src/api/ledger.ts`).
+The UI sends `q`, `limit=20`, and an opaque `cursor` for subsequent pages only
+(no section, kind, or date filters in the SPA yet).
+
+Results reuse `TransactionListTable` with a **year** column so cross-month hits
+are scannable. React Query's `useInfiniteQuery` loads the first page automatically;
+when `has_more` is true, **Load more** fetches the next signed cursor. Errors on
+the first page or on pagination offer **Retry** without clearing the query.
+Changing the text resets debounce and starts a fresh search key.
+
+Matching is server-side (prefix, substring, and trigram similarity for longer
+queries) — see [backend/README.md § Universal transaction search](../backend/README.md).
+Implementation: `src/pages/TransactionSearchPage.tsx`,
+`src/components/search/TransactionSearch.tsx`.
 
 ## Settings page
 

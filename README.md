@@ -57,7 +57,7 @@ Health check: `GET /health` (also used by the container `HEALTHCHECK`).
 
 ```
 backend/              Go API, migrations, sqlc queries, dev Postgres compose
-frontend/             React SPA (Record, Dashboard, Lent, Chits, Insights, Categories, Settings, Profile)
+frontend/             React SPA (Record, Dashboard, Search, Lent, Chits, Insights, Categories, Settings, Profile)
 auth-api-spec.json    Goauth OpenAPI spec (signup, login, refresh, …)
 Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine runtime
 ```
@@ -72,7 +72,10 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
   from dashboard group cards
   ([frontend/README.md § Dashboard page](frontend/README.md),
   [backend/README.md § Group spend history](backend/README.md))
-- **Record page** — default landing route; per-section status filter; daily rows grouped by date;
+- **Transaction search** — fuzzy name lookup across all months with cursor pagination
+  ([frontend/README.md § Transaction search](frontend/README.md),
+  [backend/README.md § Universal transaction search](backend/README.md))
+- **Record page** — default landing route; per-section status filter; daily rows grouped by date with per-day spent totals;
   Essential/Flexible **Add row** via local draft (no empty-category API post); post-save focus back to
   name with cleared amount on Daily/Income/Quick add; transaction-name autocomplete on Daily/Income
   quick-add; **Copy last month** on Income/Essential/Flexible; **Quick add** cross-section entry at
