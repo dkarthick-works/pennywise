@@ -85,6 +85,24 @@ describe("ChitDetailPage", () => {
     expect(screen.queryByRole("button", { name: /Save changes/i })).not.toBeInTheDocument();
   });
 
+  it("shows the year for every installment and preserves date editing", async () => {
+    mocks.getChit.mockResolvedValue(detail({
+      installments: [
+        { id: "i1", paid_on: "2026-12-10", amount: 4800, note: "" },
+        { id: "i2", paid_on: "2027-01-10", amount: 5000, note: "" },
+      ],
+    }));
+    const { container } = renderDetail();
+
+    expect(await screen.findByText("10 Dec 2026")).toBeInTheDocument();
+    expect(screen.getByText("10 Jan 2027")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit installment" })[0]);
+    expect(container.querySelector('input[type="date"]')).toHaveValue("2026-12-10");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByText("10 Dec 2026")).toBeInTheDocument();
+  });
+
   it("navigates to edit and add-installment pages", async () => {
     mocks.getChit.mockResolvedValue(detail());
     renderDetail();

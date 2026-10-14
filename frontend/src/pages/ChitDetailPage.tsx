@@ -268,7 +268,7 @@ export function ChitDetailPage() {
                     </>
                   ) : (
                     <>
-                      <td>{prettyDate(row.paid_on)}</td>
+                      <td>{prettyDate(row.paid_on)} {row.paid_on.slice(0, 4)}</td>
                       <td className="num">{inr(row.amount)}</td>
                       <td className="num">
                         {inr(paymentVariance(chit.expected_monthly, row.amount))}
