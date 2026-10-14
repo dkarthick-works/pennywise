@@ -38,7 +38,21 @@ export function parseContentDisposition(value?: string): string | null {
   return plainMatch?.[1] ?? null;
 }
 
+// Injected by the Android WebView wrapper (android/), which can't download blob: URLs.
+type AndroidBridge = { saveFile(base64: string, filename: string, mimeType: string): void };
+
 export function downloadBlob(blob: Blob, filename: string): void {
+  const android = (window as Window & { PennywiseAndroid?: AndroidBridge }).PennywiseAndroid;
+  if (android) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // Data URL is "data:<mime>;base64,<payload>".
+      const base64 = String(reader.result).split(",", 2)[1] ?? "";
+      android.saveFile(base64, filename, blob.type || "application/octet-stream");
+    };
+    reader.readAsDataURL(blob);
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
