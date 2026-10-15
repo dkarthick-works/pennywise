@@ -18,6 +18,10 @@ roadmap/2026-08-12-three-month-product-roadmap.md
 /frontend/node_modules
 /backend/web/dist
 /backend/healthcheck
+/backend/.db-backups/
+/backend/.db-refresh.local.json
+/backend/scripts/db_refresh_password.py
+/backend/scripts/__pycache__/
 
 /graphify-out
 /project
