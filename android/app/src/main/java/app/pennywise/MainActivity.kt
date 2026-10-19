@@ -129,16 +129,22 @@ class MainActivity : ComponentActivity() {
         /** Saves into the public Downloads folder. Called on a WebView background thread. */
         @JavascriptInterface
         fun saveFile(base64: String, filename: String, mimeType: String) {
-            val saved = runCatching {
-                val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, filename)
-                    put(MediaStore.Downloads.MIME_TYPE, mimeType)
-                }
-                val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)!!
-                contentResolver.openOutputStream(uri)!!.use { it.write(Base64.decode(base64, Base64.DEFAULT)) }
-            }.isSuccess
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, filename)
+                put(MediaStore.Downloads.MIME_TYPE, mimeType)
+            }
+            val uri = runCatching { contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) }.getOrNull()
+            val savedAs = uri?.let {
+                runCatching {
+                    contentResolver.openOutputStream(it)!!.use { out -> out.write(Base64.decode(base64, Base64.DEFAULT)) }
+                    // Android renames duplicates ("export (1).csv"); report the name it actually used.
+                    contentResolver.query(it, arrayOf(MediaStore.Downloads.DISPLAY_NAME), null, null, null)
+                        ?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: filename
+                }.onFailure { _ -> contentResolver.delete(it, null, null) } // no empty file left behind
+                    .getOrNull()
+            }
             runOnUiThread {
-                val msg = if (saved) "Saved $filename to Downloads" else "Couldn't save $filename"
+                val msg = if (savedAs != null) "Saved $savedAs to Downloads" else "Couldn't save $filename"
                 Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
             }
         }
