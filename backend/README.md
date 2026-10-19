@@ -145,6 +145,7 @@ only ever talks to this origin.
 | POST   | `/api/transactions/{id}/convert-to-reserves` | convert eligible normal cash income into reserve allocations |
 | GET    | `/api/transactions/export?from=YYYY-MM-DD&to=YYYY-MM-DD` | download CSV (max 6-month range; settlements omitted) |
 | POST   | `/api/transactions/import` | bulk-create from validated rows (max 2000; settlements rejected) |
+| GET    | `/api/transactions/search?q=&limit=&cursor=&sort=` | fuzzy search transaction names across all months (see § Universal transaction search) |
 | GET    | `/api/transaction-names/suggestions?section=&q=&limit=` | ranked, typo-tolerant transaction-name autocomplete |
 | GET    | `/api/sections/{section}/open-credits?exclude={id}` | settlement picker candidates |
 | GET    | `/api/daily-suggestions` | ghost-autocomplete categories |
