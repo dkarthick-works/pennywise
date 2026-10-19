@@ -5,10 +5,12 @@ in `../backend/`; auth is proxied through that backend to Goauth.
 
 ## Running locally
 
-Start the API first (see `../backend/README.md`), then:
+Start the API first (see [backend setup](../backend/README.md#running)). Use Node
+22.13+ on the 22.x line, matching the production Node 22 build. From the repo root:
 
 ```bash
-npm install
+cd frontend
+npm ci
 npm run dev          # http://localhost:5173
 ```
 
@@ -25,6 +27,8 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/record/entry` | Quick add | Manual cross-section entry plus AI language parsing; section/kind cycle chips, sticky date, visit session log |
 | `/dashboard` | Dashboard | Month/year charts, hero cards, category-group spend |
 | `/transactions/search` | Search | Fuzzy name search across all months; cursor-paginated results |
+| `/dashboard/cash-flow?month=YYYY-MM` | Cash Flow Transactions | Cash out, balance, free money and current-month event suggestions |
+| `/dashboard/groups/:groupId/compare?to=&range=` | Group comparison | 3/6/12-month history and contributions |
 | `/dashboard/credits?month=&view=calendar\|billing` | Credit transactions | Drill-down from the Credit Card Usage hero card; month + view carried in the URL |
 | `/dashboard/groups/:groupId` | Category group | Drill-down from a category-group spend card |
 | `/reserves?reserve=&year=` | Reserves | Ledger workspace with reserve navigation, selected-reserve actions, and year-filtered activity |
@@ -37,7 +41,7 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/chits/:id/installments/new` | Add installment | Record a chit payment |
 | `/events` | Events | Standalone plans, status filtering, paginated list |
 | `/events/new` | Create event | Optional date, estimates, incurred costs |
-| `/events/:id` | Event detail | Costs, lifecycle, duplication, soft deletion |
+| `/events/:id` | Event detail | Costs, lifecycle, duplication, explicit cash-transaction conversion and deletion choices |
 | `/events/:id/edit` | Edit event | Atomic item/metadata edits with version conflict handling |
 | `/insights` | Insights | Emergency fund targets (from `GET /api/insights`) |
 | `/categories` | Map Categories | Assign transaction labels to high-level groups |
@@ -45,7 +49,7 @@ Production builds are embedded into the Go binary (`Dockerfile` multi-stage buil
 | `/settings` | Settings | Budgets, templates, credit card controls |
 | `/profile` | Profile | Display name and email |
 | `/login` | Auth | Sign up / log in (password field has show/hide toggle) |
-| `/forgot-password` | Forgot password | Request a reset link by email (always shows the same success copy — anti-enumeration). The emailed link goes straight to Goauth's own domain, not back into Pennywise — the reset form itself is served entirely by Goauth. |
+| `/forgot-password` | Forgot password | Request a reset link by email (always shows the same success copy — anti-enumeration). Reset email/link hosting is an external Goauth integration requirement, not a reset-form implementation in this SPA. |
 
 Unknown authenticated paths fall back to `/record`.
 
@@ -56,8 +60,12 @@ own list/create/detail/edit routes; the default landing page remains Record Expe
 The list is independent of the selected transaction month. Status and pagination
 are kept in the URL; links back from detail retain that list context.
 
-- Expected and actual costs remain independent of Transactions. Actual means
-  cumulative incurred cost, including unpaid bills. The UI explains this boundary.
+- Ordinary planning edits do not create Transactions. Actual means cumulative
+  incurred cost, including unpaid bills. Explicit **Convert to Transaction** on a
+  completed event creates one normal cash expense for its actual total, named after
+  the event, in the chosen expense section/date. It affects normal analytics and
+  sets the event target date. Do not also record the same payment manually.
+  Conversion is a linked snapshot, not ongoing synchronization of item costs.
 - Empty plans and partial estimates can be saved. Line items support add/remove and
   keyboard-friendly move up/down controls. Removing saved items requires confirmation.
 - Blank costs mean null/not entered; explicit zero is preserved, with paise formatting
@@ -65,7 +73,9 @@ are kept in the URL; links back from detail retain that list context.
   are labelled Last saved totals and update on Save, not while typing.
 - Planned/In progress/Completed/Cancelled transitions are explicit. Complete uses
   the backend's `can_complete`; an event needs items and actual costs for every item.
-  All states remain editable. No variance calculations, allocations, or payments.
+  All states remain editable. Saved totals drive under/over/on-budget comparisons,
+  variance and budget-use bars; percentages require positive expected totals. These
+  comparisons do not allocate money or execute payments.
 - Full PUT saves preserve item IDs and the loaded version. Background refetches do
   not overwrite an edit draft. A 409 conflict keeps the draft and requires explicit
   discard/reload rather than automatic merging or blind retries.
@@ -73,7 +83,9 @@ are kept in the URL; links back from detail retain that list context.
   existing declarative router is unchanged: SPA browser-history Back/Forward is
   not intercepted. Do not rely on it to preserve an unsaved draft.
 - Duplication calls the server's copy endpoint; defaults reset date/actuals/status.
-  Delete sends a quoted `If-Match` version and soft-deletes after confirmation. No
+  Delete sends a quoted `If-Match` version and soft-deletes after confirmation.
+  Converted events offer **Delete event, keep transaction** or **Delete event and
+  transaction**; the second choice also removes the normal cash expense. No
   restore/Undo is offered. Create/copy requests do not automatically retry after a
   network failure; users are warned to check the list before retrying.
 
@@ -85,8 +97,10 @@ Historical/future views hide the section. Pagination is server-side and failures
 contained within the suggestions section.
 
 `src/api/events.ts` preserves HTTP status for 404/409 handling. `useEvents` centralizes
-mutations and cache updates. Event writes refresh only Events/suggestions; transaction
-and budget changes also invalidate suggestions (never the reverse financial effect).
+mutations and cache updates. Ordinary event CRUD refreshes Events/suggestions;
+conversion also invalidates its transaction month, and deletion of a linked
+transaction invalidates broader transaction caches. Transaction and budget changes
+also invalidate suggestions.
 Styles are scoped in `components/events/events.css`. The responsive list uses a shared
 card grid at desktop and mobile sizes so there are no duplicate accessible entries.
 
@@ -140,8 +154,9 @@ independently to statement-cycle and calendar-month totals.
 
 Below the hero cards, a **Daily Spend by Day** bar chart shows **Daily**
 section incurred spend (`cash` + `credit`) for each calendar day in the
-selected month. Data comes from the same month transaction fetch as the Record
-page (`GET /api/transactions?month=`); the chart is computed client-side in
+selected month. Dashboard uses `GET /api/transactions?month=`; Record initially
+loads rows through `POST /api/months/{month}/open`, which can seed configured
+templates. The chart is computed client-side in
 `src/lib/txns.ts` (`dailySpendByDay`, `dailySpendAverage`) and rendered with
 `DayBars` in `src/components/charts/Charts.tsx`.
 
@@ -149,8 +164,8 @@ Every day in the month appears on the axis — days with no matching rows show
 ₹0. Future-dated transactions in the selected month are included. The card
 header shows the month total and an average rupees-per-day figure: for the
 **current** month the average is through today ("Avg · …/day · so far"); for
-past or future months it uses the full month. Loading, error/retry, and empty
-month states mirror the hero cards.
+past or future months it uses the full month. The chart has its own loading,
+error/retry and empty-month states; not all hero cards share that handling.
 
 ### Category group spend
 
@@ -162,10 +177,11 @@ groups to show; each card links to `/dashboard/groups/:groupId`. The section has
 
 ### Drill-down pages
 
-Both drill-down routes reuse `TransactionListTable` (`src/components/dashboard/TransactionListTable.tsx`).
+Transaction-list drill-downs reuse `TransactionListTable` (`src/components/dashboard/TransactionListTable.tsx`).
 
 | Route | Data source | Notes |
 |-------|-------------|-------|
+| `/dashboard/cash-flow?month=` | `GET /api/transactions?month=` plus `GET /api/dashboard/monthly` | Positive cash/settlement expense rows grouped by section |
 | `/dashboard/credits?month=&view=` | `GET /api/dashboard/credit-transactions?month=&view=` | Kind column hidden; month + view read from the URL |
 | `/dashboard/groups/:groupId?month=` | `GET /api/category-groups/{id}/transactions?month=` | Shows date, category, section, kind, amount; links to comparison |
 | `/dashboard/groups/:groupId/compare?to=&range=` | `GET /api/dashboard/group-spend/history` | 3/6/12-month chart, statistics, mappings, and category contributions |
@@ -187,15 +203,24 @@ that month's transaction list rather than re-anchoring the analytics. A group
 selector switches directly to another group's comparison while preserving the
 anchor and range.
 
+Cash Flow is outgoing cash plus settlements, not net cash flow. Balance remaining
+is income minus cash spending. Free money further subtracts the signed remaining
+monthly section budgets (budget minus incurred cash + credit); these remainders
+are not clamped at zero. The cash-flow page shows these totals and expandable
+section-budget details.
+
 ### Yearly view
 
 Client-side rollups from `GET /api/transactions?year=`: total income/spend,
-per-month bars, top categories, and section split donut.
+per-month bars, top categories, and section split donut. Expense totals exclude
+income, but the current yearly top-category list includes all non-settlement rows,
+including income; do not treat that list as expense-only.
 
 ## Record page
 
-The primary workflow surface. Three section tiles — **Essential**, **Flexible**,
-and **Daily / Running** — each with an editable transaction table for the
+The primary workflow surface. The grid includes **Quick add**, **Income**, and
+expense tiles **Bare Minimum**, **Subscriptions**, and **Daily / Running**.
+Section tiles open editable transaction tables for the
 selected month. Tile budget amounts (and the detail-header editor) use
 `GET`/`PUT /api/budgets/{month}` for the shell month and save on blur or Enter.
 On the tile grid (not inside a section), a **Dashboard** button
@@ -367,8 +392,8 @@ Nav item: **Settings** (`/settings`).
 | Section | Anchor | Notes |
 |---------|--------|-------|
 | Budgets | — | Per-month Essential / Flexible / Daily amounts for the shell month (`GET`/`PUT /api/budgets/{month}`). Saves on blur or Enter. Missing months show zeros only after a successful GET. |
-| Templates | — | Ordered category lists per section |
-| Preferences | — | Income, currency, theme |
+| Templates | — | Ordered labels for Essential and Flexible |
+| Preferences | — | Stored currency/theme preferences; no income preference. Money helpers remain INR-based; no application-wide theme behavior or FX conversion is implied. |
 | Credit card controls | `#credit-billing-cycle` | Statement closing day + spending threshold |
 
 **Credit card controls** groups two explicit Save/Clear settings (never
@@ -513,9 +538,11 @@ React Query keys are prefixed with `["categories", …]`; mutations invalidate t
 
 ## API client
 
-- `src/api/client.ts` — axios instance, Bearer token from `sessionStorage`,
+- `src/api/client.ts` — axios instance, Bearer token from tab-scoped `sessionStorage`,
   silent refresh on 401 via `/api/auth/refresh`.
-- `src/api/ledger.ts` — typed wrappers for all ledger endpoints.
+- `src/api/ledger.ts` — core transaction, dashboard, settings, category, month,
+  profile and insights wrappers.
+- `src/api/lents.ts`, `chits.ts`, `reserves.ts`, `events.ts` — dedicated domain APIs.
 - `src/api/auth.ts` — signup, login, logout, forgotPassword.
 
 ## Testing
@@ -528,12 +555,25 @@ npm test              # vitest run (from frontend/)
 
 Config: `vitest.config.ts`; setup: `src/test/setup.ts` (jest-dom matchers +
 RTL cleanup). Tests live beside source as `*.test.ts` / `*.test.tsx`. Playwright
-is installed for e2e but is separate from `npm test`.
+is installed for e2e but is separate from `npm test`. From `frontend/`:
+
+```bash
+npm run build
+npx playwright install chromium   # browser/OS dependencies must be available
+npm run test:e2e
+```
+
+Playwright starts Vite preview and mocks API responses; it does not verify a live
+Goauth/Postgres deployment. `npm run lint` runs ESLint; `npm run preview` serves
+the build, not the backend, and has no configured development API proxy. For
+Node-version troubleshooting, see [configuration](../docs/configuration.md).
 
 ## PWA
 
 `vite-plugin-pwa` precaches the app shell. Client-side routes fall back to
 `index.html`; `/api/*` is excluded from the service worker navigate fallback.
+There is no offline financial database, API cache or queued-write replay. Financial
+reads/writes still require connectivity; offline support is the cached shell only.
 
 In production the Go server serves the embedded SPA with explicit cache headers:
 `index.html`, `sw.js`, and `registerSW.js` are sent with `Cache-Control: no-cache`
@@ -548,10 +588,10 @@ logging the user out unnecessarily:
 
 | Mechanism | Where | Behavior |
 |-----------|-------|----------|
-| Access token | `sessionStorage` (`pennywise_access_token`) | Attached as Bearer on API calls |
+| Access token | Tab-scoped `sessionStorage` (`pennywise_access_token`) | Attached as Bearer on API calls; not stored in persistent `localStorage` |
 | Refresh cookie | HttpOnly at `/api/auth/refresh` | Rotated via `withCredentials: true` |
-| Coordinated refresh | `src/api/client.ts` | Single in-flight refresh; `BroadcastChannel` + `navigator.locks` dedupe across tabs |
-| Retryable failures | `AuthContext.tsx` + `App.tsx` | Network/5xx refresh errors show **Connection unavailable** with **Retry**; token kept |
+| Coordinated refresh | `src/api/client.ts` | Single in-flight refresh per context; cross-tab coordination uses `BroadcastChannel` and `navigator.locks` when available |
+| Retryable failures | `AuthContext.tsx` + `App.tsx` | Startup/retry hydration errors show **Connection unavailable** with **Retry**; established-page failures remain request/page-level, not a universal screen |
 | Terminal logout | `TerminalAuthError` | Refresh `400`/`401`/`403` clears token and redirects to login |
 | Tab focus | No unconditional auth requests | Returning to a tab does not refresh auth or reload `/api/me`; stale page queries may refetch normally |
 | Cross-tab token rotation | `auth:token` listener | Updates a healthy session's token without rehydrating the cached profile or unmounting active forms |
