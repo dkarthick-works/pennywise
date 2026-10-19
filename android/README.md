@@ -16,4 +16,33 @@ WebView wrapper around the web app served by the Go backend in `../backend`.
 Debug APKs are always named `pennywise-debug.apk`, generated at
 `app/build/outputs/apk/debug/pennywise-debug.apk` inside `android/`.
 
+## Release build (use this on your own phone)
+
+Debug builds are inspectable over USB and signed with a per-machine key. Release builds
+are not inspectable and use one permanent key, so updates from any machine install over
+each other without logging you out.
+
+One-time setup, outside the repo (back up the `.jks` and its password):
+
+```sh
+mkdir -p ~/keys && keytool -genkeypair -v -keystore ~/keys/pennywise-release.jks \
+  -alias pennywise -keyalg RSA -keysize 4096 -validity 10000
+```
+
+Then add to `~/.gradle/gradle.properties`:
+
+```properties
+pennywiseStoreFile=/absolute/path/to/pennywise-release.jks
+pennywiseStorePassword=...
+pennywiseKeyAlias=pennywise
+pennywiseKeyPassword=...
+```
+
+```sh
+./gradlew installRelease   # → app/build/outputs/apk/release/pennywise-release.apk
+```
+
+Bump `versionCode` in `app/build.gradle.kts` for each release. Switching an installed
+debug app to a release build needs one uninstall, since the signing key changes.
+
 Open `android/` (not the repo root) in Android Studio.

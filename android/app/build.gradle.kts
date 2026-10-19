@@ -23,6 +23,23 @@ android {
         )
     }
 
+    // One permanent key for every machine, so updates install over each other and keep
+    // the login cookie. Key and passwords live outside the repo, in ~/.gradle/gradle.properties.
+    signingConfigs {
+        create("release") {
+            storeFile = findProperty("pennywiseStoreFile")?.let { file(it) }
+            storePassword = findProperty("pennywiseStorePassword") as String?
+            keyAlias = findProperty("pennywiseKeyAlias") as String?
+            keyPassword = findProperty("pennywiseKeyPassword") as String?
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
     buildFeatures {
         buildConfig = true
     }
