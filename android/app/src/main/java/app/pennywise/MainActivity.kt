@@ -12,6 +12,7 @@ import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
@@ -27,6 +28,7 @@ import androidx.core.view.WindowInsetsCompat
 class MainActivity : ComponentActivity() {
     private lateinit var web: WebView
     private var pendingFiles: ValueCallback<Array<Uri>>? = null
+    private val appHost = Uri.parse(BuildConfig.APP_URL).host
 
     private val pickFile = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         // Must always answer, even on cancel, or the <input type="file"> stops responding.
@@ -42,7 +44,16 @@ class MainActivity : ComponentActivity() {
         web = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true // access token is in sessionStorage
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                // Only our own site loads in-app, so other sites never get the JS bridge.
+                // Everything else (other sites, mailto:, tel:) goes to the matching app.
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                    // Embedded frames (e.g. third-party widgets) must load in place, not open a browser.
+                    if (!request.isForMainFrame || request.url.host == appHost) return false
+                    runCatching { startActivity(Intent(Intent.ACTION_VIEW, request.url)) }
+                    return true
+                }
+            }
             webChromeClient = object : WebChromeClient() {
                 override fun onShowFileChooser(
                     view: WebView,
