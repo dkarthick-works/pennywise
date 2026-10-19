@@ -9,7 +9,9 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Base64
 import android.webkit.CookieManager
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -51,6 +53,18 @@ class MainActivity : ComponentActivity() {
                     // Embedded frames (e.g. third-party widgets) must load in place, not open a browser.
                     if (!request.isForMainFrame || request.url.host == appHost) return false
                     runCatching { startActivity(Intent(Intent.ACTION_VIEW, request.url)) }
+                    return true
+                }
+
+                // The renderer crashed or was killed for memory. A dead WebView can't be reused
+                // or even redrawn, so drop it and start a fresh screen instead of crashing.
+                // ponytail: a page that crashes the renderer on every load would restart forever;
+                // add a retry limit if that ever happens.
+                override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                    (view.parent as ViewGroup).removeView(view)
+                    view.destroy()
+                    finish()
+                    startActivity(intent)
                     return true
                 }
             }
