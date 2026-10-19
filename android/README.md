@@ -11,7 +11,13 @@ WebView wrapper around the web app served by the Go backend in `../backend`.
 ./gradlew installDebug -PappUrl=http://10.0.2.2:8080
 # Local Vite dev server instead:
 ./gradlew installDebug -PappUrl=http://10.0.2.2:5173
+# Physical phone over USB (10.0.2.2 only exists on the emulator):
+adb reverse tcp:8080 tcp:8080
+./gradlew installDebug -PappUrl=http://localhost:8080
 ```
+
+Plain `http://` is allowed only in debug builds, and only for `10.0.2.2` and `localhost`
+(`app/src/debug/res/xml/network_security_config.xml`). Release builds are HTTPS only.
 
 Debug APKs are always named `pennywise-debug.apk`, generated at
 `app/build/outputs/apk/debug/pennywise-debug.apk` inside `android/`.

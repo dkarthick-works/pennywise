@@ -1,7 +1,3 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Cleartext only for the emulator's host loopback (local Go backend). -->
-<network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">10.0.2.2</domain>
-    </domain-config>
-</network-security-config>
+<!-- Release: HTTPS only. Debug builds override this in src/debug/ to allow local http. -->
+<network-security-config />
