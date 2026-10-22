@@ -1,10 +1,15 @@
 # Pennywise
 
-A calm single-user expense tracker that separates **cash**, **credit**, and **settlements** so
+A personal expense tracker that separates **cash**, **credit**, and **settlements** so
 incurred spend and cash-out timing never double-count. The SPA is **Pennywise**; the Go service
 is historically named **Ledger**.
 
 ## Architecture
+
+Start with the [application overview and backend diagram](docs/architecture.md);
+the canonical [Mermaid source](docs/architecture.mmd) is versioned alongside it.
+For runtime defaults, database bootstrap, tests and troubleshooting, see
+[configuration and safe local operation](docs/configuration.md).
 
 | Layer | Stack | Documentation |
 |-------|-------|---------------|
@@ -17,32 +22,48 @@ development the frontend runs on Vite and proxies `/api` to the backend.
 
 ## Local development
 
+Prerequisites: Go 1.26.3 or a compatible newer toolchain, Node 22.13+ on the
+22.x line, npm, Make and Docker Compose. Use valid local database credentials in
+`backend/.env` (the example contains a placeholder password). Do not use an
+existing personal/production database to try these commands.
+
+Terminal 1, **starting at the repository root**:
+
 ```bash
-# 1. Postgres (from backend/)
-cd backend && make db-up
+cd backend
+cp .env.example .env
+# Edit .env: use the dev Compose database credentials and a JWT_SECRET matching Goauth.
+make db-up
+make run                    # :8080, applies migrations before serving
+```
 
-# 2. API — copy .env.example → .env, set JWT_SECRET to match Goauth
-make run                    # :8080, migrations on boot
+Terminal 2, **starting at the repository root**:
 
-# 3. SPA (from frontend/, separate terminal)
-cd frontend && npm install && npm run dev   # :5173
+```bash
+cd frontend
+npm ci
+npm run dev                 # :5173; /api proxies to :8080
 ```
 
 Sign-up and login require a running **Goauth** instance at `GOAUTH_BASE_URL` (default
 `http://localhost:8090`). To exercise the API without Goauth, mint a dev token — see
 [backend/README.md § Trying it without Goauth](backend/README.md).
 
-On first authenticated request a new user is auto-provisioned with default settings and
-templates; set `SEED_DEMO_DATA=true` to plant the demo dataset (documented in
-[backend/README.md](backend/README.md)).
+On first authenticated request, the backend ensures the user, default settings
+and General Reserve exist. It does not insert template rows or demo transactions;
+`SEED_DEMO_DATA` is not a supported server setting. Configure templates through
+the app. See [database and provisioning details](docs/configuration.md).
 
 ## Production
 
 Copy [`.env.example`](.env.example) to `.env`. Key variables: `DATABASE_URL`, `JWT_SECRET`
 (must match Goauth), `GOAUTH_BASE_URL`, `CORS_ORIGINS`.
 
-The server connects to the URL you provide, **creates a `pennywise` database** if it does not
-exist, then applies embedded migrations on every boot.
+The server always uses the **`pennywise` database**. When the supplied URL targets
+another existing database, it bootstraps `pennywise` there if needed (requiring
+creation privileges), then switches to it. A URL already targeting `pennywise`
+skips creation and requires that database to exist. Pending embedded migrations
+run on every boot; inspect them and back up data before deploying.
 
 ```bash
 docker compose up -d --build    # serves on host :8084 → container :8080
@@ -57,7 +78,8 @@ Health check: `GET /health` (also used by the container `HEALTHCHECK`).
 
 ```
 backend/              Go API, migrations, sqlc queries, dev Postgres compose
-frontend/             React SPA (Record, Dashboard, Search, Lent, Chits, Insights, Categories, Settings, Profile)
+frontend/             React SPA (Record, Dashboard, Search, Events, Reserves, Lent, Chits, …)
+docs/                 Architecture overview/diagram and configuration guide
 auth-api-spec.json    Goauth OpenAPI spec (signup, login, refresh, …)
 Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine runtime
 ```
@@ -84,6 +106,12 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
 - **Dashboard daily spend chart** — Daily-section incurred spend by calendar day with month total and
   average-per-day header (client-side rollups)
   ([frontend/README.md § Dashboard page](frontend/README.md))
+- **Events** — planning with item estimates/actuals and optimistic concurrency;
+  explicit conversion can create a linked normal transaction
+  ([frontend workflow](frontend/README.md#events), [backend API](backend/README.md#events-apievents))
+- **Reserves** — entry-derived balances and operation history; reserve-only
+  operations stay separate, while income-transfer/funded-expense operations create
+  protected normal transactions ([architecture boundaries](docs/architecture.md#financial-boundaries))
 - **Lent tracker** — standalone ledger for money lent to others with repayment history
   ([frontend/README.md § Lent page](frontend/README.md),
   [backend/README.md § Lents](backend/README.md))
@@ -105,6 +133,6 @@ Dockerfile            Multi-stage: npm build → go build (prod tag) → alpine 
   [backend/README.md § Chit JSON transfer](backend/README.md))
 - **Insights** — emergency fund targets from essential spend lookback
   ([backend/README.md § Insights](backend/README.md))
-- **PWA** — installable, offline-capable app shell with resilient multi-tab sessions and safe
-  cache headers on deploy
+- **PWA** — installable, precached app shell with resilient multi-tab sessions and safe
+  cache headers on deploy; API access and financial writes still require a network
   ([frontend/README.md § PWA](frontend/README.md))
