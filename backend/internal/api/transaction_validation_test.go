@@ -38,6 +38,36 @@ func TestDecimalToNumeric(t *testing.T) {
 	}
 }
 
+func TestValidateTransactionValuesRejectsNegativeAmount(t *testing.T) {
+	section, category, date, kind := "daily", "Cafe", "2026-08-26", "cash"
+	amount := money.Number("-50")
+	issues := validateTransactionValues(transactionValues{
+		Section: &section, Category: &category, Amount: &amount, Date: &date, Kind: &kind,
+	}, true, true)
+	if len(issues) != 1 || issues[0].Field != "amount" || issues[0].Code != "invalid_amount" || issues[0].Message != "Amount must be zero or greater" {
+		t.Fatalf("issues = %#v", issues)
+	}
+
+	// Zero is a real amount: template rows and unpaid lines are stored as 0.
+	// Income and settlement use a positive amount, not a negative one.
+	amount = money.Number("0")
+	issues = validateTransactionValues(transactionValues{
+		Section: &section, Category: &category, Amount: &amount, Date: &date, Kind: &kind,
+	}, true, true)
+	if len(issues) != 0 {
+		t.Fatalf("zero amount issues = %#v", issues)
+	}
+
+	kind = "settlement"
+	amount = money.Number("25")
+	issues = validateTransactionValues(transactionValues{
+		Section: &section, Category: &category, Amount: &amount, Date: &date, Kind: &kind,
+	}, true, true)
+	if len(issues) != 0 {
+		t.Fatalf("positive settlement issues = %#v", issues)
+	}
+}
+
 func TestValidateTransactionValues(t *testing.T) {
 	section, category, amount, date, kind := "income", " Salary ", money.Number("10.00"), "2026-08-26", "credit"
 	issues := validateTransactionValues(transactionValues{

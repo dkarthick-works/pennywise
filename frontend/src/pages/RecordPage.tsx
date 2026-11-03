@@ -303,12 +303,14 @@ function DraftRow({ section, month, placeholder, add, onClose }: {
   const [amount, setAmount] = useState<number | null>(null);
   const [name, setName] = useState("");
   const submitted = useRef(false);
+  const amountRejectedRef = useRef(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const [amountKey, setAmountKey] = useState(0);
 
   // `amt` is passed on Enter: the amount input reports its parsed value in the
   // same tick, before `amount` state has updated.
   function submit(v: string, amt: number | null = amount) {
+    if (amountRejectedRef.current || (amt != null && amt < 0)) return;
     const category = v.trim();
     if (!category || submitted.current) return;
     submitted.current = true;
@@ -319,6 +321,7 @@ function DraftRow({ section, month, placeholder, add, onClose }: {
         onSuccess: () => {
           setName("");
           setAmount(null);
+          amountRejectedRef.current = false;
           setAmountKey((k) => k + 1); // remount so the amount input's local text clears
           submitted.current = false;
           requestAnimationFrame(() => {
@@ -355,7 +358,7 @@ function DraftRow({ section, month, placeholder, add, onClose }: {
           }}
         />
       </td>
-      <td><AmountInput key={amountKey} value={amount} onChange={(v) => setAmount(v)} onEnterCommit={(parsed) => submit(name, parsed)} /></td>
+      <td><AmountInput key={amountKey} value={amount} onRejected={(rejected) => { amountRejectedRef.current = rejected; }} onChange={(v) => setAmount(v)} onEnterCommit={(parsed) => submit(name, parsed)} /></td>
       <td className="muted" style={{ fontSize: 12.5 }}>{add.isPending ? "Saving…" : "Enter a name to save"}</td>
       <td><button className="x-btn" onClick={onClose} aria-label="Discard"><IconX size={15} /></button></td>
     </tr>
@@ -625,9 +628,11 @@ function DailyTile({ rows, section, month, settledSet }: {
   const blank = { date: defaultDraftDate(month, rows.map((r) => r.date)), category: "", amount: 0 };
   const [draft, setDraft] = useState(blank);
   const categoryCellRef = useRef<HTMLTableCellElement>(null);
+  const amountRejectedRef = useRef(false);
   const [amountKey, setAmountKey] = useState(0);
   // After a save, put the cursor back on the name field for rapid entry.
   const resetDraft = () => {
+    amountRejectedRef.current = false;
     setDraft((d) => ({ date: d.date, category: "", amount: 0 }));
     setAmountKey((k) => k + 1); // remount the amount input so its local text clears
     requestAnimationFrame(() => categoryCellRef.current?.querySelector("input")?.focus());
@@ -661,10 +666,14 @@ function DailyTile({ rows, section, month, settledSet }: {
     return groups;
   }, [visible]);
 
-  function commit() {
-    if (!draft.category.trim() || !draft.amount) return;
+  function commit(amt?: number) {
+    // Callers may be click/submit handlers, which pass an event or the category
+    // text. Only an explicit number is the amount from the field.
+    const amount = typeof amt === "number" ? amt : draft.amount;
+    if (amountRejectedRef.current || amount < 0) return;
+    if (!draft.category.trim() || !(amount > 0)) return;
     add.mutate(
-      { section, category: draft.category.trim(), amount: draft.amount, date: draft.date || `${month}-01`, kind: "cash" },
+      { section, category: draft.category.trim(), amount, date: draft.date || `${month}-01`, kind: "cash" },
       { onSuccess: resetDraft }
     );
   }
@@ -693,13 +702,12 @@ function DailyTile({ rows, section, month, settledSet }: {
                   onSubmit={() => commit()}
                 />
               </td>
-              <td><AmountInput key={amountKey} value={draft.amount} onChange={(v) => setDraft((d) => ({ ...d, amount: v ?? 0 }))} placeholder="0"
+              <td><AmountInput key={amountKey} value={draft.amount} placeholder="0"
+                onRejected={(rejected) => { amountRejectedRef.current = rejected; }}
+                onChange={(v) => setDraft((d) => ({ ...d, amount: v ?? 0 }))}
                 onEnterCommit={(parsed) => {
-                  if (!draft.category.trim() || !parsed) return;
-                  add.mutate(
-                    { section, category: draft.category.trim(), amount: parsed, date: draft.date || `${month}-01`, kind: "cash" },
-                    { onSuccess: resetDraft }
-                  );
+                  if (parsed == null || !(parsed > 0)) return;
+                  commit(parsed);
                 }}
               /></td>
               <td><span className="muted" style={{ fontSize: 12 }}>cash</span></td>
@@ -707,7 +715,7 @@ function DailyTile({ rows, section, month, settledSet }: {
                 <button
                   className="btn btn-primary"
                   style={{ width: 34, height: 30, padding: 0, borderRadius: 8 }}
-                  onClick={commit}
+                  onClick={() => commit()}
                   aria-label="Add entry"
                 >
                   <IconPlus size={16} />
@@ -809,18 +817,24 @@ function IncomeTile({ rows, month, onCopyPendingChange }: {
   const sentToReserves = (activity.data ?? []).filter((item) => item.nature === "sent_to_reserves");
 
   const sourceCellRef = useRef<HTMLTableCellElement>(null);
+  const amountRejectedRef = useRef(false);
   const [amountKey, setAmountKey] = useState(0);
   // After a save, put the cursor back on the source field for rapid entry.
   const resetDraft = () => {
+    amountRejectedRef.current = false;
     setDraft((d) => ({ date: d.date, category: "", amount: 0 }));
     setAmountKey((k) => k + 1); // remount the amount input so its local text clears
     requestAnimationFrame(() => sourceCellRef.current?.querySelector("input")?.focus());
   };
 
-  function commit() {
-    if (!draft.category.trim() || !draft.amount) return;
+  function commit(amt?: number) {
+    // Callers may be click/submit handlers, which pass an event or the category
+    // text. Only an explicit number is the amount from the field.
+    const amount = typeof amt === "number" ? amt : draft.amount;
+    if (amountRejectedRef.current || amount < 0) return;
+    if (!draft.category.trim() || !(amount > 0)) return;
     add.mutate(
-      { section: "income", category: draft.category.trim(), amount: draft.amount, date: draft.date || `${month}-01`, kind: "cash" },
+      { section: "income", category: draft.category.trim(), amount, date: draft.date || `${month}-01`, kind: "cash" },
       { onSuccess: resetDraft }
     );
   }
@@ -849,12 +863,15 @@ function IncomeTile({ rows, month, onCopyPendingChange }: {
                 <tbody>
                   <tr style={{ background: "oklch(0.955 0.035 155 / 0.4)" }}>
                     <td><DateCell value={draft.date} onChange={(v) => setDraft((d) => ({ ...d, date: v }))} /></td>
-                    <td ref={sourceCellRef}><CategoryInput value={draft.category} section="income" placeholder="e.g. Salary, Freelance, Dividend" onChange={(v) => setDraft((d) => ({ ...d, category: v }))} onSubmit={commit} /></td>
-                    <td><AmountInput key={amountKey} value={draft.amount} onChange={(v) => setDraft((d) => ({ ...d, amount: v ?? 0 }))} placeholder="0" onEnterCommit={(parsed) => {
-                      if (!draft.category.trim() || !parsed) return;
-                      add.mutate({ section: "income", category: draft.category.trim(), amount: parsed, date: draft.date || `${month}-01`, kind: "cash" }, { onSuccess: resetDraft });
-                    }} /></td>
-                    <td><button className="btn btn-primary" style={{ width: 34, height: 30, padding: 0, borderRadius: 8, background: "var(--pos)" }} onClick={commit} aria-label="Add income"><IconPlus size={16} /></button></td>
+                    <td ref={sourceCellRef}><CategoryInput value={draft.category} section="income" placeholder="e.g. Salary, Freelance, Dividend" onChange={(v) => setDraft((d) => ({ ...d, category: v }))} onSubmit={() => commit()} /></td>
+                    <td><AmountInput key={amountKey} value={draft.amount} placeholder="0"
+                      onRejected={(rejected) => { amountRejectedRef.current = rejected; }}
+                      onChange={(v) => setDraft((d) => ({ ...d, amount: v ?? 0 }))}
+                      onEnterCommit={(parsed) => {
+                        if (parsed == null || !(parsed > 0)) return;
+                        commit(parsed);
+                      }} /></td>
+                    <td><button className="btn btn-primary" style={{ width: 34, height: 30, padding: 0, borderRadius: 8, background: "var(--pos)" }} onClick={() => commit()} aria-label="Add income"><IconPlus size={16} /></button></td>
                   </tr>
                   {sorted.map((r) => {
                     const item = activityByTransaction.get(r.id);

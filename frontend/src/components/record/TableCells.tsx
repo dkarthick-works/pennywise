@@ -10,7 +10,13 @@ import {
   normalizeTransactionNameQuery,
   transactionNameSuggestionKeys,
 } from "../../lib/transactionNameSuggestions";
-import { formatIndianAmount, parseIndianAmount } from "../../lib/parseAmount";
+import {
+  formatIndianAmount,
+  isNegativeAmount,
+  parseIndianAmount,
+  POSITIVE_AMOUNT_MESSAGE,
+  type ParsedAmount,
+} from "../../lib/parseAmount";
 import type {
   TransactionNameSuggestion,
   TransactionNameSuggestionSection,
@@ -23,62 +29,104 @@ export function AmountInput({
   value,
   onChange,
   onEnterCommit,
+  onRejected,
   placeholder = "—",
   align = "right",
   /** When true, parse and report to parent on every keystroke (form-style entry). */
   immediate = false,
+  /** Hand the negative number to the parent, which already shows its own message. */
+  reportNegative = false,
 }: {
   value: number | null;
   onChange: (n: number | null, decimalPlaces?: number) => void;
   onEnterCommit?: (parsed: number | null, decimalPlaces: number) => void;
+  /** Tracks whether the current draft text is negative. Sync, so a later save can refuse it. */
+  onRejected?: (rejected: boolean) => void;
   placeholder?: string;
   align?: string;
   immediate?: boolean;
+  reportNegative?: boolean;
 }) {
   const fmt = (n: number | null) => (n ? formatIndianAmount(n) : "");
   const [local, setLocal] = useState(fmt(value));
   const [focused, setFocused] = useState(false);
+  const [error, setError] = useState("");
+  const errorId = `${useId().replace(/:/g, "")}-amount-error`;
 
   useEffect(() => {
-    if (!focused) setLocal(fmt(value));
-  }, [value, focused]);
+    // Keep a rejected draft on screen. Replacing it with the saved value would
+    // hide the minus sign the user just typed.
+    if (!focused && !error) setLocal(fmt(value));
+  }, [value, focused, error]);
 
-  function commit() {
-    setFocused(false);
-    const parsed = parseIndianAmount(local);
+  function reject(parsed: ParsedAmount, commit: boolean) {
+    if (reportNegative) setError("");
+    else setError(POSITIVE_AMOUNT_MESSAGE);
+    onRejected?.(true);
+    if (!reportNegative) {
+      if (commit) setFocused(false);
+      return;
+    }
+    onChange(parsed.value, parsed.decimalPlaces);
+    if (commit) {
+      setLocal(fmt(parsed.value));
+      setFocused(false);
+    }
+  }
+
+  function accept(parsed: ParsedAmount, phase: "edit" | "commit" | "enter") {
+    setError("");
+    onRejected?.(false);
+    if (phase === "edit") {
+      if (immediate) onChange(parsed.value, parsed.decimalPlaces);
+      return;
+    }
     onChange(parsed.value, parsed.decimalPlaces);
     setLocal(fmt(parsed.value));
+    setFocused(false);
+    if (phase === "enter") onEnterCommit?.(parsed.value, parsed.decimalPlaces);
+  }
+
+  function apply(raw: string, phase: "edit" | "commit" | "enter") {
+    const parsed = parseIndianAmount(raw);
+    if (isNegativeAmount(parsed)) {
+      reject(parsed, phase !== "edit");
+      if (reportNegative && phase === "enter") onEnterCommit?.(parsed.value, parsed.decimalPlaces);
+      return;
+    }
+    accept(parsed, phase);
   }
 
   return (
-    <input
-      className="cell-input num"
-      inputMode="decimal"
-      style={{ textAlign: align as "left" | "right", minWidth: 110 }}
-      value={local}
-      placeholder={placeholder}
-      onChange={(e) => {
-        const next = e.target.value;
-        setLocal(next);
-        if (immediate) {
-          const parsed = parseIndianAmount(next);
-          onChange(parsed.value, parsed.decimalPlaces);
-        }
-      }}
-      onFocus={() => setFocused(true)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
+    <>
+      <input
+        className="cell-input num"
+        inputMode="decimal"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        style={{ textAlign: align as "left" | "right", minWidth: 110 }}
+        value={local}
+        placeholder={placeholder}
+        onChange={(e) => {
+          const next = e.target.value;
+          setLocal(next);
+          apply(next, "edit");
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => apply(local, "commit")}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
           e.preventDefault();
           e.stopPropagation();
-          const parsed = parseIndianAmount(local);
-          onChange(parsed.value, parsed.decimalPlaces);
-          setLocal(fmt(parsed.value));
-          setFocused(false);
-          onEnterCommit?.(parsed.value, parsed.decimalPlaces);
-        }
-      }}
-    />
+          apply(local, "enter");
+        }}
+      />
+      {error ? (
+        <div id={errorId} style={{ color: "var(--neg)", fontSize: 12, marginTop: 4 }}>
+          {error}
+        </div>
+      ) : null}
+    </>
   );
 }
 

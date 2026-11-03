@@ -397,6 +397,38 @@ describe("RecordEntryPage", () => {
     expect(screen.queryByDisplayValue("Cafe")).not.toBeInTheDocument();
   });
 
+  it("rejects a negative quick-add amount instead of saving the absolute value", async () => {
+    renderEntry();
+    await screen.findByRole("heading", { name: /Quick add/i });
+
+    fireEvent.change(screen.getByPlaceholderText(/Groceries/i), { target: { value: "Cafe" } });
+    const amountInput = screen.getByPlaceholderText("0");
+    fireEvent.focus(amountInput);
+    fireEvent.change(amountInput, { target: { value: "-50" } });
+    fireEvent.keyDown(amountInput, { key: "Enter" });
+
+    expect(await screen.findByText("Amount must be greater than 0")).toBeInTheDocument();
+    expect(mocks.createTxn).not.toHaveBeenCalled();
+    expect((amountInput as HTMLInputElement).value).not.toBe("50");
+    expect((amountInput as HTMLInputElement).value).toMatch(/50/);
+  });
+
+  it("rejects a negative amount edited on a session row", async () => {
+    renderEntry();
+    await screen.findByRole("heading", { name: /Quick add/i });
+    await addTxn("Groceries", "200");
+
+    const sessionTable = screen.getByDisplayValue("Groceries").closest("table")!;
+    const amtInput = within(sessionTable).getByDisplayValue("200");
+    fireEvent.focus(amtInput);
+    fireEvent.change(amtInput, { target: { value: "-50" } });
+    fireEvent.blur(amtInput);
+
+    expect(await screen.findByText("Amount must be greater than 0")).toBeInTheDocument();
+    expect(mocks.updateTxn).not.toHaveBeenCalled();
+    expect((amtInput as HTMLInputElement).value).toBe("-50");
+  });
+
   it("edits amount via blur and calls updateTxn with new amount", async () => {
     renderEntry();
     await screen.findByRole("heading", { name: /Quick add/i });
