@@ -266,6 +266,7 @@ export function AiQuickAdd({
       <AmountInput
         value={row.amount}
         placeholder="0"
+        reportNegative
         onChange={(n, places) =>
           updateRow(row.clientId, { amount: n, amountDecimalPlaces: places ?? 0 }, "amount")
         }

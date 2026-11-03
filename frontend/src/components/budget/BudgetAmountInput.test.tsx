@@ -58,6 +58,19 @@ describe("BudgetAmountInput", () => {
     expect(screen.getByText(/exceeds the maximum/i)).toBeInTheDocument();
   });
 
+  it("rejects a negative amount instead of saving the absolute value", () => {
+    const onCommit = vi.fn();
+    render(<BudgetAmountInput value={15000} onCommit={onCommit} aria-label="Budget" />);
+    const input = screen.getByLabelText("Budget") as HTMLInputElement;
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "-50" } });
+    expect(input.value).toBe("-50");
+    fireEvent.blur(input);
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(screen.getByText("Enter an amount that is zero or greater")).toBeInTheDocument();
+    expect(input.value).toBe("-50");
+  });
+
   it("restores the last confirmed value on Escape", () => {
     const onCommit = vi.fn();
     render(<BudgetAmountInput value={15000} onCommit={onCommit} aria-label="Budget" />);

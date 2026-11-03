@@ -128,6 +128,18 @@ describe("RecordPage overview", () => {
     expect(await screen.findByText(/of ₹15,000/)).toBeInTheDocument();
   });
 
+  it("does not save a negative section budget", async () => {
+    renderRecord();
+    fireEvent.click(await screen.findByText("Daily / Running"));
+    const input = await screen.findByLabelText("Daily / Running section budget");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "-50" } });
+    fireEvent.blur(input);
+    expect(await screen.findByText("Enter an amount that is zero or greater")).toBeInTheDocument();
+    expect(mocks.putMonthlyBudget).not.toHaveBeenCalled();
+    expect((input as HTMLInputElement).value).toBe("-50");
+  });
+
   it("does not enable budget inputs until GET succeeds", async () => {
     mocks.getMonthlyBudget.mockReturnValue(new Promise(() => {}));
     renderRecord();
@@ -159,6 +171,19 @@ describe("RecordPage income activity", () => {
     expect(screen.getByRole("heading", { name: "Sent to reserves" })).toBeInTheDocument();
     expect(screen.getByText(/not included in normal income or Dashboard calculations/i)).toBeInTheDocument();
     expect(await screen.findByText((_, element) => element?.tagName === "LI" && element.textContent === "General Reserve · ₹60,000")).toBeInTheDocument();
+  });
+
+  it("does not create income when the amount is negative", async () => {
+    const user = userEvent.setup();
+    mocks.openMonth.mockResolvedValue({ ...openMonthPayload(), transactions: [normalIncome] });
+    renderRecord();
+    fireEvent.click(await screen.findByText("Income"));
+    await user.type(await screen.findByPlaceholderText("e.g. Salary, Freelance, Dividend"), "Refund");
+    const amount = screen.getByPlaceholderText("0");
+    await user.type(amount, "-50");
+    await user.click(screen.getByRole("button", { name: "Add income" }));
+    expect(await screen.findByText("Amount must be greater than 0")).toBeInTheDocument();
+    expect(mocks.createTxn).not.toHaveBeenCalled();
   });
 
   it("retains normal transaction creation when Normal income is selected", async () => {

@@ -16,6 +16,7 @@ import {
   nextSection,
 } from "../lib/recordLabels";
 import { AmountInput, DateCell, CategoryInput } from "../components/record/TableCells";
+import { POSITIVE_AMOUNT_MESSAGE } from "../lib/parseAmount";
 import { AiQuickAdd } from "../components/record/AiQuickAdd";
 import { MonthDropdown } from "../components/record/MonthDropdown";
 import { IconChevL, IconChevR, IconPlus, IconX } from "../components/ui/Icons";
@@ -224,7 +225,7 @@ export function RecordEntryPage({
         return;
       }
       if (!amt || amt <= 0) {
-        setFormErr("Amount must be greater than 0");
+        setFormErr(POSITIVE_AMOUNT_MESSAGE);
         return;
       }
       if (!date || monthKey(date) !== month) {
@@ -417,6 +418,7 @@ export function RecordEntryPage({
                     onChange={(n) => setAmount(n ?? 0)}
                     placeholder="0"
                     immediate
+                    reportNegative
                     onEnterCommit={(parsed) => submit({ amount: parsed ?? 0 })}
                   />
                 </td>

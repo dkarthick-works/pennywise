@@ -18,6 +18,12 @@ describe("sanitizeBudgetDraft", () => {
     expect(sanitizeBudgetDraft(".")).toBe(".");
     expect(sanitizeBudgetDraft("12.")).toBe("12.");
   });
+
+  it("keeps a minus sign so a negative draft is not saved as a positive amount", () => {
+    expect(sanitizeBudgetDraft("-50")).toBe("-50");
+    expect(sanitizeBudgetDraft("−1,234.50")).toBe("-1234.50");
+    expect(sanitizeBudgetDraft("-")).toBe("-");
+  });
 });
 
 describe("parseBudgetCommit", () => {
@@ -32,6 +38,14 @@ describe("parseBudgetCommit", () => {
     expect(parseBudgetCommit("12.").ok).toBe(false);
     expect(parseBudgetCommit("1.001").ok).toBe(false);
     expect(parseBudgetCommit(String(MONTHLY_BUDGET_MAX + 1)).ok).toBe(false);
+  });
+
+  it("rejects a negative draft", () => {
+    expect(parseBudgetCommit("-50")).toEqual({
+      ok: false,
+      message: "Enter an amount that is zero or greater",
+    });
+    expect(parseBudgetCommit("-0").ok).toBe(false);
   });
 });
 

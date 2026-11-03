@@ -33,6 +33,12 @@ describe("previewReadiness", () => {
     expect(result.issues.some((issue) => issue.message === "Date must be in the selected month")).toBe(true);
   });
 
+  it("blocks negative amounts", () => {
+    const result = previewReadiness(row({ amount: -50 }), "2026-08");
+    expect(result.ready).toBe(false);
+    expect(result.issues.some((issue) => issue.message === "Amount must be greater than 0")).toBe(true);
+  });
+
   it("blocks over-precise amounts", () => {
     const result = previewReadiness(row({ amount: 500.251, amountDecimalPlaces: 3 }), "2026-08");
     expect(result.ready).toBe(false);

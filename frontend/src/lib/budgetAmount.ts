@@ -5,8 +5,15 @@ export const MONTHLY_BUDGET_MAX = 999_999_999_999.99;
 export function sanitizeBudgetDraft(raw: string): string {
   let seenDot = false;
   let frac = 0;
+  let negative = false;
   let out = "";
   for (const ch of raw) {
+    if (ch === "-" || ch === "−") {
+      // Keep the sign visible so commit can reject it. Dropping it would save
+      // the absolute value.
+      negative = true;
+      continue;
+    }
     if (ch === ",") continue;
     if (ch >= "0" && ch <= "9") {
       if (seenDot) {
@@ -21,7 +28,7 @@ export function sanitizeBudgetDraft(raw: string): string {
       out += ".";
     }
   }
-  return out;
+  return negative ? `-${out}` : out;
 }
 
 export function budgetDraftIsTemporary(draft: string): boolean {
@@ -42,8 +49,8 @@ export function parseBudgetCommit(
   if (budgetDraftIsTemporary(draft)) {
     return { ok: false, message: "Enter an amount that is zero or greater" };
   }
-  const { value, decimalPlaces } = parseIndianAmount(draft);
-  if (value == null || !Number.isFinite(value) || value < 0) {
+  const { value, decimalPlaces, negative } = parseIndianAmount(draft);
+  if (negative || value == null || !Number.isFinite(value) || value < 0) {
     return { ok: false, message: "Enter an amount that is zero or greater" };
   }
   if (decimalPlaces > 2) {
