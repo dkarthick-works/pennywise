@@ -1,23 +1,27 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { AuthProvider } from "../auth/AuthContext";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { AuthPage } from "./AuthPage";
 
-function renderAuthPage() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+vi.mock("../auth/AuthContext", () => ({
+  useAuth: () => ({ login: vi.fn().mockResolvedValue(undefined) }),
+}));
+
+function GoBack() {
+  const navigate = useNavigate();
+  return <button onClick={() => navigate(-1)}>Back</button>;
+}
+
+function renderAuthPage(initialEntries = ["/login"]) {
   return render(
-    <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/login"]}>
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<AuthPage />} />
-            <Route path="/forgot-password" element={<div>Forgot page</div>} />
-          </Routes>
-        </AuthProvider>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <MemoryRouter initialEntries={initialEntries} initialIndex={initialEntries.length - 1}>
+      <Routes>
+        <Route path="/start" element={<div>Start page</div>} />
+        <Route path="/login" element={<AuthPage />} />
+        <Route path="/record" element={<GoBack />} />
+        <Route path="/forgot-password" element={<div>Forgot page</div>} />
+      </Routes>
+    </MemoryRouter>,
   );
 }
 
@@ -35,5 +39,17 @@ describe("AuthPage — forgot password entry point", () => {
     renderAuthPage();
     fireEvent.click(screen.getByRole("button", { name: /Create one/i }));
     expect(screen.queryByRole("button", { name: /Forgot password\?/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("AuthPage — sign in", () => {
+  it("replaces /login in history so Back skips the login form", async () => {
+    renderAuthPage(["/start", "/login"]);
+    fireEvent.change(screen.getByPlaceholderText("you@email.com"), { target: { value: "a@b.co" } });
+    fireEvent.change(screen.getByPlaceholderText("••••••••"), { target: { value: "secret1" } });
+    fireEvent.click(screen.getByRole("button", { name: /Sign in/i }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+    expect(screen.getByText("Start page")).toBeInTheDocument();
   });
 });
