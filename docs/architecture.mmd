@@ -1,0 +1,40 @@
+flowchart TB
+  Browser["Browser: Pennywise React SPA"]
+  Vite["Development only: Vite :5173"]
+  subgraph Backend["Ledger: Go HTTP application"]
+    Entry["cmd/server: environment and startup"]
+    Router["chi router: request ID, logs, recovery, CORS"]
+    Static["Production only: embedded SPA and PWA assets"]
+    Proxy["Auth reverse proxy: path and cookie-path rewrite"]
+    Verify["Local HMAC JWT verification and user provisioning"]
+    Handlers["HTTP handlers and domain validation"]
+    Queries["sqlc queries and pgx transactions / pool"]
+    Migration["Database bootstrap and embedded up migrations"]
+    Parser["Optional AI preview parser: no financial writes"]
+    Sentry["Optional Sentry error reporting"]
+  end
+  subgraph External["External dependencies"]
+    PG[("Postgres: pennywise database")]
+    Goauth["Goauth: credentials, sessions and refresh cookies"]
+    OpenRouter["Optional OpenRouter model API"]
+    Monitor["Optional Sentry service"]
+  end
+  Browser -->|"dev /api"| Vite
+  Vite -->|"proxy /api to :8080"| Router
+  Browser -->|"production HTTP: assets and /api"| Router
+  Entry -->|"before serving"| Migration
+  Migration -->|"create database when needed; migrate"| PG
+  Entry -->|"configure and start"| Router
+  Router -->|"production static fallback"| Static
+  Static -->|"SPA assets"| Browser
+  Router -->|"/api/auth/*: no local JWT required"| Proxy
+  Proxy -->|"/auth/*; relay response and cookies"| Goauth
+  Router -->|"protected /api routes"| Verify
+  Verify -->|"ensure user, settings and General Reserve"| Queries
+  Verify -->|"authenticated identity"| Handlers
+  Handlers -->|"user-scoped reads and writes"| Queries
+  Queries -->|"SQL over pgx"| PG
+  Handlers -->|"/transactions/parse only"| Parser
+  Parser -.->|"message and reference date"| OpenRouter
+  Router -.->|"capture errors when configured"| Sentry
+  Sentry -.-> Monitor
