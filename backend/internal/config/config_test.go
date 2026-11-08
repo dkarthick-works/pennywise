@@ -28,6 +28,24 @@ func TestLoadOpenRouterConfig(t *testing.T) {
 	}
 }
 
+func TestSMSAIConfiguration(t *testing.T) {
+	t.Setenv("OPENROUTER_MODEL", "existing/model")
+	t.Setenv("SMS_AI_MODEL", "")
+	t.Setenv("SMS_AI_ENABLED", "")
+	t.Setenv("SMS_AI_POLL_INTERVAL", "")
+	cfg := Load()
+	if cfg.SMSAIEnabled || cfg.SMSAIModel != "existing/model" || cfg.SMSAIPollInterval != 2*time.Second {
+		t.Fatalf("unexpected SMS defaults: enabled=%v model=%s interval=%s", cfg.SMSAIEnabled, cfg.SMSAIModel, cfg.SMSAIPollInterval)
+	}
+	t.Setenv("SMS_AI_ENABLED", "true")
+	t.Setenv("SMS_AI_MODEL", "another/model")
+	t.Setenv("SMS_AI_POLL_INTERVAL", "3s")
+	cfg = Load()
+	if !cfg.SMSAIEnabled || cfg.SMSAIModel != "another/model" || cfg.OpenRouterModel != "existing/model" || cfg.SMSAIPollInterval != 3*time.Second {
+		t.Fatal("SMS override changed natural-language configuration or was not applied")
+	}
+}
+
 func TestInvalidOpenRouterTimeoutUsesDefault(t *testing.T) {
 	t.Setenv("OPENROUTER_TIMEOUT", "not-a-duration")
 	if got := Load().OpenRouterTimeout; got != 15*time.Second {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SMSDevicesCard } from "../components/SMSDevicesCard";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getSettings,
@@ -399,6 +400,8 @@ export function SettingsPage({ month, setMonth }: { month: string; setMonth: (m:
           <p className="page-sub">Budgets, templates and preferences.</p>
         </div>
       </div>
+
+      <SMSDevicesCard />
 
       {/* budgets */}
       <div className="card card-pad" style={{ marginBottom: 18 }}>

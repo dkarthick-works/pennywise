@@ -13,6 +13,7 @@ import { CashFlowTransactionsPage } from "./pages/CashFlowTransactionsPage";
 import { RecordPage }    from "./pages/RecordPage";
 import { RecordEntryPage } from "./pages/RecordEntryPage";
 import { SettingsPage }  from "./pages/SettingsPage";
+import { SMSDraftsPage } from "./pages/SMSDraftsPage";
 import { ProfilePage }   from "./pages/ProfilePage";
 import { InsightsPage }  from "./pages/InsightsPage";
 import { CategoriesPage } from "./pages/CategoriesPage";
@@ -97,6 +98,7 @@ export default function App() {
                 <Route path="/insights"  element={<InsightsPage />} />
                 <Route path="/categories" element={<CategoriesPage />} />
                 <Route path="/export"    element={<ImportExportPage />} />
+                <Route path="/sms-drafts" element={<SMSDraftsPage />} />
                 <Route path="/settings"  element={<SettingsPage month={month} setMonth={setMonth} />} />
                 <Route path="/profile"   element={<ProfilePage />} />
                 <Route path="*"          element={<Navigate to="/record" replace />} />

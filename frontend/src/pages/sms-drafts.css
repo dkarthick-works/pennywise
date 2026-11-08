@@ -1,0 +1,34 @@
+.sms-drafts { max-width: 1080px; }
+.sms-drafts h2 { font-size: 18px; font-weight: 650; margin: 0 0 8px; overflow-wrap: anywhere; }
+.sms-drafts p { line-height: 1.6; }
+.sms-meta { color: var(--ink-2); font-size: 13px; margin: 6px 0 14px; }
+.sms-meta a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 3px; }
+.sms-notice { color: var(--accent-ink); }
+.sms-notice:empty { display: none; }
+.sms-review { padding: 24px 0 28px; border-bottom: 1px solid var(--border); }
+.sms-review fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.sms-review legend { font-size: 13px; color: var(--ink-2); margin-bottom: 12px; }
+.sms-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.sms-fields label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.sms-fields .input { min-width: 0; width: 100%; min-height: 44px; font-variant-numeric: tabular-nums; }
+.sms-name { grid-column: 1 / -1; }
+.sms-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.sms-drafts .btn { min-height: 44px; white-space: normal; }
+.sms-actions .btn-primary { width: auto; background: var(--accent-strong); }
+.sms-drafts :focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 3px; }
+.sms-drafts :disabled { cursor: wait; opacity: .65; }
+.sms-warnings, .sms-warning { background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 13px; line-height: 1.6; padding: 14px 18px; margin: 16px 0; }
+.sms-warnings { padding-left: 34px; }
+.sms-warnings li + li { margin-top: 6px; }
+.sms-error { color: var(--ink); font-weight: 600; }
+.sms-ignore { margin-top: 18px; }
+.sms-failures { margin-top: 36px; }
+.sms-failures ul { list-style: none; padding: 0; }
+.sms-failure { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--border); padding: 16px 0; }
+.sms-failure > div { min-width: 0; overflow-wrap: anywhere; }
+.sms-empty { padding: 32px 0; border-bottom: 1px solid var(--border); }
+@media (max-width: 560px) {
+  .sms-fields { grid-template-columns: minmax(0, 1fr); }
+  .sms-actions .btn-primary { width: 100%; }
+  .sms-review { padding-top: 20px; }
+}
