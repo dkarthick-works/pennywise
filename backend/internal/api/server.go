@@ -69,7 +69,16 @@ func (s *Server) Router() http.Handler {
 	// Recoverer then preserves the API's existing panic response behavior.
 	sentryHandler := sentryhttp.New(sentryhttp.Options{Repanic: true})
 	r.Use(func(next http.Handler) http.Handler {
-		return sentryHandler.Handle(next)
+		withSentry := sentryHandler.Handle(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// SMS payloads and device credentials must never enter Sentry request
+			// capture. Recoverer still handles panics without recording bodies.
+			if strings.HasPrefix(r.URL.Path, "/api/sms/") {
+				next.ServeHTTP(w, r)
+				return
+			}
+			withSentry.ServeHTTP(w, r)
+		})
 	})
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   s.cfg.CORSOrigins,
@@ -84,6 +93,12 @@ func (s *Server) Router() http.Handler {
 	// Auth endpoints are proxied straight to Goauth (no local JWT required).
 	r.Handle("/api/auth/*", s.proxy.Handler())
 
+	// Native SMS endpoints accept narrowly scoped opaque device tokens only.
+	r.Get("/api/sms/device/session", s.smsDeviceEndpoint(smsSession))
+	r.Put("/api/sms/device/consent", s.smsDeviceEndpoint(smsConsent))
+	r.Get("/api/sms/device/senders", s.smsDeviceEndpoint(smsConfig))
+	r.Post("/api/sms/device/uploads", s.smsDeviceEndpoint(s.smsUpload))
+
 	// Everything else requires a valid access token, and ensures the user row
 	// (+ default settings + optional demo seed) exists.
 	r.Group(func(pr chi.Router) {
@@ -93,6 +108,15 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/me", s.handleMe)
 		pr.Get("/api/profile", s.handleGetProfile)
 		pr.Put("/api/profile", s.handleUpdateProfile)
+
+		pr.Get("/api/sms/drafts", s.handleListSMSDrafts)
+		pr.Put("/api/sms/drafts/{id}", s.handleUpdateSMSDraft)
+		pr.Post("/api/sms/drafts/{id}/ignore", s.handleIgnoreSMSDraft)
+		pr.Get("/api/sms/jobs", s.handleListSMSJobs)
+		pr.Post("/api/sms/jobs/{id}/retry", s.handleRetrySMSJob)
+		pr.Get("/api/sms/devices", s.handleListSMSDevices)
+		pr.Post("/api/sms/devices", s.handleCreateSMSDevice)
+		pr.Delete("/api/sms/devices/{id}", s.handleRevokeSMSDevice)
 
 		pr.Get("/api/settings", s.handleGetSettings)
 		pr.Put("/api/settings/preferences", s.handleUpdatePreferences)

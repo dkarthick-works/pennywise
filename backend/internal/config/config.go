@@ -32,6 +32,11 @@ type Config struct {
 	OpenRouterTimeout time.Duration
 	OpenRouterSiteURL string
 	OpenRouterAppName string
+
+	// SMS uses independent strategies; defaults reuse the existing OpenRouter model/key.
+	SMSAIEnabled      bool
+	SMSAIModel        string
+	SMSAIPollInterval time.Duration
 }
 
 func Load() Config {
@@ -50,6 +55,9 @@ func Load() Config {
 		OpenRouterTimeout: envDuration("OPENROUTER_TIMEOUT", 15*time.Second),
 		OpenRouterSiteURL: env("OPENROUTER_SITE_URL", ""),
 		OpenRouterAppName: env("OPENROUTER_APP_NAME", "Pennywise"),
+		SMSAIEnabled:      strings.EqualFold(strings.TrimSpace(env("SMS_AI_ENABLED", "false")), "true"),
+		SMSAIModel:        env("SMS_AI_MODEL", env("OPENROUTER_MODEL", "")),
+		SMSAIPollInterval: envDuration("SMS_AI_POLL_INTERVAL", 2*time.Second),
 	}
 }
 

@@ -17,7 +17,9 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.Button
+import app.pennywise.sms.SmsSettingsActivity
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
@@ -42,6 +44,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Reconcile an interrupted opt-out, but do not automatically scan in phase 3.
+        app.pennywise.sms.SmsWork.reconcileDisabled(this)
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG) // chrome://inspect
         web = WebView(this).apply {
             settings.javaScriptEnabled = true
@@ -89,12 +93,14 @@ class MainActivity : ComponentActivity() {
         }
         // Inset a native container, not the WebView: the website's viewport (including
         // fixed/sticky elements) must be physically outside system bars and the keyboard.
-        val container = FrameLayout(this).apply {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.WHITE)
-            addView(web, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ))
+            addView(Button(this@MainActivity).apply {
+                text = "Android SMS settings"
+                setOnClickListener { startActivity(Intent(this@MainActivity, SmsSettingsActivity::class.java)) }
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+            addView(web, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         }
         ViewCompat.setOnApplyWindowInsetsListener(container) { v, insets ->
             val safeArea = insets.getInsets(

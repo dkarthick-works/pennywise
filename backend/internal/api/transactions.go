@@ -139,12 +139,14 @@ func (s *Server) handleExportTransactions(w http.ResponseWriter, r *http.Request
 }
 
 type txnInput struct {
-	Section  string       `json:"section"`
-	Category string       `json:"category"`
-	Amount   money.Number `json:"amount"`
-	Date     string       `json:"date"`
-	Kind     string       `json:"kind"`
-	Settles  []string     `json:"settles"`
+	Section          string       `json:"section"`
+	Category         string       `json:"category"`
+	Amount           money.Number `json:"amount"`
+	Date             string       `json:"date"`
+	Kind             string       `json:"kind"`
+	Settles          []string     `json:"settles"`
+	SMSDraftID       string       `json:"sms_draft_id,omitempty"`
+	SMSDraftRevision int          `json:"sms_draft_revision,omitempty"`
 }
 
 type txnPatchInput struct {
@@ -165,7 +167,7 @@ func (s *Server) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 	values := transactionValues{
 		Section: &in.Section, Category: &in.Category, Amount: numberOrNil(in.Amount), Date: &in.Date, Kind: &in.Kind,
 	}
-	if issues := validateTransactionValues(values, true, true); len(issues) > 0 {
+	if issues := validateTransactionValues(values, true, in.SMSDraftID == ""); len(issues) > 0 {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "validation failed", "issues": issues})
 		return
 	}
@@ -180,6 +182,36 @@ func (s *Server) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 	defer tx.Rollback(r.Context())
 	qtx := s.q.WithTx(tx)
 
+	var smsSource uuid.UUID
+	if in.SMSDraftID != "" {
+		if amount.Int.Sign() <= 0 {
+			writeErr(w, 400, "SMS draft amount must be greater than zero")
+			return
+		}
+		if len(in.Settles) > 0 {
+			writeErr(w, 400, "SMS drafts cannot link settlements")
+			return
+		}
+		smsSource, err = lockSMSDraft(r, tx, in.SMSDraftID, in.SMSDraftRevision)
+		if err != nil {
+			writeSMSReviewError(w, err)
+			return
+		}
+		// Currency is not a transaction column. Never silently reinterpret a draft.
+		var currencyMatches bool
+		err = tx.QueryRow(r.Context(), `SELECT d.currency=COALESCE(NULLIF(st.currency,''),'INR')
+ FROM sms_transaction_drafts d LEFT JOIN user_settings st ON st.user_id=d.user_id
+ WHERE d.source_sms_id=$1`, smsSource).Scan(&currencyMatches)
+		if err != nil {
+			writeErr(w, 500, "could not check draft currency")
+			return
+		}
+		if !currencyMatches {
+			writeErr(w, 409, "draft currency differs from your ledger currency")
+			return
+		}
+	}
+
 	created, err := qtx.InsertTransaction(r.Context(), db.InsertTransactionParams{
 		UserID: userID(r), Section: db.Section(in.Section), Category: strings.TrimSpace(in.Category),
 		Amount: amount, TxnDate: d, Kind: db.TxnKind(in.Kind),
@@ -191,6 +223,16 @@ func (s *Server) handleCreateTransaction(w http.ResponseWriter, r *http.Request)
 	if in.Kind == "settlement" {
 		if err := replaceLinks(r.Context(), qtx, created.ID, in.Settles); err != nil {
 			writeErr(w, http.StatusBadRequest, "could not link credits")
+			return
+		}
+	}
+	if in.SMSDraftID != "" {
+		_, err = tx.Exec(r.Context(), `UPDATE sms_transaction_drafts SET section=$2,category=$3,amount=$4,txn_date=$5,kind=$6,revision=revision+1,updated_at=now() WHERE source_sms_id=$1`, smsSource, in.Section, strings.TrimSpace(in.Category), amount, d, in.Kind)
+		if err == nil {
+			_, err = tx.Exec(r.Context(), `UPDATE sms_suggestions SET status='approved',transaction_id=$2,updated_at=now() WHERE id=$1`, smsSource, created.ID)
+		}
+		if err != nil {
+			writeErr(w, 500, "could not approve SMS draft")
 			return
 		}
 	}

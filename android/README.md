@@ -52,3 +52,39 @@ Bump `versionCode` in `app/build.gradle.kts` for each release. Switching an inst
 debug app to a release build needs one uninstall, since the signing key changes.
 
 Open `android/` (not the repo root) in Android Studio.
+
+## SMS import preview (manual delivery only)
+
+Backend migration `0016_sms_ingestion` and the web Settings device-token controls are required.
+Maintainers must populate the global sender list; it starts empty. See
+[`../docs/research/android-sms-ingestion-implementation.md`](../docs/research/android-sms-ingestion-implementation.md)
+for the configuration SQL and API contracts.
+
+1. Create a token in web Settings → Android SMS import.
+2. Tap the native **Android SMS settings** button above the WebView, paste the token and connect.
+3. Read the disclosure, enable SMS import, grant `READ_SMS`, then tap **Scan now**.
+
+The first scan starts at today's beginning; re-enablement starts at the time of re-enabling.
+Each scan catches up at most one day, with overlap. Matching messages are queued in private
+Room/SQLite, uploaded with fingerprint deduplication, and processed when the operator enables
+`SMS_AI_ENABLED=true` on the backend. Complete messages with explicit dates can become
+review drafts; incomplete messages are rejected. See the
+[Phase 4 processing contract](../docs/research/android-sms-phase4.md).
+Review, edit, approve or ignore drafts in **SMS Drafts** under the app's Tools menu.
+Only approval creates a ledger Transaction; see [Phase 5](../docs/research/android-sms-phase5.md).
+**Daily scheduling and foreground scanning are not enabled.**
+The native token is independent of browser login: disable native import or revoke the token when
+switching accounts/ownership. Ordinary browser logout does not revoke device credentials.
+
+`READ_SMS` is hard-restricted; runtime consent alone may not suffice. Verify the real installer
+and phone even if emulator tests pass. Native SMS settings block screenshots; all Android app
+backups/device transfer are excluded to keep queued SMS and token preferences off backups.
+Raw payload retention is seven days (local expiration is checked on scan; backend hourly).
+
+Checks:
+
+```sh
+./gradlew testDebugUnitTest assembleDebug
+# Requires a running emulator or attached device:
+./gradlew connectedDebugAndroidTest
+```

@@ -57,3 +57,5 @@ local.properties
 *.iml
 .idea/
 .kotlin/
+/.codex/
+.cursor/hooks.json

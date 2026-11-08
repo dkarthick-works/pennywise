@@ -18,6 +18,7 @@ const NAV_MAIN = [
   { path: "/categories", label: "Map Categories",  Icon: IconCategories },
 ];
 const NAV_TOOLS = [
+  { path: "/sms-drafts", label: "SMS Drafts", Icon: IconEvents },
   { path: "/export",   label: "Import / Export", Icon: IconExport },
   { path: "/settings", label: "Settings",         Icon: IconSettings },
   { path: "/profile",  label: "Profile",          Icon: IconProfile },

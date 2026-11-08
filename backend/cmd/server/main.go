@@ -15,6 +15,7 @@ import (
 	"github.com/ledger/backend/internal/api"
 	"github.com/ledger/backend/internal/config"
 	"github.com/ledger/backend/internal/database"
+	"github.com/ledger/backend/internal/smspipeline"
 	"github.com/ledger/backend/internal/transactionparser"
 )
 
@@ -66,6 +67,35 @@ func main() {
 		log.Fatalf("server: %v", err)
 	}
 
+	backgroundCtx, stopBackground := context.WithCancel(ctx)
+	retentionDone := make(chan struct{})
+	go func() {
+		defer close(retentionDone)
+		srv.RunSMSRetention(backgroundCtx)
+	}()
+	smsDone := make(chan struct{})
+	if cfg.SMSAIEnabled {
+		providerConfig := smspipeline.OpenRouterConfig{
+			APIKey: cfg.OpenRouterAPIKey, Model: cfg.SMSAIModel, BaseURL: cfg.OpenRouterBaseURL,
+			Timeout: cfg.OpenRouterTimeout, SiteURL: cfg.OpenRouterSiteURL, AppName: cfg.OpenRouterAppName,
+		}
+		verifier, err := smspipeline.NewOpenRouterVerifier(providerConfig)
+		if err != nil {
+			log.Fatalf("SMS verifier: %v", err)
+		}
+		extractor, err := smspipeline.NewOpenRouterExtractor(providerConfig)
+		if err != nil {
+			log.Fatalf("SMS extractor: %v", err)
+		}
+		worker := smspipeline.NewWorker(smspipeline.NewPostgresStore(pool), verifier, extractor,
+			smspipeline.WorkerOptions{PollInterval: cfg.SMSAIPollInterval, CallTimeout: cfg.OpenRouterTimeout})
+		go func() { defer close(smsDone); worker.Run(backgroundCtx) }()
+	} else {
+		log.Print("SMS AI worker disabled; queued raw SMS expires after seven days")
+		close(smsDone)
+	}
+	defer func() { stopBackground(); <-smsDone; <-retentionDone }()
+
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           srv.Router(),
@@ -84,6 +114,7 @@ func main() {
 	<-stop
 
 	log.Println("shutting down…")
+	stopBackground()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)

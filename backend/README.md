@@ -1076,3 +1076,68 @@ Focused integration checks (use a disposable database; tests truncate user data)
 PENNYWISE_TEST_DATABASE_URL='postgres://.../test_db?sslmode=disable' \
   go test ./internal/api -run '^TestTransactionSearch' -count=1
 ```
+
+### SMS ingestion preview (phases 1–3)
+
+Migration `0016_sms_ingestion` adds global sender configuration, hashed/revocable
+SMS device credentials and the `sms_suggestions` table, which doubles as the future
+processing queue. SMS AI processing is **off by default**; Phase 4 adds the optional
+worker described below. The existing natural-language transaction parser is unchanged.
+
+- Web JWT: `GET/POST /api/sms/devices`, `DELETE /api/sms/devices/{id}`.
+- Opaque SMS device token: `GET /api/sms/device/session`, `GET /api/sms/device/senders`,
+  `PUT /api/sms/device/consent`, `POST /api/sms/device/uploads`.
+- Device tokens cannot access ledger APIs. Uploads require enabled, versioned consent.
+- Fingerprint uniqueness is enforced before processing; acknowledgements mean committed
+  acceptance, not completed AI. Sender eligibility is checked against the global list.
+- The sender list starts empty and is manually maintained in the database. No user-facing
+  editor is exposed. The server runs raw-payload retention cleanup at startup/hourly;
+  unprocessed payloads expire after seven days while fingerprints remain.
+
+Setup SQL, payload formats, limits and remaining phone/provider verification gates:
+[`../docs/research/android-sms-ingestion-implementation.md`](../docs/research/android-sms-ingestion-implementation.md).
+
+```sh
+# Disposable database only: integration tests truncate users and update sender config.
+PENNYWISE_TEST_DATABASE_URL='postgres://.../test_db?sslmode=disable' \
+  go test ./internal/api -run '^TestSMS' -count=1
+```
+
+### SMS AI processing (Phase 4)
+
+Migration `0017_sms_ai_pipeline` adds stage-specific claims/retries and
+`sms_transaction_drafts`. Enable processing with `SMS_AI_ENABLED=true`; the two
+independent strategies reuse `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`.
+`SMS_AI_MODEL` optionally overrides the model for both SMS strategies without
+changing natural-language parsing. `SMS_AI_POLL_INTERVAL` defaults to `2s`.
+
+Verifier readiness is strict yes/no: explicit transaction date including year,
+amount, counterparty, direction and event type, or rejection. No received-date
+fallback or incomplete-message review state. Explicit card transactions map to
+credit, everything else defaults to cash, and suspected settlements are cash
+proposals with review warnings. Section is an optional AI suggestion.
+
+Provider requests occur outside database transactions. Separate counters/backoff,
+leased claims and fresh consent/sender checks prevent stale commits. Conversion
+failure retries conversion only. Draft insertion and source completion are atomic;
+the worker never calls transaction creation. SMS-specific errors never log provider
+response text. Seven-day source retention still runs while the worker is disabled.
+
+Web-JWT read/retry routes: `GET /api/sms/jobs`, `POST /api/sms/jobs/{id}/retry`, and
+`GET /api/sms/drafts?offset=0`. Device upload tokens cannot use these routes.
+Phase 5 adds the SMS Drafts review page and atomic ledger approval. Migration
+`0018_sms_draft_review` adds review revisions. `PUT /api/sms/drafts/{id}` saves edits;
+`POST /api/sms/drafts/{id}/ignore` dismisses a draft. Approval uses the existing
+`POST /api/transactions` with `sms_draft_id` and `sms_draft_revision`. All review
+operations require the current revision and a pending, owner-scoped draft.
+See [Phase 5 contracts](../docs/research/android-sms-phase5.md).
+
+Details and strategy replacement seam:
+[`../docs/research/android-sms-phase4.md`](../docs/research/android-sms-phase4.md).
+
+```sh
+go test -race ./internal/smspipeline ./internal/config
+# Disposable database only:
+PENNYWISE_TEST_DATABASE_URL='postgres://.../test_db?sslmode=disable' \
+  go test -race ./internal/api -run '^TestSMS' -count=1
+```
