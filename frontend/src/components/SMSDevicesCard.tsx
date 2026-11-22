@@ -51,7 +51,7 @@ export function SMSDevicesCard() {
         <p>Shown once. Paste this token into Android SMS settings. Keep it private.</p>
         <label htmlFor="sms-device-token">New device token</label>
         <input id="sms-device-token" className="input" value={token} readOnly autoComplete="off"
-          data-clarity-mask="true" data-private="true" spellCheck={false} style={{ width: "100%", boxSizing: "border-box", margin: "8px 0" }} />
+          data-private="true" spellCheck={false} style={{ width: "100%", boxSizing: "border-box", margin: "8px 0" }} />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button type="button" className="btn btn-soft" onClick={async () => {
             try { await navigator.clipboard.writeText(token); setCopied(true); setCopyFailed(false); }

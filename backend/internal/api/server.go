@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -65,21 +64,6 @@ func (s *Server) Router() http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	// Place Sentry inside Recoverer so it captures and repanics; chi's
-	// Recoverer then preserves the API's existing panic response behavior.
-	sentryHandler := sentryhttp.New(sentryhttp.Options{Repanic: true})
-	r.Use(func(next http.Handler) http.Handler {
-		withSentry := sentryHandler.Handle(next)
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// SMS payloads and device credentials must never enter Sentry request
-			// capture. Recoverer still handles panics without recording bodies.
-			if strings.HasPrefix(r.URL.Path, "/api/sms/") {
-				next.ServeHTTP(w, r)
-				return
-			}
-			withSentry.ServeHTTP(w, r)
-		})
-	})
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   s.cfg.CORSOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
