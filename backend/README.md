@@ -131,6 +131,7 @@ only ever talks to this origin.
 | *      | `/api/auth/*` | proxied to Goauth (signup, login, refresh, logout, me, …) |
 | GET    | `/api/me` · `/api/profile` | current user / profile |
 | PUT    | `/api/profile` | update name + email |
+| GET    | `/api/admin/users?limit=50&offset=0` | admin only: users, joined date, non-zero transaction counts, totals |
 | GET    | `/api/settings` | currency, theme, templates, credit statement day, credit spending threshold |
 | PUT    | `/api/settings/preferences` | currency and theme |
 | PUT    | `/api/settings/credit-billing-cycle` | set/clear credit statement closing day (`1..31` or `null`) |

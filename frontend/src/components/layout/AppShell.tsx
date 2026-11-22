@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { initials } from "../../lib/txns";
 import {
-  IconDashboard, IconSearch, IconReserves, IconLent, IconChit, IconEvents, IconInsights, IconCategories, IconExport, IconSettings, IconProfile, IconMenu, IconPlus,
+  IconDashboard, IconSearch, IconReserves, IconLent, IconChit, IconEvents, IconInsights, IconCategories, IconExport, IconSettings, IconProfile, IconAdmin, IconMenu, IconPlus,
 } from "../ui/Icons";
 
 const NAV_CTA = { path: "/record", label: "Record Expense", Icon: IconPlus };
@@ -23,6 +23,7 @@ const NAV_TOOLS = [
   { path: "/settings", label: "Settings",         Icon: IconSettings },
   { path: "/profile",  label: "Profile",          Icon: IconProfile },
 ];
+const NAV_ADMIN = { path: "/admin", label: "Admin", Icon: IconAdmin };
 
 interface Props {
   children: React.ReactNode;
@@ -33,6 +34,7 @@ export function AppShell({ children }: Props) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [navOpen, setNavOpen] = useState(false);
+  const navTools = profile?.is_admin ? [...NAV_TOOLS, NAV_ADMIN] : NAV_TOOLS;
 
   const userInitials = profile
     ? initials(profile.display_name || profile.email.split("@")[0])
@@ -75,7 +77,7 @@ export function AppShell({ children }: Props) {
             </button>
           ))}
           <div className="nav-label">Tools</div>
-          {NAV_TOOLS.map(({ path, label, Icon }) => (
+          {navTools.map(({ path, label, Icon }) => (
             <button
               key={path}
               className={"nav-item" + (pathname.startsWith(path) ? " active" : "")}

@@ -53,7 +53,7 @@ func (q *Queries) GetSettings(ctx context.Context, userID uuid.UUID) (UserSettin
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, email, display_name, created_at, updated_at FROM users WHERE id = $1
+SELECT id, email, display_name, created_at, updated_at, is_admin FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
@@ -65,6 +65,7 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.DisplayName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsAdmin,
 	)
 	return i, err
 }
@@ -162,7 +163,7 @@ SET display_name = $2,
     email        = $3,
     updated_at   = now()
 WHERE id = $1
-RETURNING id, email, display_name, created_at, updated_at
+RETURNING id, email, display_name, created_at, updated_at, is_admin
 `
 
 type UpdateUserProfileParams struct {
@@ -180,6 +181,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.DisplayName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsAdmin,
 	)
 	return i, err
 }
@@ -190,7 +192,7 @@ VALUES ($1, $2)
 ON CONFLICT (id) DO UPDATE
     SET email = EXCLUDED.email,
         updated_at = now()
-RETURNING id, email, display_name, created_at, updated_at
+RETURNING id, email, display_name, created_at, updated_at, is_admin
 `
 
 type UpsertUserParams struct {
@@ -208,6 +210,7 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, e
 		&i.DisplayName,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsAdmin,
 	)
 	return i, err
 }

@@ -118,6 +118,23 @@ export interface Profile {
   user_id: string;
   email: string;
   display_name: string;
+  is_admin: boolean;
+}
+
+export interface AdminUser {
+  user_id: string;
+  email: string;
+  display_name: string;
+  joined_at: string;
+  transaction_count: number;
+}
+
+export interface AdminUsersResponse {
+  users: AdminUser[];
+  total_users: number;
+  total_transactions: number;
+  limit: number;
+  offset: number;
 }
 
 export interface LoginRequest  { email: string; password: string; }

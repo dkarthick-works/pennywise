@@ -1,0 +1,18 @@
+.admin-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.admin-user { min-width: 0; overflow-wrap: anywhere; }
+.admin-user-name { font-weight: 600; }
+.admin-user-sub { color: var(--ink-3); font-size: 12.5px; }
+.admin-count { text-align: right; font-variant-numeric: tabular-nums; }
+.admin-state { padding: 28px 18px; text-align: center; color: var(--ink-2); }
+.admin-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; flex-wrap: wrap; }
+.admin-pager-actions { display: flex; gap: 8px; }
+.admin-pager .btn { width: auto; }
+
+@media (max-width: 640px) {
+  .admin-table thead { display: none; }
+  .admin-table, .admin-table tbody, .admin-table tr, .admin-table td { display: block; width: 100%; }
+  .admin-table tr { padding: 10px 0; border-bottom: 1px solid var(--border-2); }
+  .admin-table td { border-bottom: 0; padding: 3px 14px; }
+  .admin-table td[data-label] { display: flex; justify-content: space-between; gap: 12px; text-align: right; }
+  .admin-table td[data-label]::before { content: attr(data-label); color: var(--ink-3); font-size: 12.5px; text-align: left; }
+}

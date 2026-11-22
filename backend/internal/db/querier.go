@@ -43,6 +43,7 @@ type Querier interface {
 	EnsureGeneralReserve(ctx context.Context, userID uuid.UUID) error
 	// Create the default settings row for a user if it does not exist yet.
 	EnsureSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
+	GetAdminSummary(ctx context.Context) (GetAdminSummaryRow, error)
 	GetCategoryGroup(ctx context.Context, arg GetCategoryGroupParams) (CategoryGroup, error)
 	GetCategoryMapping(ctx context.Context, arg GetCategoryMappingParams) (CategoryMapping, error)
 	GetChit(ctx context.Context, arg GetChitParams) (GetChitRow, error)
@@ -59,6 +60,7 @@ type Querier interface {
 	GetSettings(ctx context.Context, userID uuid.UUID) (UserSetting, error)
 	GetTransaction(ctx context.Context, arg GetTransactionParams) (Transaction, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
+	GetUserIsAdmin(ctx context.Context, id uuid.UUID) (bool, error)
 	// Distinct income source categories for ghost autocomplete.
 	IncomeCategorySuggestions(ctx context.Context, userID uuid.UUID) ([]string, error)
 	InsertCategoryGroup(ctx context.Context, arg InsertCategoryGroupParams) (CategoryGroup, error)
@@ -77,6 +79,8 @@ type Querier interface {
 	InsertTemplate(ctx context.Context, arg InsertTemplateParams) (Template, error)
 	InsertTransaction(ctx context.Context, arg InsertTransactionParams) (Transaction, error)
 	LentTransferPreflight(ctx context.Context, userID uuid.UUID) (LentTransferPreflightRow, error)
+	// Opening a month creates amount = 0 template rows, so only non-zero rows count.
+	ListAdminUsers(ctx context.Context, arg ListAdminUsersParams) ([]ListAdminUsersRow, error)
 	ListCategoryGroups(ctx context.Context, userID uuid.UUID) ([]CategoryGroup, error)
 	ListCategoryMappings(ctx context.Context, userID uuid.UUID) ([]ListCategoryMappingsRow, error)
 	ListCategoryMappingsByGroup(ctx context.Context, arg ListCategoryMappingsByGroupParams) ([]CategoryMapping, error)

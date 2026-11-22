@@ -78,6 +78,26 @@ type ProfileDTO struct {
 	UserID      string `json:"user_id"`
 	Email       string `json:"email"`
 	DisplayName string `json:"display_name"`
+	IsAdmin     bool   `json:"is_admin"`
+}
+
+// AdminUserDTO is one user's account summary. It deliberately carries no
+// amounts, categories, or individual transactions.
+type AdminUserDTO struct {
+	UserID           string `json:"user_id"`
+	Email            string `json:"email"`
+	DisplayName      string `json:"display_name"`
+	JoinedAt         string `json:"joined_at"`
+	TransactionCount int64  `json:"transaction_count"`
+}
+
+// AdminUsersDTO is one page of users plus totals across all users.
+type AdminUsersDTO struct {
+	Users             []AdminUserDTO `json:"users"`
+	TotalUsers        int64          `json:"total_users"`
+	TotalTransactions int64          `json:"total_transactions"`
+	Limit             int32          `json:"limit"`
+	Offset            int32          `json:"offset"`
 }
 
 type MonthEssentialTotalDTO struct {

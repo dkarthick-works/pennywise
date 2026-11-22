@@ -93,6 +93,11 @@ func (s *Server) Router() http.Handler {
 		pr.Get("/api/profile", s.handleGetProfile)
 		pr.Put("/api/profile", s.handleUpdateProfile)
 
+		pr.Route("/api/admin", func(ar chi.Router) {
+			ar.Use(s.requireAdmin)
+			ar.Get("/users", s.handleAdminListUsers)
+		})
+
 		pr.Get("/api/sms/drafts", s.handleListSMSDrafts)
 		pr.Put("/api/sms/drafts/{id}", s.handleUpdateSMSDraft)
 		pr.Post("/api/sms/drafts/{id}/ignore", s.handleIgnoreSMSDraft)
@@ -226,7 +231,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "could not load user")
 		return
 	}
-	writeJSON(w, http.StatusOK, ProfileDTO{UserID: u.ID.String(), Email: u.Email, DisplayName: u.DisplayName})
+	writeJSON(w, http.StatusOK, profileDTO(u))
 }
 
 func userID(r *http.Request) uuid.UUID {
