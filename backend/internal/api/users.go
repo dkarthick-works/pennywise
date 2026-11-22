@@ -54,13 +54,17 @@ func (s *Server) provisionUser(ctx context.Context, id auth.Identity) error {
 	return tx.Commit(ctx)
 }
 
+func profileDTO(u db.User) ProfileDTO {
+	return ProfileDTO{UserID: u.ID.String(), Email: u.Email, DisplayName: u.DisplayName, IsAdmin: u.IsAdmin}
+}
+
 func (s *Server) handleGetProfile(w http.ResponseWriter, r *http.Request) {
 	u, err := s.q.GetUser(r.Context(), userID(r))
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not load profile")
 		return
 	}
-	writeJSON(w, http.StatusOK, ProfileDTO{UserID: u.ID.String(), Email: u.Email, DisplayName: u.DisplayName})
+	writeJSON(w, http.StatusOK, profileDTO(u))
 }
 
 func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
@@ -79,5 +83,5 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "could not update profile")
 		return
 	}
-	writeJSON(w, http.StatusOK, ProfileDTO{UserID: u.ID.String(), Email: u.Email, DisplayName: u.DisplayName})
+	writeJSON(w, http.StatusOK, profileDTO(u))
 }

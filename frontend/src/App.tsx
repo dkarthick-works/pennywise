@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
+import { RequireAdmin } from "./auth/RequireAdmin";
 import { AppShell } from "./components/layout/AppShell";
 import { AuthPage }      from "./pages/AuthPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
@@ -15,6 +16,7 @@ import { RecordEntryPage } from "./pages/RecordEntryPage";
 import { SettingsPage }  from "./pages/SettingsPage";
 import { SMSDraftsPage } from "./pages/SMSDraftsPage";
 import { ProfilePage }   from "./pages/ProfilePage";
+import { AdminPage } from "./pages/AdminPage";
 import { InsightsPage }  from "./pages/InsightsPage";
 import { CategoriesPage } from "./pages/CategoriesPage";
 import { ImportExportPage } from "./pages/ImportExportPage";
@@ -101,6 +103,7 @@ export default function App() {
                 <Route path="/sms-drafts" element={<SMSDraftsPage />} />
                 <Route path="/settings"  element={<SettingsPage month={month} setMonth={setMonth} />} />
                 <Route path="/profile"   element={<ProfilePage />} />
+                <Route path="/admin"     element={<RequireAdmin><AdminPage /></RequireAdmin>} />
                 <Route path="*"          element={<Navigate to="/record" replace />} />
               </Routes>
             </AppShell>

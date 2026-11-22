@@ -245,6 +245,74 @@ type SettlementLink struct {
 	CreditID     uuid.UUID `json:"credit_id"`
 }
 
+type SmsDevice struct {
+	ID             uuid.UUID          `json:"id"`
+	UserID         uuid.UUID          `json:"user_id"`
+	Label          string             `json:"label"`
+	TokenHash      string             `json:"token_hash"`
+	Enabled        bool               `json:"enabled"`
+	ConsentVersion int64              `json:"consent_version"`
+	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	LastUploadAt   pgtype.Timestamptz `json:"last_upload_at"`
+	LastScanEnd    *int64             `json:"last_scan_end"`
+}
+
+type SmsSenderConfig struct {
+	ID        bool               `json:"id"`
+	Version   int64              `json:"version"`
+	Senders   []string           `json:"senders"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type SmsSuggestion struct {
+	ID                   uuid.UUID          `json:"id"`
+	UserID               uuid.UUID          `json:"user_id"`
+	DeviceID             uuid.UUID          `json:"device_id"`
+	ConsentVersion       int64              `json:"consent_version"`
+	FingerprintVersion   int32              `json:"fingerprint_version"`
+	Fingerprint          string             `json:"fingerprint"`
+	Sender               *string            `json:"sender"`
+	ReceivedAt           *int64             `json:"received_at"`
+	Body                 *string            `json:"body"`
+	AllowlistVersion     int64              `json:"allowlist_version"`
+	Status               string             `json:"status"`
+	Attempts             int32              `json:"attempts"`
+	Result               []byte             `json:"result"`
+	TransactionID        pgtype.UUID        `json:"transaction_id"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	VerificationAttempts int32              `json:"verification_attempts"`
+	ExtractionAttempts   int32              `json:"extraction_attempts"`
+	Verification         []byte             `json:"verification"`
+	VerificationUsage    []byte             `json:"verification_usage"`
+	ExtractionUsage      []byte             `json:"extraction_usage"`
+	ClaimToken           pgtype.UUID        `json:"claim_token"`
+	ClaimedAt            pgtype.Timestamptz `json:"claimed_at"`
+	NextAttemptAt        pgtype.Timestamptz `json:"next_attempt_at"`
+	FailedStage          *string            `json:"failed_stage"`
+	LastErrorCode        *string            `json:"last_error_code"`
+	RejectionReason      *string            `json:"rejection_reason"`
+}
+
+type SmsTransactionDraft struct {
+	ID          uuid.UUID          `json:"id"`
+	UserID      uuid.UUID          `json:"user_id"`
+	SourceSmsID uuid.UUID          `json:"source_sms_id"`
+	Section     *Section           `json:"section"`
+	Category    string             `json:"category"`
+	Amount      pgtype.Numeric     `json:"amount"`
+	TxnDate     pgtype.Date        `json:"txn_date"`
+	Kind        TxnKind            `json:"kind"`
+	Currency    string             `json:"currency"`
+	Direction   string             `json:"direction"`
+	EventType   string             `json:"event_type"`
+	Warnings    []byte             `json:"warnings"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	Revision    int32              `json:"revision"`
+}
+
 type Template struct {
 	ID       uuid.UUID `json:"id"`
 	UserID   uuid.UUID `json:"user_id"`
@@ -281,6 +349,7 @@ type User struct {
 	DisplayName string             `json:"display_name"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	IsAdmin     bool               `json:"is_admin"`
 }
 
 type UserSetting struct {

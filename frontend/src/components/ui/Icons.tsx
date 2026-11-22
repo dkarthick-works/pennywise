@@ -53,6 +53,12 @@ export const IconProfile = (p: IcProps) => (
     <path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" />
   </Ic>
 );
+export const IconAdmin = (p: IcProps) => (
+  <Ic {...p}>
+    <path d="M12 3l7 3v5c0 4.6-2.9 8.2-7 10-4.1-1.8-7-5.4-7-10V6l7-3z" />
+    <path d="M9 12l2 2 4-4" />
+  </Ic>
+);
 export const IconChevL = (p: IcProps) => (
   <Ic {...p}><path d="M15 6l-6 6 6 6" /></Ic>
 );
