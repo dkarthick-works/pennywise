@@ -564,10 +564,3 @@ cross-tab tokens, expired-token recovery, and logout during an in-flight refresh
 Deployers
 should verify production `Set-Cookie` attributes — see
 [backend/README.md § Production refresh-cookie gate](../backend/README.md).
-
-## Analytics
-
-Production builds only (`import.meta.env.PROD`) initialize **Microsoft Clarity**
-in `src/main.tsx` for session recordings and heatmaps. Local `npm run dev` does
-not load Clarity. The project id is hard-coded in source; manage retention and
-masking in the Clarity dashboard, not in this repo.
